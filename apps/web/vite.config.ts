@@ -30,6 +30,9 @@ export default defineConfig({
   // so named imports are available in the browser.
   optimizeDeps: {
     include: ['@headtilts/shared'],
+    esbuildOptions: {
+      target: 'es2020',
+    },
   },
   server: {
     port: 5173, // unified dev entry point
