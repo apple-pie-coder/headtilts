@@ -1,0 +1,15 @@
+$kind: http-request
+name: Update Widget
+method: PUT
+url: '{{baseUrl}}/api/widgets/{{widgetId}}'
+order: 7000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "title": "Updated Widget",
+      "config": {}
+    }

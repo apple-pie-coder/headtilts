@@ -1,0 +1,5 @@
+$kind: http-request
+name: List Sitemap Entries
+method: GET
+url: '{{baseUrl}}/api/sitemap'
+order: 1000

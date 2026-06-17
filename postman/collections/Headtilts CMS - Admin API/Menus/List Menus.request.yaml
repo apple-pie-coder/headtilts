@@ -1,0 +1,5 @@
+$kind: http-request
+name: List Menus
+method: GET
+url: '{{baseUrl}}/api/menus'
+order: 1000

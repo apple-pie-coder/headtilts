@@ -1,0 +1,247 @@
+/* ═══════════════════════════════════════════
+   DESIGN TOKENS — Apple Liquid Glass
+   ═══════════════════════════════════════════ */
+
+:root {
+  /* — Backgrounds — */
+  --bg: #f2f2f7;
+  --surface: rgba(255, 255, 255, 0.72);
+  --surface-raised: rgba(255, 255, 255, 0.86);
+  --surface-overlay: rgba(255, 255, 255, 0.97);
+  --sidebar-bg: rgba(246, 246, 252, 0.9);
+  --header-bg: rgba(252, 252, 255, 0.84);
+
+  /* — Glass — */
+  --glass-blur: blur(24px) saturate(1.8);
+  --glass-border: rgba(255, 255, 255, 0.55);
+  --glass-shine: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+
+  /* — Text — */
+  --t1: #1d1d1f;
+  --t2: #6e6e73;
+  --t3: #aeaeb2;
+
+  /* — Borders — */
+  --border: rgba(0, 0, 0, 0.1);
+  --border-strong: rgba(0, 0, 0, 0.18);
+  --sep: rgba(0, 0, 0, 0.06);
+
+  /* — Accent (Apple blue) — */
+  --accent: #0071e3;
+  --accent-h: #0080ff;
+  --accent-bg: rgba(0, 113, 227, 0.1);
+  --accent-text: #0071e3;
+
+  /* — Danger — */
+  --danger: #ff3b30;
+  --danger-h: #e0342a;
+  --danger-t: #c00523;
+  --danger-bg: rgba(255, 59, 48, 0.1);
+
+  /* — Success — */
+  --success: #34c759;
+  --success-t: #197832;
+  --success-bg: rgba(52, 199, 89, 0.1);
+
+  /* — Warning — */
+  --warning: #ff9500;
+  --warning-t: #a05900;
+  --warning-bg: rgba(255, 149, 0, 0.1);
+
+  /* — Inputs — */
+  --input-bg: rgba(255, 255, 255, 0.9);
+  --input-border: rgba(0, 0, 0, 0.15);
+  --input-ring: 0 0 0 3px rgba(0, 113, 227, 0.2);
+
+  /* — Buttons (ghost/secondary) — */
+  --ghost: rgba(0, 0, 0, 0.05);
+  --ghost-h: rgba(0, 0, 0, 0.09);
+
+  /* — Nav — */
+  --nav-active: rgba(0, 113, 227, 0.1);
+  --nav-hover: rgba(0, 0, 0, 0.04);
+
+  /* — Overlay — */
+  --overlay: rgba(0, 0, 0, 0.45);
+
+  /* — Radii — */
+  --r: 14px;
+  --r-sm: 10px;
+  --r-xs: 8px;
+
+  /* — Transition — */
+  --ease: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme='dark'] {
+  --bg: #000000;
+  --surface: rgba(28, 28, 30, 0.82);
+  --surface-raised: rgba(44, 44, 46, 0.88);
+  --surface-overlay: rgba(44, 44, 46, 0.97);
+  --sidebar-bg: rgba(18, 18, 20, 0.94);
+  --header-bg: rgba(22, 22, 24, 0.88);
+
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-shine: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
+
+  --t1: #f5f5f7;
+  --t2: #aeaeb2;
+  --t3: #48484a;
+
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --sep: rgba(255, 255, 255, 0.06);
+
+  --accent: #0a84ff;
+  --accent-h: #409cff;
+  --accent-bg: rgba(10, 132, 255, 0.15);
+  --accent-text: #0a84ff;
+
+  --danger: #ff453a;
+  --danger-h: #e03d33;
+  --danger-t: #ff6961;
+  --danger-bg: rgba(255, 69, 58, 0.15);
+
+  --success: #30d158;
+  --success-t: #30d158;
+  --success-bg: rgba(48, 209, 88, 0.12);
+
+  --warning: #ffd60a;
+  --warning-t: #ffd60a;
+  --warning-bg: rgba(255, 214, 10, 0.12);
+
+  --input-bg: rgba(58, 58, 60, 0.7);
+  --input-border: rgba(255, 255, 255, 0.12);
+  --input-ring: 0 0 0 3px rgba(10, 132, 255, 0.3);
+
+  --ghost: rgba(255, 255, 255, 0.08);
+  --ghost-h: rgba(255, 255, 255, 0.13);
+
+  --nav-active: rgba(10, 132, 255, 0.15);
+  --nav-hover: rgba(255, 255, 255, 0.05);
+
+  --overlay: rgba(0, 0, 0, 0.65);
+}
+
+/* ═══════════════════════════════════════════
+   RESET & GLOBAL
+   ═══════════════════════════════════════════ */
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue',
+    Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 120% 55% at 8% 0%, rgba(88, 86, 214, 0.07) 0%, transparent 55%),
+    radial-gradient(ellipse 80% 60% at 88% 100%, rgba(0, 120, 255, 0.05) 0%, transparent 55%);
+  background-attachment: fixed;
+  color: var(--t1);
+  transition: background-color var(--ease), color var(--ease);
+}
+
+[data-theme='dark'] body {
+  background-image:
+    radial-gradient(ellipse 120% 55% at 8% 0%, rgba(88, 86, 214, 0.22) 0%, transparent 55%),
+    radial-gradient(ellipse 80% 60% at 88% 100%, rgba(0, 100, 255, 0.14) 0%, transparent 55%);
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--t1);
+}
+
+/* ═══════════════════════════════════════════
+   QUILL EDITOR — DARK MODE OVERRIDES
+   ═══════════════════════════════════════════ */
+
+[data-theme='dark'] .ql-toolbar.ql-snow {
+  background: rgba(44, 44, 46, 0.6);
+  border-color: var(--border) !important;
+}
+
+[data-theme='dark'] .ql-container.ql-snow {
+  border-color: var(--border) !important;
+}
+
+[data-theme='dark'] .ql-editor {
+  color: var(--t1);
+}
+
+[data-theme='dark'] .ql-stroke {
+  stroke: var(--t2) !important;
+}
+
+[data-theme='dark'] .ql-fill {
+  fill: var(--t2) !important;
+}
+
+[data-theme='dark'] .ql-picker-label,
+[data-theme='dark'] .ql-picker-options {
+  color: var(--t1) !important;
+  background: var(--surface-raised) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme='dark'] .ql-toolbar button:hover .ql-stroke,
+[data-theme='dark'] .ql-toolbar button.ql-active .ql-stroke {
+  stroke: var(--accent) !important;
+}
+
+[data-theme='dark'] .ql-toolbar button:hover .ql-fill,
+[data-theme='dark'] .ql-toolbar button.ql-active .ql-fill {
+  fill: var(--accent) !important;
+}
+
+[data-theme='dark'] .ql-snow .ql-tooltip {
+  background: var(--surface-raised);
+  border-color: var(--border);
+  color: var(--t1);
+  box-shadow: var(--glass-shadow);
+}
+
+[data-theme='dark'] .ql-snow .ql-tooltip input {
+  background: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--t1);
+}

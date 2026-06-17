@@ -1,0 +1,26 @@
+$kind: http-request
+name: List Posts
+method: GET
+url: '{{baseUrl}}/api/posts'
+order: 1000
+queryParams:
+  - key: page
+    value: '1'
+  - key: limit
+    value: '10'
+  - key: search
+    value: ''
+  - key: status
+    value: ''
+  - key: type
+    value: post
+  - key: categoryId
+    value: ''
+  - key: authorId
+    value: ''
+  - key: featured
+    value: ''
+  - key: sortBy
+    value: ''
+  - key: sortOrder
+    value: desc

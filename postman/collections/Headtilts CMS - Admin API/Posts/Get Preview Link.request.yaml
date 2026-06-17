@@ -1,0 +1,5 @@
+$kind: http-request
+name: Get Preview Link
+method: GET
+url: '{{baseUrl}}/api/posts/{{postId}}/preview-link'
+order: 3000

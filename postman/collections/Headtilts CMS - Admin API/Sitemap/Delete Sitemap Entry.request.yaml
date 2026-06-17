@@ -1,0 +1,5 @@
+$kind: http-request
+name: Delete Sitemap Entry
+method: DELETE
+url: '{{baseUrl}}/api/sitemap/{{sitemapId}}'
+order: 5000

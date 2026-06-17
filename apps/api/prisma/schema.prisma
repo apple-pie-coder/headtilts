@@ -1,0 +1,499 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ===================== Users & Authentication =====================
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  username      String   @unique
+  password      String
+  firstName     String?
+  lastName      String?
+  avatar        String?
+  bio           String?  @db.Text
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  posts         Post[]
+  coAuthoredPosts PostCoAuthor[]
+  media         Media[]
+  userRoles     UserRole[]
+  sessions      Session[]
+  notifications Notification[]
+  revisions     PostRevision[]
+
+  @@index([email])
+  @@index([username])
+}
+
+model Notification {
+  id        Int       @id @default(autoincrement())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String    // 'comment' | 'contact' | 'post_published' | 'user_registered'
+  title     String
+  body      String?   @db.Text
+  link      String?   // admin route to open, e.g. '/admin/comments'
+  data      Json?     // optional structured payload (entity ids, etc.)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+}
+
+model Session {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token         String    @unique
+  expiresAt     DateTime
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ===================== Roles & Permissions =====================
+
+model Role {
+  id          Int           @id @default(autoincrement())
+  name        String        @unique
+  description String?       @db.Text
+  isSystem    Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  permissions       RolePermission[]
+  userRoles         UserRole[]
+
+  @@index([name])
+}
+
+model Permission {
+  id          Int           @id @default(autoincrement())
+  module      String
+  action      String
+  description String?       @db.Text
+  createdAt   DateTime      @default(now())
+
+  roles       RolePermission[]
+
+  @@unique([module, action])
+  @@index([module])
+}
+
+model RolePermission {
+  id           Int      @id @default(autoincrement())
+  roleId       Int
+  permissionId Int
+  role         Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+}
+
+model UserRole {
+  id     Int  @id @default(autoincrement())
+  userId String
+  roleId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+}
+
+// ===================== Posts & Publishing =====================
+
+model Post {
+  id              Int       @id @default(autoincrement())
+  title           String
+  slug            String    @unique
+  content         String    @db.LongText
+  excerpt         String?   @db.Text
+  type            String    @default("post")
+  parentId        Int?
+  parent          Post?     @relation("PageHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children        Post[]    @relation("PageHierarchy")
+  authorId        String?
+  author          User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  status          String    @default("draft")
+  publishedAt     DateTime?
+  scheduledFor    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  featuredImage   String?
+  template        String?
+  isFeatured      Boolean   @default(false)
+  showSidebar     Boolean   @default(false)
+  commentStatus   String?   // null = inherit site default, "open" / "closed" = per-post override
+
+  metaTitle       String?
+  metaDescription String?
+  metaKeywords    String?
+  canonicalUrl    String?
+  ogTitle         String?
+  ogDescription   String?
+  ogImage         String?
+
+  categories      PostCategory[]
+  tags            PostTag[]
+  coAuthors       PostCoAuthor[]
+  seoMetadata     SeoMetadata?
+  comments        Comment[]
+  revisions       PostRevision[]
+
+  @@index([slug])
+  @@index([status])
+  @@index([type])
+  @@index([parentId])
+  @@index([authorId])
+  @@index([publishedAt])
+  @@index([scheduledFor])
+  @@index([isFeatured])
+}
+
+// ===================== Post Revisions =====================
+
+model PostRevision {
+  id         Int      @id @default(autoincrement())
+  postId     Int
+  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String   // 'created' | 'updated' | 'published' | 'unpublished' | 'scheduled' | 'trashed'
+  changes    Json?    // ChangeEntry[] — { field, label, from?, to?, note? }
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([postId, createdAt])
+  @@index([postId, isArchived])
+}
+
+// ===================== Media Library =====================
+
+model Media {
+  id           Int      @id @default(autoincrement())
+  filename     String
+  originalName String
+  url          String              // delivery version (capped + optionally webp/avif)
+  originalUrl  String?             // untouched source upload
+  mimeType     String
+  size         Int
+  width        Int?                // intrinsic pixel width (images only)
+  height       Int?                // intrinsic pixel height (images only)
+  altText      String?
+  title        String?
+  caption      String?  @db.Text
+  description  String?  @db.Text
+  contentHash  String?             // sha256 of source bytes, for dedup
+  thumbnailUrl String?
+  mediumUrl    String?
+  folderId     Int?
+  folder       MediaFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  uploadedById String?
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+
+  @@index([mimeType])
+  @@index([uploadedById])
+  @@index([contentHash])
+  @@index([folderId])
+}
+
+model MediaFolder {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  media     Media[]
+
+  @@index([slug])
+}
+
+model Comment {
+  id          Int       @id @default(autoincrement())
+  postId      Int
+  post        Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parentId    Int?
+  parent      Comment?  @relation("CommentThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     Comment[] @relation("CommentThread")
+  authorName  String
+  authorEmail String
+  content     String    @db.Text
+  status      String    @default("pending")
+  visitorId   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  reactions   CommentReaction[]
+
+  @@index([postId, status])
+  @@index([status])
+  @@index([parentId])
+  @@index([authorEmail])
+}
+
+model CommentReaction {
+  id        Int      @id @default(autoincrement())
+  commentId Int
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  emoji     String
+  visitorId String
+  createdAt DateTime @default(now())
+
+  @@unique([commentId, emoji, visitorId])
+  @@index([commentId])
+}
+
+model ContactSubmission {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String
+  subject   String?
+  message   String    @db.Text
+  isRead    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model Category {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  slug        String    @unique
+  description String?   @db.Text
+  parentId    Int?
+  icon        String?
+  showSidebar Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  parent      Category? @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Category[] @relation("CategoryHierarchy")
+  posts       PostCategory[]
+
+  @@index([slug])
+  @@index([parentId])
+}
+
+model PostCategory {
+  id         Int      @id @default(autoincrement())
+  postId     Int
+  categoryId Int
+  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, categoryId])
+  @@index([postId])
+  @@index([categoryId])
+}
+
+model Tag {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  slug        String    @unique
+  description String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  posts       PostTag[]
+
+  @@index([slug])
+}
+
+model PostTag {
+  id     Int  @id @default(autoincrement())
+  postId Int
+  tagId  Int
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag    Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, tagId])
+  @@index([postId])
+  @@index([tagId])
+}
+
+model PostCoAuthor {
+  id     Int    @id @default(autoincrement())
+  postId Int
+  userId String
+  order  Int    @default(0)
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([postId])
+  @@index([userId])
+}
+
+// ===================== Menus & Navigation =====================
+
+model Menu {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  location    String    @unique
+  description String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  items       MenuItem[]
+
+  @@index([location])
+}
+
+model MenuItem {
+  id          Int       @id @default(autoincrement())
+  menuId      Int
+  menu        Menu      @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  parentId    Int?
+  title       String
+  url         String?
+  postId      Int?
+  categoryId  Int?
+  tagId       Int?
+  position    Int       @default(0)
+  isVisible   Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  parent      MenuItem? @relation("MenuItemHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    MenuItem[] @relation("MenuItemHierarchy")
+
+  @@index([menuId])
+  @@index([parentId])
+}
+
+// ===================== Widgets & Widget Zones =====================
+
+model Widget {
+  id          Int       @id @default(autoincrement())
+  name        String
+  type        String
+  title       String?
+  description String?   @db.Text
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  settings    WidgetSetting[]
+  zones       WidgetZoneWidget[]
+
+  @@unique([name])
+  @@index([type])
+}
+
+model WidgetZone {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?   @db.Text
+  maxWidgets  Int       @default(10)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  widgets     WidgetZoneWidget[]
+
+  @@index([name])
+}
+
+model WidgetZoneWidget {
+  id       Int    @id @default(autoincrement())
+  zoneId   Int
+  widgetId Int
+  zone     WidgetZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  widget   Widget     @relation(fields: [widgetId], references: [id], onDelete: Cascade)
+  position Int    @default(0)
+
+  @@unique([zoneId, widgetId])
+  @@index([zoneId])
+  @@index([widgetId])
+}
+
+model WidgetSetting {
+  id       Int    @id @default(autoincrement())
+  widgetId Int
+  widget   Widget @relation(fields: [widgetId], references: [id], onDelete: Cascade)
+  key      String
+  value    String @db.LongText
+  type     String
+
+  @@unique([widgetId, key])
+  @@index([widgetId])
+}
+
+// ===================== Settings =====================
+
+model Setting {
+  id      Int     @id @default(autoincrement())
+  key     String  @unique
+  value   String  @db.LongText
+  type    String
+
+  @@index([key])
+}
+
+// ===================== SEO =====================
+
+model SeoMetadata {
+  id              Int     @id @default(autoincrement())
+  postId          Int     @unique
+  post            Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  focusKeyword    String?
+  readabilityScore Int?
+  seoScore        Int?
+
+  @@index([postId])
+}
+
+model Sitemap {
+  id        Int     @id @default(autoincrement())
+  url       String  @unique
+  priority  Float   @default(0.5)
+  changefreq String?
+  lastmod   DateTime?
+
+  @@index([url])
+}
+
+// ===================== Celebrations =====================
+
+// Artist birthdays & remembrances. Recurs annually, so the date is stored as
+// month/day; `year` (optional) is the birth year or year of passing.
+model Celebration {
+  id        Int      @id @default(autoincrement())
+  name      String
+  type      String   // 'birthday' | 'remembrance'
+  month     Int      // 1-12
+  day       Int      // 1-31
+  year      Int?
+  photo     String?  @db.Text
+  message   String?  @db.Text
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([month, day])
+}

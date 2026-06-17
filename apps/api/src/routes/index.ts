@@ -1,0 +1,40 @@
+import { Router, IRouter } from 'express';
+import authRoutes from './auth.routes';
+import userRoutes from './users.routes';
+import roleRoutes from './roles.routes';
+import categoryRoutes from './categories.routes';
+import tagRoutes from './tags.routes';
+import settingRoutes from './settings.routes';
+import postRoutes from './posts.routes';
+import mediaRoutes from './media.routes';
+import dashboardRoutes from './dashboard.routes';
+import menuRoutes from './menus.routes';
+import widgetRoutes from './widgets.routes';
+import sitemapRoutes from './sitemap.routes';
+import contactRoutes from './contact.routes';
+import commentRoutes from './comments.routes';
+import notificationRoutes from './notifications.routes';
+import celebrationRoutes from './celebrations.routes';
+import publicRoutes from './public.routes';
+
+const router: IRouter = Router();
+
+router.use('/auth', authRoutes);
+router.use('/users', userRoutes);
+router.use('/roles', roleRoutes);
+router.use('/categories', categoryRoutes);
+router.use('/tags', tagRoutes);
+router.use('/settings', settingRoutes);
+router.use('/posts', postRoutes);
+router.use('/media', mediaRoutes);
+router.use('/dashboard', dashboardRoutes);
+router.use('/menus', menuRoutes);
+router.use('/widgets', widgetRoutes);
+router.use('/sitemap', sitemapRoutes);
+router.use('/contact-submissions', contactRoutes);
+router.use('/comments', commentRoutes);
+router.use('/notifications', notificationRoutes);
+router.use('/celebrations', celebrationRoutes);
+router.use('/public', publicRoutes);
+
+export default router;

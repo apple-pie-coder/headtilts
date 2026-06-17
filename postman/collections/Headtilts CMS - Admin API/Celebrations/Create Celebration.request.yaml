@@ -1,0 +1,16 @@
+$kind: http-request
+name: Create Celebration
+method: POST
+url: '{{baseUrl}}/api/celebrations'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "title": "New Year",
+      "date": "2026-01-01",
+      "type": "holiday"
+    }

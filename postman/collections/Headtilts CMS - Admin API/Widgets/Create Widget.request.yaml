@@ -1,0 +1,17 @@
+$kind: http-request
+name: Create Widget
+method: POST
+url: '{{baseUrl}}/api/widgets'
+order: 6000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "type": "text",
+      "title": "My Widget",
+      "config": {},
+      "zone": "sidebar"
+    }

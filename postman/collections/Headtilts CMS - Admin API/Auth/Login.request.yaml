@@ -1,0 +1,16 @@
+$kind: http-request
+name: Login
+method: POST
+url: "{{baseUrl}}/api/auth/login"
+order: 4000
+auth:
+  type: noauth
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "identifier": "realnilanjan",
+      "password": "NewHorizons098"
+    }

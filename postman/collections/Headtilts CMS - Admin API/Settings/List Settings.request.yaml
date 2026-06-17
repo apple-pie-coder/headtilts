@@ -1,0 +1,5 @@
+$kind: http-request
+name: List Settings
+method: GET
+url: '{{baseUrl}}/api/settings'
+order: 1000

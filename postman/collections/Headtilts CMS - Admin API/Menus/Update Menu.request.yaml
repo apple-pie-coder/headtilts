@@ -1,0 +1,15 @@
+$kind: http-request
+name: Update Menu
+method: PUT
+url: '{{baseUrl}}/api/menus/{{menuId}}'
+order: 4000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "Updated Menu",
+      "location": "primary"
+    }

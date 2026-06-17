@@ -1,0 +1,45 @@
+$kind: collection
+name: Headtilts CMS - Admin API
+description: Admin API for Headtilts CMS — all endpoints require authentication except the auth bootstrap routes.
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{authToken}}'
+variables:
+  - key: baseUrl
+    value: 'http://localhost:3000'
+  - key: authToken
+    value: ''
+  - key: userId
+    value: ''
+  - key: roleId
+    value: ''
+  - key: postId
+    value: ''
+  - key: revisionId
+    value: ''
+  - key: categoryId
+    value: ''
+  - key: tagId
+    value: ''
+  - key: mediaId
+    value: ''
+  - key: folderId
+    value: ''
+  - key: commentId
+    value: ''
+  - key: menuId
+    value: ''
+  - key: widgetId
+    value: ''
+  - key: zoneName
+    value: ''
+  - key: celebrationId
+    value: ''
+  - key: submissionId
+    value: ''
+  - key: sitemapId
+    value: ''
+  - key: resetToken
+    value: ''

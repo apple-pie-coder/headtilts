@@ -1,0 +1,5 @@
+$kind: http-request
+name: Get Widget
+method: GET
+url: '{{baseUrl}}/api/widgets/{{widgetId}}'
+order: 2000

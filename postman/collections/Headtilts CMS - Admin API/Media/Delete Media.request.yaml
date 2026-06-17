@@ -1,0 +1,5 @@
+$kind: http-request
+name: Delete Media
+method: DELETE
+url: '{{baseUrl}}/api/media/{{mediaId}}'
+order: 6000

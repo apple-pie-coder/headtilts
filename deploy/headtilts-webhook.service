@@ -1,0 +1,24 @@
+[Unit]
+Description=Headtilts auto-deploy webhook
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=flypi
+WorkingDirectory=/home/flypi/headtilts
+
+# ── Fill these in ─────────────────────────────────────────────────────────────
+Environment=WEBHOOK_SECRET=change-me-webhook-secret
+Environment=REPO_DIR=/home/flypi/headtilts
+Environment=DEPLOY_BRANCH=main
+Environment=WEBHOOK_PORT=9000
+Environment=LOG_FILE=/var/log/headtilts-deploy.log
+# COMPOSE_CMD defaults to "docker compose up -d --build"
+
+ExecStart=/usr/bin/python3 /home/flypi/headtilts/deploy/webhook.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

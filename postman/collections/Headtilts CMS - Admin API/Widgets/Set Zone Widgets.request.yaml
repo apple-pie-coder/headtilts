@@ -1,0 +1,14 @@
+$kind: http-request
+name: Set Zone Widgets
+method: PUT
+url: '{{baseUrl}}/api/widgets/zones/{{zoneName}}'
+order: 5000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "widgets": []
+    }

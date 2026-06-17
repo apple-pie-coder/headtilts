@@ -1,0 +1,5 @@
+$kind: http-request
+name: Mark Submission Read
+method: PUT
+url: '{{baseUrl}}/api/contact-submissions/{{submissionId}}/read'
+order: 2000

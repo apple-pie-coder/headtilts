@@ -1,0 +1,10 @@
+$kind: http-request
+name: List Comments
+method: GET
+url: '{{baseUrl}}/api/comments'
+order: 1000
+queryParams:
+  - key: page
+    value: '1'
+  - key: limit
+    value: '10'

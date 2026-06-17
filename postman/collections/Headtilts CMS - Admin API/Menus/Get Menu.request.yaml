@@ -1,0 +1,5 @@
+$kind: http-request
+name: Get Menu
+method: GET
+url: '{{baseUrl}}/api/menus/{{menuId}}'
+order: 2000

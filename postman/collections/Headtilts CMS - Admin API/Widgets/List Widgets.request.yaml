@@ -1,0 +1,5 @@
+$kind: http-request
+name: List Widgets
+method: GET
+url: '{{baseUrl}}/api/widgets'
+order: 1000

@@ -1,0 +1,5 @@
+$kind: http-request
+name: Get Author List
+method: GET
+url: '{{baseUrl}}/api/posts/author-list'
+order: 4000

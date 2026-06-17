@@ -1,0 +1,10 @@
+$kind: http-request
+name: List Media
+method: GET
+url: '{{baseUrl}}/api/media'
+order: 1000
+queryParams:
+  - key: page
+    value: '1'
+  - key: limit
+    value: '20'

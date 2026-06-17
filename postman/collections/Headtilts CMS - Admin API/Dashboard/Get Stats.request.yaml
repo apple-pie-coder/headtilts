@@ -1,0 +1,5 @@
+$kind: http-request
+name: Get Stats
+method: GET
+url: '{{baseUrl}}/api/dashboard/stats'
+order: 1000

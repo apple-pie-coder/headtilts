@@ -1,0 +1,5 @@
+$kind: http-request
+name: List Submissions
+method: GET
+url: '{{baseUrl}}/api/contact-submissions'
+order: 1000

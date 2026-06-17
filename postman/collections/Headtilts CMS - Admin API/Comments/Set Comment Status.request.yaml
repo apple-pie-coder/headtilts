@@ -1,0 +1,14 @@
+$kind: http-request
+name: Set Comment Status
+method: PUT
+url: '{{baseUrl}}/api/comments/{{commentId}}/status'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "status": "approved"
+    }

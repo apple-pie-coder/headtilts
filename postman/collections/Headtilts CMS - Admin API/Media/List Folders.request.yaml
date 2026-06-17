@@ -1,0 +1,5 @@
+$kind: http-request
+name: List Folders
+method: GET
+url: '{{baseUrl}}/api/media/folders'
+order: 7000

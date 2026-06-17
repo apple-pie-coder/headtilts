@@ -1,0 +1,13 @@
+$kind: http-request
+name: Upload Media
+method: POST
+url: '{{baseUrl}}/api/media'
+order: 3000
+description: Upload a file using multipart/form-data. Use the "files" field to attach the file(s) to upload.
+body:
+  type: formdata
+  content:
+    - key: files
+      type: file
+      src: ''
+      description: 'File(s) to upload'

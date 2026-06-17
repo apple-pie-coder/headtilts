@@ -1,0 +1,90 @@
+.panel {
+  background: var(--surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-shine);
+  border-radius: var(--r);
+  padding: 1.5rem;
+  position: sticky;
+  top: 1.5rem;
+}
+
+.panel h3 {
+  margin: 0 0 1.25rem;
+  color: var(--t2);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--sep);
+  padding-bottom: 0.625rem;
+}
+
+.formGroup { margin-bottom: 1rem; }
+
+.formGroup label {
+  display: block;
+  margin-bottom: 0.375rem;
+  font-weight: 600;
+  color: var(--t2);
+  font-size: 0.875rem;
+}
+
+.formGroup input[type='text'],
+.formGroup textarea,
+.formGroup select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--r-sm);
+  font-size: 0.9375rem;
+  color: var(--t1);
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+
+.formGroup input[type='text']:focus,
+.formGroup textarea:focus,
+.formGroup select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--input-ring);
+}
+
+.formGroup textarea { resize: vertical; }
+
+.error {
+  background: var(--danger-bg);
+  color: var(--danger-t);
+  border-left: 3px solid var(--danger);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0 var(--r-xs) var(--r-xs) 0;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.actions button {
+  padding: 0.5rem 1.125rem;
+  border-radius: var(--r-sm);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  border: none;
+  transition: background var(--ease);
+}
+
+.cancelButton { background: var(--ghost); color: var(--t1); }
+.cancelButton:hover { background: var(--ghost-h); }
+
+.saveButton { background: var(--accent); color: #fff; }
+.saveButton:hover:not(:disabled) { background: var(--accent-h); }
+
+.saveButton:disabled,
+.cancelButton:disabled { opacity: 0.55; cursor: not-allowed; }

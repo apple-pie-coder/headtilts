@@ -1,0 +1,1942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Headtilts CMS — Developer Documentation</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --accent: #6c8ef7;
+    --accent2: #a78bfa;
+    --green: #34d399;
+    --yellow: #fbbf24;
+    --red: #f87171;
+    --orange: #fb923c;
+    --cyan: #22d3ee;
+    --text: #e2e8f0;
+    --muted: #8892a4;
+    --heading: #f8fafc;
+    --code-bg: #12151f;
+    --nav-w: 260px;
+    --radius: 8px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.65;
+    display: flex;
+  }
+
+  /* NAV */
+  nav {
+    width: var(--nav-w);
+    min-width: var(--nav-w);
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    overflow-y: auto;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 1.5rem 0 3rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  nav::-webkit-scrollbar { width: 4px; }
+  nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .nav-logo {
+    padding: 0 1.25rem 1.5rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--heading);
+    letter-spacing: -0.02em;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1rem;
+  }
+  .nav-logo span { color: var(--accent); }
+  .nav-section {
+    padding: 0.5rem 1.25rem 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 0.75rem;
+  }
+  nav a {
+    display: block;
+    padding: 0.3rem 1.25rem;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.875rem;
+    border-left: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  nav a:hover { color: var(--text); }
+  nav a.active { color: var(--accent); border-left-color: var(--accent); }
+
+  /* MAIN */
+  main {
+    flex: 1;
+    min-width: 0;
+    padding: 3rem 4rem 6rem;
+    max-width: 960px;
+  }
+  @media (max-width: 900px) {
+    body { flex-direction: column; }
+    nav { width: 100%; height: auto; position: static; }
+    main { padding: 2rem 1.5rem; }
+  }
+
+  /* TYPOGRAPHY */
+  h1 { font-size: 2.25rem; font-weight: 800; color: var(--heading); letter-spacing: -0.03em; margin-bottom: 0.5rem; }
+  h2 { font-size: 1.5rem; font-weight: 700; color: var(--heading); letter-spacing: -0.02em; margin: 3rem 0 1rem; padding-top: 3rem; border-top: 1px solid var(--border); }
+  h2:first-of-type { border-top: none; margin-top: 1.5rem; padding-top: 0; }
+  h3 { font-size: 1.1rem; font-weight: 700; color: var(--heading); margin: 2rem 0 0.75rem; }
+  h4 { font-size: 0.9rem; font-weight: 700; color: var(--accent2); text-transform: uppercase; letter-spacing: 0.05em; margin: 1.5rem 0 0.5rem; }
+  p { margin-bottom: 1rem; color: var(--text); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  ul, ol { padding-left: 1.5rem; margin-bottom: 1rem; }
+  li { margin-bottom: 0.3rem; }
+  strong { color: var(--heading); font-weight: 600; }
+
+  /* CODE */
+  code {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+    font-size: 0.825rem;
+    background: var(--code-bg);
+    color: #93c5fd;
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    overflow-x: auto;
+    margin: 1rem 0 1.5rem;
+    line-height: 1.55;
+  }
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.85rem;
+    color: var(--text);
+  }
+
+  /* BADGES */
+  .badge {
+    display: inline-block;
+    padding: 0.15em 0.55em;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.6;
+  }
+  .badge-get { background: rgba(52,211,153,0.15); color: var(--green); border: 1px solid rgba(52,211,153,0.3); }
+  .badge-post { background: rgba(251,191,36,0.15); color: var(--yellow); border: 1px solid rgba(251,191,36,0.3); }
+  .badge-put { background: rgba(108,142,247,0.15); color: var(--accent); border: 1px solid rgba(108,142,247,0.3); }
+  .badge-patch { background: rgba(167,139,250,0.15); color: var(--accent2); border: 1px solid rgba(167,139,250,0.3); }
+  .badge-delete { background: rgba(248,113,113,0.15); color: var(--red); border: 1px solid rgba(248,113,113,0.3); }
+  .badge-public { background: rgba(34,211,238,0.12); color: var(--cyan); border: 1px solid rgba(34,211,238,0.25); }
+  .badge-auth { background: rgba(251,191,36,0.12); color: var(--yellow); border: 1px solid rgba(251,191,36,0.25); }
+  .badge-perm { background: rgba(251,146,60,0.12); color: var(--orange); border: 1px solid rgba(251,146,60,0.25); }
+
+  /* TABLES */
+  .table-wrap { overflow-x: auto; margin: 1rem 0 2rem; border-radius: var(--radius); border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  thead tr { background: var(--surface2); }
+  th { padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); white-space: nowrap; }
+  td { padding: 0.6rem 1rem; border-top: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* CARDS */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1rem;
+  }
+  .card-title { font-weight: 700; color: var(--heading); margin-bottom: 0.4rem; }
+  .card-desc { color: var(--muted); font-size: 0.875rem; }
+
+  /* ENDPOINT */
+  .endpoint {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .endpoint-path {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--text);
+    flex: 1;
+    min-width: 200px;
+  }
+  .endpoint-desc {
+    font-size: 0.8rem;
+    color: var(--muted);
+    flex-basis: 100%;
+    margin-top: 0.25rem;
+    padding-left: calc(54px + 0.75rem);
+  }
+  .endpoint-meta { display: flex; gap: 0.4rem; flex-shrink: 0; align-items: center; }
+
+  /* ALERT */
+  .alert {
+    padding: 1rem 1.25rem;
+    border-radius: var(--radius);
+    margin: 1.5rem 0;
+    border-left: 3px solid;
+    font-size: 0.9rem;
+  }
+  .alert-info { background: rgba(108,142,247,0.08); border-color: var(--accent); }
+  .alert-warn { background: rgba(251,191,36,0.08); border-color: var(--yellow); color: var(--text); }
+
+  /* HERO */
+  .hero {
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-subtitle { color: var(--muted); font-size: 1.05rem; margin-top: 0.5rem; }
+  .hero-pills { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1.25rem; }
+  .pill {
+    padding: 0.35em 0.85em;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+
+  /* SHORTCODE */
+  .shortcode-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.75rem;
+    margin: 1rem 0 1.5rem;
+  }
+  .shortcode-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+  }
+  .shortcode-key { font-family: monospace; font-size: 0.85rem; color: var(--green); font-weight: 600; }
+  .shortcode-desc { font-size: 0.8rem; color: var(--muted); margin-top: 0.2rem; }
+
+  /* SECTION ANCHOR */
+  section { scroll-margin-top: 2rem; }
+</style>
+</head>
+<body>
+
+<nav id="sidenav">
+  <div class="nav-logo">Headtilts <span>CMS</span></div>
+
+  <div class="nav-section">Overview</div>
+  <a href="#overview">Introduction</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#auth-flow">Auth Flow</a>
+  <a href="#permissions">Permissions &amp; Roles</a>
+
+  <div class="nav-section">Data Models</div>
+  <a href="#model-user">User &amp; Auth</a>
+  <a href="#model-post">Posts</a>
+  <a href="#model-media">Media</a>
+  <a href="#model-taxonomy">Taxonomy</a>
+  <a href="#model-menus">Menus &amp; Widgets</a>
+  <a href="#model-misc">Misc Models</a>
+
+  <div class="nav-section">API Reference</div>
+  <a href="#api-auth">Authentication</a>
+  <a href="#api-posts">Posts</a>
+  <a href="#api-media">Media</a>
+  <a href="#api-users">Users</a>
+  <a href="#api-categories">Categories</a>
+  <a href="#api-tags">Tags</a>
+  <a href="#api-comments">Comments</a>
+  <a href="#api-menus">Menus</a>
+  <a href="#api-widgets">Widgets</a>
+  <a href="#api-roles">Roles</a>
+  <a href="#api-celebrations">Celebrations</a>
+  <a href="#api-settings">Settings</a>
+  <a href="#api-seo">SEO &amp; Sitemap</a>
+  <a href="#api-notifications">Notifications</a>
+  <a href="#api-public">Public Endpoints</a>
+
+  <div class="nav-section">Admin Panel</div>
+  <a href="#admin-pages">Admin Pages</a>
+  <a href="#admin-posteditor">Post Editor</a>
+
+  <div class="nav-section">Public Website</div>
+  <a href="#web-pages">Web Pages</a>
+  <a href="#web-components">Key Components</a>
+
+  <div class="nav-section">Services &amp; Internals</div>
+  <a href="#services">API Services</a>
+  <a href="#middleware">Middleware</a>
+  <a href="#settings">Site Settings</a>
+  <a href="#shortcodes">Shortcodes</a>
+  <a href="#widgets-ref">Widget System</a>
+  <a href="#permalinks">Permalinks</a>
+  <a href="#celebrations-ref">Celebrations Feature</a>
+
+  <div class="nav-section">Operations</div>
+  <a href="#predeploy-checklist">Pre-Deploy Checklist</a>
+  <a href="#docker-overview">Docker Overview</a>
+  <a href="#docker-requirements">Requirements</a>
+  <a href="#docker-setup">First-Time Setup</a>
+  <a href="#docker-port">Choosing a Port</a>
+  <a href="#docker-services">Services Reference</a>
+  <a href="#docker-env">Environment Variables</a>
+  <a href="#docker-seed">Seed &amp; First Login</a>
+  <a href="#docker-commands">Useful Commands</a>
+  <a href="#docker-rebuild">Rebuilding</a>
+  <a href="#docker-domain">Custom Domain / HTTPS</a>
+  <a href="#backup-what">What to Back Up</a>
+  <a href="#backup-commands">Backup Commands</a>
+  <a href="#backup-automate">Automating Backups</a>
+  <a href="#backup-restore">Restore Procedure</a>
+  <a href="#incident-response">Incident Response</a>
+</nav><main>
+
+<!-- HERO -->
+<section id="overview" class="hero">
+  <h1>Headtilts CMS</h1>
+  <p class="hero-subtitle">Full developer reference — APIs, models, admin UI, services, and configuration.</p>
+  <div class="hero-pills">
+    <span class="pill">Node.js + Express</span>
+    <span class="pill">React + Vite</span>
+    <span class="pill">Prisma + MySQL</span>
+    <span class="pill">JWT Auth</span>
+    <span class="pill">RBAC Permissions</span>
+    <span class="pill">pnpm Workspaces</span>
+  </div>
+</section>
+
+<h2 id="architecture">Architecture</h2>
+<p>Headtilts is a monorepo with three apps and a shared package, managed by <strong>pnpm workspaces</strong>.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Package</th><th>Path</th><th>Stack</th><th>Port</th></tr></thead>
+<tbody>
+<tr><td><code>@headtilts/api</code></td><td><code>apps/api</code></td><td>Express · Prisma · MySQL · tsx</td><td>3000</td></tr>
+<tr><td><code>@headtilts/admin</code></td><td><code>apps/admin</code></td><td>React 18 · Vite · CSS Modules</td><td>5173</td></tr>
+<tr><td><code>@headtilts/web</code></td><td><code>apps/web</code></td><td>React 18 · Vite · Global CSS</td><td>5174</td></tr>
+<tr><td><code>@headtilts/shared</code></td><td><code>packages/shared</code></td><td>TypeScript · permissions constants · types</td><td>—</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="alert alert-warn">
+  <strong>No API watch mode.</strong> After any change to <code>apps/api/src/**</code>, restart the API manually:<br>
+  <code>kill $(lsof -nP -iTCP:3000 -sTCP:LISTEN -t) 2&gt;/dev/null; cd apps/api &amp;&amp; nohup node --env-file=../../.env --import tsx/esm src/index.ts &gt; /tmp/headtilts-api.log 2&gt;&amp;1 &amp; disown</code>
+</div>
+
+<h3>Environment Variables</h3>
+<pre><code># apps/api uses a root .env
+DATABASE_URL="mysql://user:pass@localhost:3306/headtilts"
+JWT_SECRET="..."
+JWT_REFRESH_SECRET="..."
+PORT=3000
+
+# Email (optional — if unset, mail is logged to console)
+SMTP_HOST="smtp.example.com"
+SMTP_PORT=587
+SMTP_USER="..."
+SMTP_PASS="..."
+SMTP_FROM="noreply@example.com"</code></pre>
+
+<!-- AUTH FLOW -->
+<h2 id="auth-flow">Auth Flow</h2>
+<p>Headtilts uses a <strong>JWT access + refresh token</strong> scheme. Tokens are stored in <code>localStorage</code> on the client and injected via an Axios interceptor.</p>
+
+<h3>Token Lifecycle</h3>
+<ul>
+  <li><strong>Access token</strong> — 15-minute expiry, signed with <code>JWT_SECRET</code>. Sent as <code>Authorization: Bearer &lt;token&gt;</code>.</li>
+  <li><strong>Refresh token</strong> — 7-day expiry, stored as a hashed <code>Session</code> record in the database. Used to obtain new access tokens silently.</li>
+  <li>On 401, the Axios interceptor calls <code>POST /auth/refresh</code> and retries the original request.</li>
+</ul>
+
+<h3>First-time Setup</h3>
+<p>On a fresh install, <code>GET /auth/setup-status</code> returns <code>{ needsSetup: true }</code>. The admin app redirects to <code>/admin/setup</code> where the first super-admin account is created. After that, the route is permanently disabled.</p>
+
+<h3>Password Reset</h3>
+<ol>
+  <li><code>POST /auth/forgot-password</code> — generates a token, emails a reset link. Silent if email not found.</li>
+  <li><code>POST /auth/reset-password</code> — verifies token (sha256 hash), sets new password, revokes all sessions.</li>
+</ol>
+
+<!-- PERMISSIONS -->
+<h2 id="permissions">Permissions &amp; Roles</h2>
+<p>All permissions are defined in <code>packages/shared/src/constants/permissions.ts</code> as the <code>PERMISSIONS</code> object. Each string follows the format <code>module_action</code>.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>POST_CREATE</td><td><code>posts_create</code></td><td>Create posts and pages</td></tr>
+<tr><td>POST_READ</td><td><code>posts_read</code></td><td>View posts in admin</td></tr>
+<tr><td>POST_EDIT</td><td><code>posts_update</code></td><td>Edit any post</td></tr>
+<tr><td>POST_DELETE</td><td><code>posts_delete</code></td><td>Delete / trash posts</td></tr>
+<tr><td>POST_PUBLISH</td><td><code>posts_publish</code></td><td>Publish / unpublish posts</td></tr>
+<tr><td>MEDIA_UPLOAD</td><td><code>media_create</code></td><td>Upload files</td></tr>
+<tr><td>MEDIA_READ</td><td><code>media_read</code></td><td>Browse media library</td></tr>
+<tr><td>MEDIA_DELETE</td><td><code>media_delete</code></td><td>Delete files</td></tr>
+<tr><td>USER_CREATE</td><td><code>users_create</code></td><td>Create user accounts</td></tr>
+<tr><td>USER_READ</td><td><code>users_read</code></td><td>View user list</td></tr>
+<tr><td>USER_EDIT</td><td><code>users_update</code></td><td>Edit users and assign roles</td></tr>
+<tr><td>USER_DELETE</td><td><code>users_delete</code></td><td>Delete users</td></tr>
+<tr><td>USER_MANAGE_ROLES</td><td><code>users_manage_roles</code></td><td>Assign / revoke roles</td></tr>
+<tr><td>CATEGORY_CREATE/READ/EDIT/DELETE</td><td><code>categories_*</code></td><td>CRUD categories</td></tr>
+<tr><td>TAG_CREATE/READ/EDIT/DELETE</td><td><code>tags_*</code></td><td>CRUD tags</td></tr>
+<tr><td>MENU_CREATE/READ/EDIT/DELETE</td><td><code>menus_*</code></td><td>CRUD menus and items</td></tr>
+<tr><td>WIDGET_CREATE/READ/EDIT/DELETE</td><td><code>widgets_*</code></td><td>CRUD widgets and zones</td></tr>
+<tr><td>ROLE_CREATE/READ/EDIT/DELETE</td><td><code>roles_*</code></td><td>CRUD custom roles</td></tr>
+<tr><td>PERMISSION_READ/MANAGE</td><td><code>permissions_*</code></td><td>View and manage permissions</td></tr>
+<tr><td>COMMENT_READ</td><td><code>comments_read</code></td><td>View comments</td></tr>
+<tr><td>COMMENT_MODERATE</td><td><code>comments_moderate</code></td><td>Approve / spam / delete comments</td></tr>
+<tr><td>SETTING_READ/EDIT</td><td><code>settings_read/update</code></td><td>View / edit site settings</td></tr>
+<tr><td>SEO_READ/EDIT/MANAGE</td><td><code>seo_*</code></td><td>Manage SEO metadata and sitemap</td></tr>
+<tr><td>REVISION_READ</td><td><code>revisions_read</code></td><td>View post revision history</td></tr>
+<tr><td>REVISION_ARCHIVE</td><td><code>revisions_archive</code></td><td>Hide revision entries</td></tr>
+<tr><td>CELEBRATION_CREATE/READ/EDIT/DELETE</td><td><code>celebrations_*</code></td><td>CRUD artist celebrations</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Default Roles</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Role</th><th>Permissions</th></tr></thead>
+<tbody>
+<tr><td><strong>super-admin</strong></td><td>All permissions (granted via <code>Object.values(PERMISSIONS)</code>)</td></tr>
+<tr><td><strong>admin</strong></td><td>All permissions including celebrations, revisions, SEO — cannot manage roles/permissions of other admins</td></tr>
+<tr><td><strong>editor</strong></td><td>POST_CREATE/READ/EDIT/PUBLISH · MEDIA_UPLOAD/READ · CATEGORY_READ · TAG_CREATE/READ/EDIT · COMMENT_READ/MODERATE · REVISION_READ/ARCHIVE · CELEBRATION_READ</td></tr>
+<tr><td><strong>author</strong></td><td>POST_CREATE/READ/EDIT · MEDIA_UPLOAD/READ · CATEGORY_READ · TAG_READ · REVISION_READ</td></tr>
+<tr><td><strong>subscriber</strong></td><td>POST_READ · CATEGORY_READ · TAG_READ</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- API REFERENCE -->
+<h2 id="model-user">Data Models — User &amp; Auth</h2>
+
+<h3>User</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>id</td><td>String (UUID)</td><td>Primary key</td></tr>
+<tr><td>email</td><td>String</td><td>Unique</td></tr>
+<tr><td>username</td><td>String</td><td>Unique, used in author URLs</td></tr>
+<tr><td>password</td><td>String</td><td>bcrypt hash</td></tr>
+<tr><td>firstName / lastName</td><td>String?</td><td>Optional display name parts</td></tr>
+<tr><td>avatar</td><td>String?</td><td>Media URL</td></tr>
+<tr><td>bio</td><td>String?</td><td>Author bio (shown on profile page)</td></tr>
+<tr><td>isActive</td><td>Boolean</td><td>Inactive users cannot log in</td></tr>
+<tr><td>createdAt / updatedAt</td><td>DateTime</td><td>Auto-managed</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Session</h3>
+<p>Stores refresh tokens. One row per active login. Expired and revoked sessions are deleted on logout or password reset.</p>
+
+<h3>PasswordResetToken</h3>
+<p>Token stored as SHA-256 hash. Expires in 1 hour. <code>usedAt</code> set on successful reset to prevent reuse.</p>
+
+<h2 id="model-post">Data Models — Posts</h2>
+
+<h3>Post</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>id</td><td>Int</td><td>Primary key</td></tr>
+<tr><td>title</td><td>String</td><td></td></tr>
+<tr><td>slug</td><td>String</td><td>Unique URL identifier</td></tr>
+<tr><td>content</td><td>LongText</td><td>HTML</td></tr>
+<tr><td>excerpt</td><td>Text?</td><td>Short summary</td></tr>
+<tr><td>type</td><td>"post" | "page"</td><td>Default "post"</td></tr>
+<tr><td>parentId</td><td>Int?</td><td>Parent page (pages only)</td></tr>
+<tr><td>authorId</td><td>String?</td><td>FK → User.id</td></tr>
+<tr><td>status</td><td>String</td><td>"draft" | "published" | "scheduled" | "trash"</td></tr>
+<tr><td>publishedAt</td><td>DateTime?</td><td>Null until first publish</td></tr>
+<tr><td>scheduledFor</td><td>DateTime?</td><td>Cron publishes at this time</td></tr>
+<tr><td>featuredImage</td><td>String?</td><td>URL</td></tr>
+<tr><td>template</td><td>String?</td><td>Custom page template name</td></tr>
+<tr><td>isFeatured</td><td>Boolean</td><td>Highlight in featured sections</td></tr>
+<tr><td>showSidebar</td><td>Boolean</td><td>Show sidebar on this post</td></tr>
+<tr><td>commentStatus</td><td>String?</td><td>null = inherit, "open", "closed"</td></tr>
+<tr><td>metaTitle / metaDescription / metaKeywords</td><td>String?</td><td>SEO fields</td></tr>
+<tr><td>canonicalUrl</td><td>String?</td><td>Override canonical link</td></tr>
+<tr><td>ogTitle / ogDescription / ogImage</td><td>String?</td><td>Open Graph overrides</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>PostRevision</h3>
+<p>Every create/update creates a revision entry. The <code>changes</code> JSON field stores a structured diff: <code>{ field, label, from?, to?, note? }[]</code>. Actions: <code>created</code>, <code>updated</code>, <code>published</code>, <code>unpublished</code>, <code>scheduled</code>, <code>trashed</code>.</p>
+
+<h3>PostCoAuthor</h3>
+<p>Join table for multiple authors. <code>order</code> controls display sequence. Primary author is stored on <code>Post.authorId</code>; co-authors are rows here. Primary author cannot simultaneously be a co-author (enforced on save).</p>
+
+<h2 id="model-media">Data Models — Media</h2>
+<h3>Media</h3>
+<p>Stores file metadata. Physical files are on disk. Generated variants:</p>
+<ul>
+  <li><code>thumbnailUrl</code> — 150×150 crop (configurable)</li>
+  <li><code>mediumUrl</code> — 300px max dimension</li>
+  <li><code>url</code> — optimized/resized main file</li>
+  <li><code>originalUrl</code> — untouched source (preserved when format conversion is on)</li>
+</ul>
+<p><code>contentHash</code> (SHA-256) enables upload deduplication. <code>mimeType</code> validated against <code>upload_allowed_mime</code> setting.</p>
+
+<h2 id="model-taxonomy">Data Models — Taxonomy</h2>
+<h3>Category</h3>
+<p>Hierarchical. <code>parentId</code> for nested categories. <code>icon</code> stores a Font Awesome class string. <code>showSidebar</code> controls sidebar widget display.</p>
+
+<h3>Tag</h3>
+<p>Flat taxonomy. Tags are created on-the-fly from <code>tagNames[]</code> in the post save flow.</p>
+
+<h2 id="model-menus">Data Models — Menus &amp; Widgets</h2>
+<h3>Menu / MenuItem</h3>
+<p>A menu has a unique <code>location</code> (e.g., "primary"). Items can link to: a custom URL, a Post, a Category, or a Tag. Items are nested via <code>parentId</code> and ordered by <code>position</code>.</p>
+
+<h3>Widget / WidgetZone</h3>
+<p>Widgets are reusable content blocks. A zone is a named slot on the frontend (e.g., "sidebar"). Many widgets can be assigned to one zone via <code>WidgetZoneWidget</code>. Widget config is key-value pairs stored in <code>WidgetSetting</code>.</p>
+
+<h2 id="model-misc">Data Models — Miscellaneous</h2>
+<h3>Notification</h3>
+<p>User-specific notifications. <code>readAt</code> is null when unread. Indexed on <code>(userId, readAt)</code> for fast unread queries.</p>
+
+<h3>Comment / CommentReaction</h3>
+<p>Comments are threaded via <code>parentId</code>. <code>visitorId</code> is a client-generated anonymous identifier. Reactions are unique per (comment, emoji, visitorId) and toggle on repeat submission.</p>
+
+<h3>Celebration</h3>
+<p>Annual events stored by month/day (no year in the date). <code>year</code> is the birth year or year of passing — optional. Indexed on <code>(month, day)</code> for fast daily queries.</p>
+
+<h3>Sitemap / SeoMetadata</h3>
+<p><code>Sitemap</code> holds manual entries. The XML generator combines these with auto-discovered posts/pages/categories/tags. <code>SeoMetadata</code> stores Yoast-style readability and SEO scores per post.</p>
+
+<!-- ADMIN PANEL -->
+<h2 id="api-auth">API — Authentication</h2>
+<p>Base path: <code>/auth</code> · All endpoints are rate-limited (20 req / 15 min per IP for auth routes).</p>
+
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/auth/setup-status</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Returns <code>{ needsSetup: boolean }</code>. If true, no users exist and the setup flow is active.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/auth/setup</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Create the first super-admin account. Disabled after first user exists. Body: <code>{ email, username, password, firstName?, lastName? }</code></div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/auth/register</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Register a new user with the subscriber role. Body: <code>{ email, username, password, firstName?, lastName? }</code></div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/auth/login</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Authenticate. Body: <code>{ identifier, password }</code> (identifier = email or username). Returns <code>{ accessToken, refreshToken, user }</code>.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/auth/refresh</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Exchange refresh token for a new access token. Body: <code>{ refreshToken }</code>.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/auth/logout</span><div class="endpoint-meta"><span class="badge badge-auth">Auth</span></div><div class="endpoint-desc">Revoke current session. Body: <code>{ refreshToken }</code>.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/auth/me</span><div class="endpoint-meta"><span class="badge badge-auth">Auth</span></div><div class="endpoint-desc">Returns current user profile with roles and all resolved permissions.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/auth/forgot-password</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Request a password reset email. Body: <code>{ email }</code>. Always returns 200 (does not reveal whether email exists).</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/auth/reset-password</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Complete password reset. Body: <code>{ token, password }</code>. Token from email link. Revokes all sessions on success.</div></div>
+
+<h2 id="api-posts">API — Posts</h2>
+<p>Base path: <code>/posts</code> · All endpoints require authentication.</p>
+
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/posts</span><div class="endpoint-meta"><span class="badge badge-perm">POST_READ</span></div><div class="endpoint-desc">List posts with pagination. Query: <code>page, limit, status, search, categoryId, authorId, featured, type, sortBy, sortOrder</code>. Returns paginated list + <code>statusCounts</code>.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/posts/author-list</span><div class="endpoint-meta"><span class="badge badge-perm">POST_EDIT</span></div><div class="endpoint-desc">Get simplified list of all active users for the author selector. Returns <code>{ id, username, firstName, lastName, avatar }[]</code>.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/posts/:id</span><div class="endpoint-meta"><span class="badge badge-perm">POST_READ</span></div><div class="endpoint-desc">Get single post with all relations: author, coAuthors, categories, tags, revisions, SEO metadata.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/posts/:id/preview-link</span><div class="endpoint-meta"><span class="badge badge-perm">POST_READ</span></div><div class="endpoint-desc">Generate a signed time-limited preview URL for a draft or scheduled post. Expires in 1 hour.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/posts/:postId/revisions</span><div class="endpoint-meta"><span class="badge badge-perm">REVISION_READ</span></div><div class="endpoint-desc">List revision history for a post. Each revision includes action, changes diff, user, and timestamp.</div></div>
+<div class="endpoint"><span class="badge badge-patch">PATCH</span><span class="endpoint-path">/posts/:postId/revisions/:id/archive</span><div class="endpoint-meta"><span class="badge badge-perm">REVISION_ARCHIVE</span></div><div class="endpoint-desc">Toggle <code>isArchived</code> on a revision entry to hide it from the history list.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/posts</span><div class="endpoint-meta"><span class="badge badge-perm">POST_CREATE</span></div><div class="endpoint-desc">Create a post or page. See Post Input below.</div></div>
+<div class="endpoint"><span class="badge badge-put">PUT</span><span class="endpoint-path">/posts/:id</span><div class="endpoint-meta"><span class="badge badge-perm">POST_EDIT</span></div><div class="endpoint-desc">Update a post. Partial updates accepted. Tracks changes and records a revision entry.</div></div>
+<div class="endpoint"><span class="badge badge-delete">DELETE</span><span class="endpoint-path">/posts/:id</span><div class="endpoint-meta"><span class="badge badge-perm">POST_DELETE</span></div><div class="endpoint-desc">Soft-delete: moves post to <code>trash</code> status.</div></div>
+
+<h4>Post Input Fields</h4>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>title</td><td>string (required)</td><td>Post title</td></tr>
+<tr><td>slug</td><td>string</td><td>URL slug (auto-generated from title if omitted)</td></tr>
+<tr><td>content</td><td>string</td><td>HTML content (LongText)</td></tr>
+<tr><td>excerpt</td><td>string | null</td><td>Short summary</td></tr>
+<tr><td>type</td><td>"post" | "page"</td><td>Content type, default "post"</td></tr>
+<tr><td>parentId</td><td>number | null</td><td>Parent page ID (for page hierarchy)</td></tr>
+<tr><td>status</td><td>"draft" | "published" | "scheduled" | "trash"</td><td>Publication status</td></tr>
+<tr><td>scheduledFor</td><td>ISO datetime | null</td><td>Publish automatically at this time</td></tr>
+<tr><td>featuredImage</td><td>string</td><td>Media URL for hero image</td></tr>
+<tr><td>template</td><td>string | null</td><td>Custom page template name</td></tr>
+<tr><td>isFeatured</td><td>boolean</td><td>Mark as featured post</td></tr>
+<tr><td>showSidebar</td><td>boolean</td><td>Show sidebar on this post/page</td></tr>
+<tr><td>commentStatus</td><td>"open" | "closed" | null</td><td>Override site default; null = inherit</td></tr>
+<tr><td>authorId</td><td>string | null</td><td>UUID of primary author (User.id)</td></tr>
+<tr><td>coAuthorIds</td><td>string[]</td><td>Array of User UUIDs for co-authors (ordered)</td></tr>
+<tr><td>categoryIds</td><td>number[]</td><td>Category IDs to assign</td></tr>
+<tr><td>tagNames</td><td>string[]</td><td>Tag names (created if they don't exist)</td></tr>
+<tr><td>metaTitle, metaDescription, metaKeywords</td><td>string</td><td>SEO meta fields</td></tr>
+<tr><td>canonicalUrl</td><td>string</td><td>Override canonical URL</td></tr>
+<tr><td>ogTitle, ogDescription, ogImage</td><td>string</td><td>Open Graph overrides</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="api-media">API — Media</h2>
+<p>Base path: <code>/media</code> · All endpoints require authentication.</p>
+
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/media</span><div class="endpoint-meta"><span class="badge badge-perm">MEDIA_READ</span></div><div class="endpoint-desc">List files with pagination. Query: <code>page, limit, search, folderId, mimeType</code>.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/media/upload-config</span><div class="endpoint-meta"><span class="badge badge-perm">MEDIA_READ</span></div><div class="endpoint-desc">Returns <code>{ maxUploadSize, allowedMimeTypes[] }</code> for client-side validation before upload.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/media/folders</span><div class="endpoint-meta"><span class="badge badge-perm">MEDIA_READ</span></div><div class="endpoint-desc">List all media folders.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/media/folders</span><div class="endpoint-meta"><span class="badge badge-perm">MEDIA_UPLOAD</span></div><div class="endpoint-desc">Create a folder. Body: <code>{ name }</code>.</div></div>
+<div class="endpoint"><span class="badge badge-delete">DELETE</span><span class="endpoint-path">/media/folders/:id</span><div class="endpoint-meta"><span class="badge badge-perm">MEDIA_DELETE</span></div><div class="endpoint-desc">Delete a folder (files inside are moved to root).</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/media</span><div class="endpoint-meta"><span class="badge badge-perm">MEDIA_UPLOAD</span></div><div class="endpoint-desc">Upload one or more images. <code>multipart/form-data</code>. Fields: <code>files[]</code>, <code>folderId?</code>. Generates thumbnails (150px), medium (300px), and optimized variants based on <code>media_format</code> setting.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/media/:id</span><div class="endpoint-meta"><span class="badge badge-perm">MEDIA_READ</span></div><div class="endpoint-desc">Get single file with all metadata.</div></div>
+<div class="endpoint"><span class="badge badge-put">PUT</span><span class="endpoint-path">/media/:id</span><div class="endpoint-meta"><span class="badge badge-perm">MEDIA_UPLOAD</span></div><div class="endpoint-desc">Update file metadata. Body: <code>{ altText?, title?, caption?, description?, folderId? }</code>.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/media/:id/replace</span><div class="endpoint-meta"><span class="badge badge-perm">MEDIA_UPLOAD</span></div><div class="endpoint-desc">Replace existing image with a new upload. Preserves ID and metadata. <code>multipart/form-data</code>.</div></div>
+<div class="endpoint"><span class="badge badge-delete">DELETE</span><span class="endpoint-path">/media/:id</span><div class="endpoint-meta"><span class="badge badge-perm">MEDIA_DELETE</span></div><div class="endpoint-desc">Delete a single file and its generated variants.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/media/bulk-delete</span><div class="endpoint-meta"><span class="badge badge-perm">MEDIA_DELETE</span></div><div class="endpoint-desc">Delete multiple files. Body: <code>{ ids: number[] }</code>.</div></div>
+
+<h2 id="api-users">API — Users</h2>
+<p>Base path: <code>/users</code> · All endpoints require authentication.</p>
+
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/users/me</span><div class="endpoint-meta"><span class="badge badge-auth">Auth</span></div><div class="endpoint-desc">Get the currently authenticated user's profile.</div></div>
+<div class="endpoint"><span class="badge badge-put">PUT</span><span class="endpoint-path">/users/me</span><div class="endpoint-meta"><span class="badge badge-auth">Auth</span></div><div class="endpoint-desc">Update own profile. Body: <code>{ firstName?, lastName?, email?, password?, avatar?, bio? }</code>.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/users</span><div class="endpoint-meta"><span class="badge badge-perm">USER_READ</span></div><div class="endpoint-desc">List users. Query: <code>page, limit, search</code>.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/users/:id</span><div class="endpoint-meta"><span class="badge badge-perm">USER_READ</span></div><div class="endpoint-desc">Get user with roles and resolved permissions.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/users</span><div class="endpoint-meta"><span class="badge badge-perm">USER_CREATE</span></div><div class="endpoint-desc">Create a user. Body: <code>{ email, username, password, firstName?, lastName?, roleIds?, isActive? }</code>.</div></div>
+<div class="endpoint"><span class="badge badge-put">PUT</span><span class="endpoint-path">/users/:id</span><div class="endpoint-meta"><span class="badge badge-perm">USER_EDIT</span></div><div class="endpoint-desc">Update user. Can assign roles by passing <code>roleIds[]</code>. Triggers notification if newly registered user is activated.</div></div>
+<div class="endpoint"><span class="badge badge-delete">DELETE</span><span class="endpoint-path">/users/:id</span><div class="endpoint-meta"><span class="badge badge-perm">USER_DELETE</span></div><div class="endpoint-desc">Delete user. Cannot delete yourself or the last super-admin.</div></div>
+
+<h2 id="api-categories">API — Categories</h2>
+<p>Base path: <code>/categories</code> · All endpoints require authentication.</p>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/categories</span><div class="endpoint-meta"><span class="badge badge-perm">CATEGORY_READ</span></div><div class="endpoint-desc">List categories. Query: <code>page, limit, search</code>. Includes parent category info.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/categories/:id</span><div class="endpoint-meta"><span class="badge badge-perm">CATEGORY_READ</span></div><div class="endpoint-desc">Get single category.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/categories</span><div class="endpoint-meta"><span class="badge badge-perm">CATEGORY_CREATE</span></div><div class="endpoint-desc">Create. Body: <code>{ name, slug?, description?, parentId?, icon?, showSidebar? }</code>.</div></div>
+<div class="endpoint"><span class="badge badge-put">PUT</span><span class="endpoint-path">/categories/:id</span><div class="endpoint-meta"><span class="badge badge-perm">CATEGORY_EDIT</span></div><div class="endpoint-desc">Update category.</div></div>
+<div class="endpoint"><span class="badge badge-delete">DELETE</span><span class="endpoint-path">/categories/:id</span><div class="endpoint-meta"><span class="badge badge-perm">CATEGORY_DELETE</span></div><div class="endpoint-desc">Delete category (posts are unlinked, not deleted).</div></div>
+
+<h2 id="api-tags">API — Tags</h2>
+<p>Base path: <code>/tags</code> · All endpoints require authentication.</p>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/tags</span><div class="endpoint-meta"><span class="badge badge-perm">TAG_READ</span></div><div class="endpoint-desc">List tags with pagination and search.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/tags/:id</span><div class="endpoint-meta"><span class="badge badge-perm">TAG_READ</span></div><div class="endpoint-desc">Get single tag.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/tags</span><div class="endpoint-meta"><span class="badge badge-perm">TAG_CREATE</span></div><div class="endpoint-desc">Create tag. Body: <code>{ name, slug?, description? }</code>.</div></div>
+<div class="endpoint"><span class="badge badge-put">PUT</span><span class="endpoint-path">/tags/:id</span><div class="endpoint-meta"><span class="badge badge-perm">TAG_EDIT</span></div><div class="endpoint-desc">Update tag.</div></div>
+<div class="endpoint"><span class="badge badge-delete">DELETE</span><span class="endpoint-path">/tags/:id</span><div class="endpoint-meta"><span class="badge badge-perm">TAG_DELETE</span></div><div class="endpoint-desc">Delete tag (posts are unlinked).</div></div>
+
+<h2 id="api-comments">API — Comments</h2>
+<p>Base path: <code>/comments</code> · All endpoints require authentication.</p>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/comments</span><div class="endpoint-meta"><span class="badge badge-perm">COMMENT_READ</span></div><div class="endpoint-desc">List comments for moderation. Query: <code>page, limit, status, postId</code>.</div></div>
+<div class="endpoint"><span class="badge badge-put">PUT</span><span class="endpoint-path">/comments/:id/status</span><div class="endpoint-meta"><span class="badge badge-perm">COMMENT_MODERATE</span></div><div class="endpoint-desc">Change comment status. Body: <code>{ status: "pending" | "approved" | "spam" | "trash" }</code>.</div></div>
+<div class="endpoint"><span class="badge badge-delete">DELETE</span><span class="endpoint-path">/comments/:id</span><div class="endpoint-meta"><span class="badge badge-perm">COMMENT_MODERATE</span></div><div class="endpoint-desc">Permanently delete a comment and its replies.</div></div>
+
+<h2 id="api-menus">API — Menus</h2>
+<p>Base path: <code>/menus</code> · All endpoints require authentication.</p>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/menus</span><div class="endpoint-meta"><span class="badge badge-perm">MENU_READ</span></div><div class="endpoint-desc">List all menus with item counts.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/menus/:id</span><div class="endpoint-meta"><span class="badge badge-perm">MENU_READ</span></div><div class="endpoint-desc">Get menu with all items and nested structure.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/menus</span><div class="endpoint-meta"><span class="badge badge-perm">MENU_CREATE</span></div><div class="endpoint-desc">Create menu. Body: <code>{ name, location, description? }</code>. Location must be unique (e.g., "primary", "footer").</div></div>
+<div class="endpoint"><span class="badge badge-put">PUT</span><span class="endpoint-path">/menus/:id</span><div class="endpoint-meta"><span class="badge badge-perm">MENU_EDIT</span></div><div class="endpoint-desc">Update menu name, location, or description.</div></div>
+<div class="endpoint"><span class="badge badge-put">PUT</span><span class="endpoint-path">/menus/:id/items</span><div class="endpoint-meta"><span class="badge badge-perm">MENU_EDIT</span></div><div class="endpoint-desc">Rebuild entire menu item structure. Replaces all items. Body: <code>{ items: MenuItem[] }</code> (nested array).</div></div>
+<div class="endpoint"><span class="badge badge-delete">DELETE</span><span class="endpoint-path">/menus/:id</span><div class="endpoint-meta"><span class="badge badge-perm">MENU_DELETE</span></div><div class="endpoint-desc">Delete menu and all its items.</div></div>
+
+<h2 id="api-widgets">API — Widgets</h2>
+<p>Base path: <code>/widgets</code> · All endpoints require authentication.</p>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/widgets/types</span><div class="endpoint-meta"><span class="badge badge-perm">WIDGET_READ</span></div><div class="endpoint-desc">List available widget type definitions (value + label).</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/widgets/zones</span><div class="endpoint-meta"><span class="badge badge-perm">WIDGET_READ</span></div><div class="endpoint-desc">List all zones with their currently assigned widgets (ordered).</div></div>
+<div class="endpoint"><span class="badge badge-put">PUT</span><span class="endpoint-path">/widgets/zones/:name</span><div class="endpoint-meta"><span class="badge badge-perm">WIDGET_EDIT</span></div><div class="endpoint-desc">Assign widgets to zone. Body: <code>{ widgetIds: number[] }</code> (order determines position).</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/widgets</span><div class="endpoint-meta"><span class="badge badge-perm">WIDGET_READ</span></div><div class="endpoint-desc">List all widgets with config.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/widgets</span><div class="endpoint-meta"><span class="badge badge-perm">WIDGET_CREATE</span></div><div class="endpoint-desc">Create widget. Body: <code>{ name, type, title?, config? }</code>.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/widgets/:id</span><div class="endpoint-meta"><span class="badge badge-perm">WIDGET_READ</span></div><div class="endpoint-desc">Get single widget with config.</div></div>
+<div class="endpoint"><span class="badge badge-put">PUT</span><span class="endpoint-path">/widgets/:id</span><div class="endpoint-meta"><span class="badge badge-perm">WIDGET_EDIT</span></div><div class="endpoint-desc">Update widget. Body: <code>{ name?, title?, isActive?, config? }</code>.</div></div>
+<div class="endpoint"><span class="badge badge-delete">DELETE</span><span class="endpoint-path">/widgets/:id</span><div class="endpoint-meta"><span class="badge badge-perm">WIDGET_DELETE</span></div><div class="endpoint-desc">Delete widget (removed from all zones).</div></div>
+
+<h2 id="api-roles">API — Roles</h2>
+<p>Base path: <code>/roles</code> · All endpoints require authentication.</p>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/roles</span><div class="endpoint-meta"><span class="badge badge-perm">USER_READ</span></div><div class="endpoint-desc">List all roles with permission counts.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/roles/permissions</span><div class="endpoint-meta"><span class="badge badge-perm">PERMISSION_READ</span></div><div class="endpoint-desc">List all available permissions grouped by module.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/roles/:id</span><div class="endpoint-meta"><span class="badge badge-perm">ROLE_READ</span></div><div class="endpoint-desc">Get role with its assigned permissions.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/roles</span><div class="endpoint-meta"><span class="badge badge-perm">ROLE_CREATE</span></div><div class="endpoint-desc">Create a custom role. Body: <code>{ name, description?, permissionIds?: number[] }</code>.</div></div>
+<div class="endpoint"><span class="badge badge-put">PUT</span><span class="endpoint-path">/roles/:id</span><div class="endpoint-meta"><span class="badge badge-perm">ROLE_EDIT</span></div><div class="endpoint-desc">Update role. Cannot modify system roles (super-admin, admin, editor, author, subscriber).</div></div>
+<div class="endpoint"><span class="badge badge-delete">DELETE</span><span class="endpoint-path">/roles/:id</span><div class="endpoint-meta"><span class="badge badge-perm">ROLE_DELETE</span></div><div class="endpoint-desc">Delete custom role. Cannot delete system roles.</div></div>
+
+<h2 id="api-celebrations">API — Celebrations</h2>
+<p>Base path: <code>/celebrations</code> · All endpoints require authentication.</p>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/celebrations</span><div class="endpoint-meta"><span class="badge badge-perm">CELEBRATION_READ</span></div><div class="endpoint-desc">List celebrations with pagination. Query: <code>page, limit, search, type</code>.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/celebrations/:id</span><div class="endpoint-meta"><span class="badge badge-perm">CELEBRATION_READ</span></div><div class="endpoint-desc">Get single celebration.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/celebrations</span><div class="endpoint-meta"><span class="badge badge-perm">CELEBRATION_CREATE</span></div><div class="endpoint-desc">Create. Body: <code>{ name, type, month, day, year?, photo?, message?, isActive? }</code>.</div></div>
+<div class="endpoint"><span class="badge badge-put">PUT</span><span class="endpoint-path">/celebrations/:id</span><div class="endpoint-meta"><span class="badge badge-perm">CELEBRATION_EDIT</span></div><div class="endpoint-desc">Update celebration.</div></div>
+<div class="endpoint"><span class="badge badge-delete">DELETE</span><span class="endpoint-path">/celebrations/:id</span><div class="endpoint-meta"><span class="badge badge-perm">CELEBRATION_DELETE</span></div><div class="endpoint-desc">Delete celebration.</div></div>
+
+<h2 id="api-settings">API — Settings</h2>
+<p>Base path: <code>/settings</code> · Requires authentication.</p>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/settings</span><div class="endpoint-meta"><span class="badge badge-perm">SETTING_READ</span></div><div class="endpoint-desc">Returns all settings as a flat array of <code>{ key, value, type }</code> objects.</div></div>
+<div class="endpoint"><span class="badge badge-put">PUT</span><span class="endpoint-path">/settings</span><div class="endpoint-meta"><span class="badge badge-perm">SETTING_EDIT</span></div><div class="endpoint-desc">Bulk upsert settings. Body: <code>{ updates: { key: string, value: string }[] }</code>.</div></div>
+
+<h2 id="api-seo">API — SEO &amp; Sitemap</h2>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/sitemap/xml</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Generate and serve <code>sitemap.xml</code>. Includes all published posts, pages, categories, tags, and manual entries.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/sitemap</span><div class="endpoint-meta"><span class="badge badge-perm">SEO_READ</span></div><div class="endpoint-desc">List manual sitemap entries.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/sitemap</span><div class="endpoint-meta"><span class="badge badge-perm">SEO_MANAGE</span></div><div class="endpoint-desc">Add a manual entry. Body: <code>{ url, priority?, changefreq?, lastmod? }</code>.</div></div>
+<div class="endpoint"><span class="badge badge-put">PUT</span><span class="endpoint-path">/sitemap/:id</span><div class="endpoint-meta"><span class="badge badge-perm">SEO_MANAGE</span></div><div class="endpoint-desc">Update manual entry.</div></div>
+<div class="endpoint"><span class="badge badge-delete">DELETE</span><span class="endpoint-path">/sitemap/:id</span><div class="endpoint-meta"><span class="badge badge-perm">SEO_MANAGE</span></div><div class="endpoint-desc">Delete manual entry.</div></div>
+
+<h2 id="api-notifications">API — Notifications</h2>
+<p>Base path: <code>/notifications</code> · All endpoints require authentication. Notifications are user-specific and real-time (SSE).</p>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/notifications</span><div class="endpoint-meta"><span class="badge badge-auth">Auth</span></div><div class="endpoint-desc">Get current user's notifications. Cursor-based pagination. Query: <code>cursor?, limit</code>.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/notifications/unread-count</span><div class="endpoint-meta"><span class="badge badge-auth">Auth</span></div><div class="endpoint-desc">Returns <code>{ count: number }</code> of unread notifications.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/notifications/read-all</span><div class="endpoint-meta"><span class="badge badge-auth">Auth</span></div><div class="endpoint-desc">Mark all user notifications as read.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/notifications/mark-read</span><div class="endpoint-meta"><span class="badge badge-auth">Auth</span></div><div class="endpoint-desc">Mark specific notifications as read. Body: <code>{ ids: number[] }</code>.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/notifications/mark-unread</span><div class="endpoint-meta"><span class="badge badge-auth">Auth</span></div><div class="endpoint-desc">Mark specific notifications as unread. Body: <code>{ ids: number[] }</code>.</div></div>
+
+<h4>Notification Types</h4>
+<ul>
+  <li><code>comment</code> — new comment submitted on a post</li>
+  <li><code>contact</code> — new contact form submission</li>
+  <li><code>post_published</code> — scheduled post published automatically</li>
+  <li><code>user_registered</code> — new user registered</li>
+</ul>
+
+<h2 id="api-public">API — Public Endpoints</h2>
+<p>Base path: <code>/public</code> · No authentication required.</p>
+
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/site-settings</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Returns a safe subset of settings for the frontend: site title, tagline, logo, logo_dark, timezone, date_format, time_format, week_starts_on, front_page_display, front_page_id, posts_page_id, contact_page_id, about_page_id, permalink_structure, show_tagline, default_comment_status, require_name_email_for_comments, show_avatars.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/posts</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">List published posts. Query: <code>page, limit, search, categorySlug, tagSlug, featured, dateFrom, dateTo, authorId, sortBy, sortOrder</code>.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/posts/:slug</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Get full published post by slug. Returns post with author, coAuthors, categories, tags, SEO fields.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/pages/:slug</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Get published page by slug.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/categories</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">List all categories with published post counts and parent info.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/tags</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">List all tags with published post counts.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/menus/:location</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Get menu by location (e.g., "primary", "footer") with items and resolved URLs.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/public/contact</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Submit contact form. Body: <code>{ name, email, subject?, message }</code>. Rate-limited. Sends notification to settings admins.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/feed</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">RSS 2.0 XML feed. Returns latest <code>posts_per_rss</code> posts with full or excerpt content (based on <code>rss_content</code> setting).</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/preview/:id?token=&amp;exp=</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">View a draft or scheduled post via a signed preview link. Token expires in 1 hour (generated by admin).</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/calendar?year=&amp;month=</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Calendar widget data. Returns days array with <code>{ day, count }</code> of published posts per day in the given month.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/resolve?path=/2026/06/my-post</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Resolve a permalink-structured URL to a post. Used by the web frontend catch-all route to support custom permalink structures.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/posts/:slug/comments</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">List approved comments on a post with reply threading and emoji reaction counts. Query: <code>visitorId</code> (to show which reactions the visitor already made).</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/public/posts/:slug/comments</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Submit a comment. Body: <code>{ authorName, authorEmail, content, parentId? }</code>. Rate-limited: 10 per minute per IP. Status depends on <code>moderate_first_comment</code> and <code>comment_moderation</code> settings.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/public/comments/:id/reactions</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Toggle an emoji reaction on a comment. Body: <code>{ emoji, visitorId }</code>. Rate-limited.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/authors/:username</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Author profile page data. Returns user bio/avatar + paginated posts where they are primary author or co-author.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/celebrations/today</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Returns <code>{ date: "YYYY-MM-DD", items: Celebration[] }</code> for active celebrations today (using site timezone setting).</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/widgets/:zone</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Get rendered widget data for a zone (e.g., "sidebar", "footer-1"). Returns ordered array of widget configs with resolved data.</div></div>
+
+<!-- DATA MODELS -->
+<h2 id="admin-pages">Admin Panel — Pages</h2>
+<p>Admin app runs at <code>http://localhost:5173</code>. All routes under <code>/admin</code> require authentication except login/setup.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Page</th><th>Route</th><th>Permission</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td>Dashboard</td><td>/admin</td><td>—</td><td>Stats overview, recent posts/media/comments/users, upcoming celebrations</td></tr>
+<tr><td>Login</td><td>/admin/login</td><td>—</td><td>Email or username + password login form</td></tr>
+<tr><td>Setup</td><td>/admin/setup</td><td>—</td><td>First-time super-admin creation (disabled after any user exists)</td></tr>
+<tr><td>Profile</td><td>/admin/profile</td><td>—</td><td>Edit own name, email, password, avatar, bio</td></tr>
+<tr><td>Posts</td><td>/admin/posts</td><td>POST_READ</td><td>Post list with status tabs (all/draft/published/scheduled/trash), search, delete</td></tr>
+<tr><td>Post Editor</td><td>/admin/posts/new<br>/admin/posts/:id/edit</td><td>POST_CREATE / POST_EDIT</td><td>Full rich text editor with sidebar panels (status, author, categories, tags, SEO, etc.)</td></tr>
+<tr><td>Pages</td><td>/admin/pages</td><td>POST_READ</td><td>Page list with hierarchy, parent column</td></tr>
+<tr><td>Page Editor</td><td>/admin/pages/new<br>/admin/pages/:id/edit</td><td>POST_CREATE / POST_EDIT</td><td>Same editor as posts, with page-specific options (parent page, template)</td></tr>
+<tr><td>Media</td><td>/admin/media</td><td>MEDIA_READ</td><td>Grid/list library, folder navigation, upload, bulk delete, inline metadata editing</td></tr>
+<tr><td>Categories</td><td>/admin/categories</td><td>CATEGORY_READ</td><td>List with parent hierarchy, icon, sidebar flag; inline create/edit form</td></tr>
+<tr><td>Tags</td><td>/admin/tags</td><td>TAG_READ</td><td>List with inline create/edit form</td></tr>
+<tr><td>Comments</td><td>/admin/comments</td><td>COMMENT_READ</td><td>Moderation queue; approve, mark as spam, trash, delete</td></tr>
+<tr><td>Celebrations</td><td>/admin/celebrations</td><td>CELEBRATION_READ</td><td>List birthdays and remembrances; photo thumb, type badge, date; CRUD with media picker</td></tr>
+<tr><td>Menus</td><td>/admin/menus</td><td>MENU_READ</td><td>List menus</td></tr>
+<tr><td>Menu Editor</td><td>/admin/menus/:id</td><td>MENU_EDIT</td><td>Drag-drop menu builder; link to posts, categories, tags, or custom URL</td></tr>
+<tr><td>Widgets</td><td>/admin/widgets</td><td>WIDGET_READ</td><td>Create widgets, assign to zones, reorder</td></tr>
+<tr><td>Sitemap</td><td>/admin/sitemap</td><td>SEO_READ</td><td>Manual sitemap entries; preview of auto-generated items</td></tr>
+<tr><td>Settings</td><td>/admin/settings</td><td>SETTING_READ</td><td>General, reading, discussion, media, permalink settings in tabbed form</td></tr>
+<tr><td>Contact</td><td>/admin/contact</td><td>SETTING_READ</td><td>Contact form submissions; mark read, delete</td></tr>
+<tr><td>Users</td><td>/admin/users</td><td>USER_READ</td><td>User list; create, edit, assign roles, deactivate</td></tr>
+<tr><td>Roles</td><td>/admin/roles</td><td>ROLE_READ</td><td>Custom role management; permission checkbox matrix</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="admin-posteditor">Post Editor — Sidebar Panels</h2>
+<p>The post editor (<code>apps/admin/src/pages/PostEditor.tsx</code>) uses a two-column layout: main area (title + rich-text content) and right sidebar with collapsible panels.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Panel</th><th>Fields</th></tr></thead>
+<tbody>
+<tr><td>Publish</td><td>Status select (draft/published/scheduled/trash), schedule datetime, Preview Link button, Publish/Update action</td></tr>
+<tr><td>Primary Author</td><td>Single-select dropdown of all active users</td></tr>
+<tr><td>Co-Authors</td><td>Chip picker — add from dropdown, remove with ×; prevents adding primary author as co-author</td></tr>
+<tr><td>Featured Image</td><td>MediaPickerInput — opens media library modal; shows thumbnail preview</td></tr>
+<tr><td>Categories</td><td>Checkbox list with search; hierarchical display</td></tr>
+<tr><td>Tags</td><td>Free-text chip input (creates tags on save)</td></tr>
+<tr><td>Page Options</td><td>Parent page select, template input (pages only)</td></tr>
+<tr><td>Display Options</td><td>Featured toggle, sidebar toggle, comment status override</td></tr>
+<tr><td>SEO</td><td>Meta title, description, keywords, canonical URL</td></tr>
+<tr><td>Open Graph</td><td>OG title, description, image picker</td></tr>
+<tr><td>Revisions</td><td>Chronological list of saves; shows changed fields, user avatar, timestamp; archive button per entry (gated by REVISION_ARCHIVE)</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- WEB PAGES -->
+<h2 id="web-pages">Public Website — Pages</h2>
+<p>Web app runs at <code>http://localhost:5174</code>. Uses React Router with a catch-all for permalink resolution.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Page</th><th>Route</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>Home</td><td>/</td><td>Shows latest posts or static front page (based on <code>front_page_display</code> setting)</td></tr>
+<tr><td>Post Detail</td><td>/posts/:slug</td><td>Single post: featured image → categories + title → byline with inline avatars → content → tags → author cards</td></tr>
+<tr><td>Page Detail</td><td>/pages/:slug</td><td>Static page with custom content; no comments by default</td></tr>
+<tr><td>Category Archive</td><td>/categories/:slug</td><td>Posts in a specific category</td></tr>
+<tr><td>Tag Archive</td><td>/tags/:slug</td><td>Posts with a specific tag</td></tr>
+<tr><td>Date Archive</td><td>/date/:year<br>/date/:year/:month<br>/date/:year/:month/:day</td><td>Posts published on a date range</td></tr>
+<tr><td>Author Page</td><td>/authors/:username</td><td>Author profile (avatar, bio) + all posts where they are primary or co-author</td></tr>
+<tr><td>Preview</td><td>/preview/:id?token=</td><td>Draft/scheduled post preview via signed link</td></tr>
+<tr><td>Permalink Resolver</td><td>* (catch-all)</td><td>Maps custom permalink URL (e.g., /2026/06/my-post) to a post via <code>GET /public/resolve</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="web-components">Public Website — Key Components</h2>
+
+<h3>PostArticle</h3>
+<p>Renders a single post. Layout order: featured image → header block (categories + title + byline) → article content → tags row → author card(s). Multi-author byline: "Jane, John &amp; Sam" with inline avatar circles. Author cards stack vertically, labeled "Primary Author" / "Co-Author", with a "View all posts →" link to the author page.</p>
+
+<h3>CelebrationSpotlight</h3>
+<p>Appears as a modal on first visit each day (gated via <code>localStorage['celebration-seen-{date}']</code>). Fetches <code>GET /public/celebrations/today</code>. Features:</p>
+<ul>
+  <li><strong>Birthday</strong> — falling confetti (48 pieces, CSS-animated), floating balloons, photo glow</li>
+  <li><strong>Remembrance</strong> — SVG candle with flickering flame animation, rising ember particles, soft halo</li>
+  <li><strong>Carousel</strong> — auto-advances every 5s when multiple items, pauses on hover, dot indicators + prev/next arrows</li>
+  <li><strong>Accessibility</strong> — all motion in <code>@media (prefers-reduced-motion: no-preference)</code> block; backdrop + card close via Esc, X button, or backdrop click</li>
+  <li>Mounted via <code>createPortal</code> on <code>document.body</code> in <code>SiteLayout.tsx</code></li>
+</ul>
+
+<h3>SiteLayout</h3>
+<p>Top-level layout wrapper for all public pages. Renders: header with nav menu, main content slot, sidebar (when applicable), footer with widget zones, and <code>&lt;CelebrationSpotlight /&gt;</code>.</p>
+
+<!-- SERVICES -->
+<h2 id="services">API Services Reference</h2>
+
+<h3>auth.service.ts</h3>
+<ul>
+  <li><code>getSetupStatus()</code> — Returns <code>{ needsSetup: boolean }</code></li>
+  <li><code>setupFirstAdmin(email, username, password, firstName?, lastName?)</code> — One-time super-admin creation</li>
+  <li><code>register(email, username, password, firstName?, lastName?)</code> — Create user with subscriber role, trigger user_registered notification</li>
+  <li><code>login(identifier, password)</code> — Returns <code>{ accessToken, refreshToken, user }</code></li>
+  <li><code>getCurrentUser(userId)</code> — User with merged permissions array from all assigned roles</li>
+  <li><code>requestPasswordReset(email)</code> — Creates token, sends reset email (silent on unknown email)</li>
+  <li><code>resetPassword(token, newPassword)</code> — Validates hash, updates password, revokes all sessions</li>
+</ul>
+
+<h3>posts.service.ts</h3>
+<ul>
+  <li><code>listPosts(page, limit, filters?)</code> — Filterable by status, category, author, featured, type, search; sortable</li>
+  <li><code>getPostById(id)</code> — Full post with all nested relations</li>
+  <li><code>createPost(input, authorId)</code> — Transaction: create post + sync co-authors + sync categories + sync tags + record revision</li>
+  <li><code>updatePost(id, input)</code> — Diffs against current state, records only changed fields in revision</li>
+  <li><code>deletePost(id)</code> — Sets status to "trash"</li>
+  <li><code>publishDuePosts()</code> — Called by cron job; publishes scheduled posts and notifies authors</li>
+  <li><code>resolveTagsByName(tx, names[])</code> — Upserts tags, returns IDs</li>
+</ul>
+
+<h3>media.service.ts</h3>
+<ul>
+  <li><code>createMedia(files, folderId, uploadedById)</code> — Processes images: generates thumbnail (sharp), medium size, and converts format (WebP/AVIF) based on settings</li>
+  <li><code>replaceMedia(id, file)</code> — Replaces physical file, regenerates variants, preserves metadata</li>
+  <li><code>getUploadConfig()</code> — Returns max size in MB and allowed MIME type list from settings</li>
+</ul>
+
+<h3>notifications.service.ts</h3>
+<ul>
+  <li><code>notify(input)</code> — Creates Notification rows for target users</li>
+  <li><code>notifyNewComment(input)</code> — Notifies all users with COMMENT_MODERATE permission</li>
+  <li><code>notifyNewContact(input)</code> — Notifies all users with SETTING_READ permission</li>
+  <li><code>notifyPostPublished(input)</code> — Notifies the post's primary author</li>
+  <li><code>notifyNewUser(input)</code> — Notifies all users with USER_READ permission</li>
+  <li><code>getUserIdsWithPermission(permission)</code> — Queries all active users who have the given permission through any of their roles</li>
+</ul>
+
+<h3>celebrations.service.ts</h3>
+<ul>
+  <li><code>getTodaysCelebrations()</code> — Reads <code>timezone</code> setting, resolves today's date via <code>Intl.DateTimeFormat</code>, queries active celebrations matching month/day</li>
+  <li><code>getUpcomingCelebrations(limit)</code> — Returns nearest upcoming celebrations (used by dashboard)</li>
+</ul>
+
+<h3>calendar.service.ts</h3>
+<ul>
+  <li><code>getCalendarMonth(year, month)</code> — Returns per-day post counts for the calendar widget. Reads <code>week_starts_on</code> setting (0=Sun, 1=Mon). Includes prev/next month navigation info.</li>
+</ul>
+
+<h3>sitemap.service.ts</h3>
+<ul>
+  <li><code>generateXml(baseUrl)</code> — Combines published posts (using permalink structure), pages (<code>/pages/slug</code>), categories, tags, and manual entries into a valid sitemap.xml string</li>
+</ul>
+
+<h3>mail.service.ts</h3>
+<ul>
+  <li><code>isMailConfigured()</code> — Checks if SMTP_HOST env var is set</li>
+  <li><code>sendMail(input)</code> — Sends via nodemailer; falls back to console.log if not configured</li>
+</ul>
+
+<!-- MIDDLEWARE -->
+<h2 id="middleware">Middleware</h2>
+
+<h3>authenticate</h3>
+<p>Extracts Bearer token from <code>Authorization</code> header, verifies with <code>JWT_SECRET</code>, attaches decoded payload to <code>req.user</code>. Returns 401 if missing or invalid.</p>
+
+<h3>requirePermission(permission)</h3>
+<p>Factory middleware. After <code>authenticate</code>, checks <code>req.user.permissions[]</code> includes the given string. Returns 403 if not. Super-admins always pass (all permissions granted).</p>
+
+<h3>asyncHandler(fn)</h3>
+<p>Wraps async route handlers so unhandled Promise rejections are forwarded to the global error handler instead of crashing.</p>
+
+<h3>errorHandler</h3>
+<p>Global Express error middleware. Converts <code>ApiError</code> instances to JSON responses. Catches Prisma validation errors and maps them to 400. All other errors return 500 in production.</p>
+
+<h3>Rate Limiters</h3>
+<ul>
+  <li><code>authLimiter</code> — 20 requests per 15 minutes per IP (auth routes)</li>
+  <li><code>apiLimiter</code> — 300 requests per 60 seconds per IP (general API)</li>
+  <li>Comment submission — 10 per minute per IP</li>
+</ul>
+
+<h3>Error Classes (<code>utils/errors.ts</code>)</h3>
+<pre><code>ApiError        → base class (code, message, statusCode, details)
+ValidationError → 400 Bad Request
+NotFoundError   → 404 Not Found
+UnauthorizedError → 401 Unauthorized
+ForbiddenError  → 403 Forbidden
+ConflictError   → 409 Conflict</code></pre>
+
+<!-- SETTINGS -->
+<h2 id="settings">Site Settings Reference</h2>
+<p>All settings are stored in the <code>Setting</code> table. Manage them at <strong>Admin → Settings</strong> or via <code>PUT /settings</code>.</p>
+
+<h4>General</h4>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>site_title</td><td>string</td><td>"Headtilts CMS"</td><td>Site name shown in header and <code>&lt;title&gt;</code></td></tr>
+<tr><td>site_tagline</td><td>string</td><td>"Powered by Node.js"</td><td>Subtitle beneath logo</td></tr>
+<tr><td>show_tagline</td><td>string (yes/no)</td><td>"yes"</td><td>Toggle tagline display</td></tr>
+<tr><td>site_logo</td><td>string</td><td>""</td><td>Logo image URL</td></tr>
+<tr><td>site_logo_dark</td><td>string</td><td>""</td><td>Dark mode logo URL</td></tr>
+<tr><td>site_description</td><td>string</td><td>—</td><td>Meta description for homepage</td></tr>
+<tr><td>admin_email</td><td>string</td><td>"admin@example.com"</td><td>Notification destination</td></tr>
+<tr><td>timezone</td><td>string</td><td>"UTC"</td><td>IANA tz (e.g., "Asia/Kolkata"). Used for scheduling and celebrations.</td></tr>
+<tr><td>date_format</td><td>string</td><td>"F j, Y"</td><td>PHP-style format: F=full month, j=day, Y=4-digit year</td></tr>
+<tr><td>time_format</td><td>string</td><td>"g:i a"</td><td>g=12hr hour, G=24hr, i=minutes, a=am/pm</td></tr>
+<tr><td>week_starts_on</td><td>number</td><td>0</td><td>0=Sunday, 1=Monday</td></tr>
+</tbody>
+</table>
+</div>
+
+<h4>Reading</h4>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Key</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>front_page_display</td><td>"posts"</td><td>"posts" = latest posts feed; "page" = static page</td></tr>
+<tr><td>front_page_id</td><td>""</td><td>Post ID for static homepage (when display="page")</td></tr>
+<tr><td>posts_page_id</td><td>""</td><td>Post ID for the blog archive page</td></tr>
+<tr><td>contact_page_id</td><td>""</td><td>Post ID of the contact page (renders contact form)</td></tr>
+<tr><td>about_page_id</td><td>""</td><td>Post ID of the about page</td></tr>
+<tr><td>posts_per_page</td><td>10</td><td>Pagination limit for post lists</td></tr>
+<tr><td>posts_per_rss</td><td>10</td><td>Number of items in RSS feed</td></tr>
+<tr><td>rss_content</td><td>"excerpt"</td><td>"excerpt" or "full" content in RSS</td></tr>
+<tr><td>search_engine_visibility</td><td>"yes"</td><td>"no" adds X-Robots-Tag: noindex to all responses</td></tr>
+<tr><td>permalink_structure</td><td>"/%postname%/"</td><td>URL pattern — supports %postname%, %year%, %monthnum%, %day%</td></tr>
+</tbody>
+</table>
+</div>
+
+<h4>Comments / Discussion</h4>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Key</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>default_comment_status</td><td>"open"</td><td>Site-wide default for new posts</td></tr>
+<tr><td>require_name_email_for_comments</td><td>"yes"</td><td>Validate name + email on public comment submit</td></tr>
+<tr><td>close_comments_days</td><td>0</td><td>Auto-close after N days; 0 = never</td></tr>
+<tr><td>moderate_first_comment</td><td>"yes"</td><td>Put first-time commenter (by email) in pending</td></tr>
+<tr><td>comment_moderation</td><td>"no"</td><td>"yes" = all comments start as pending regardless</td></tr>
+<tr><td>comment_notify_author</td><td>"yes"</td><td>Notify post author of new comments</td></tr>
+<tr><td>show_avatars</td><td>"yes"</td><td>Show Gravatar/identicon avatars in comments</td></tr>
+<tr><td>default_avatar</td><td>"mystery"</td><td>Gravatar fallback: mystery, blank, identicon, wavatar, monsterid, retro</td></tr>
+<tr><td>avatar_rating</td><td>"G"</td><td>Max Gravatar content rating: G, PG, R, X</td></tr>
+</tbody>
+</table>
+</div>
+
+<h4>Media</h4>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Key</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>thumbnail_size_w / thumbnail_size_h</td><td>150</td><td>Thumbnail dimensions in px</td></tr>
+<tr><td>thumbnail_crop</td><td>"yes"</td><td>"yes" = center crop; "no" = contain</td></tr>
+<tr><td>medium_size_w / medium_size_h</td><td>300</td><td>Medium size max dimensions</td></tr>
+<tr><td>large_size_w / large_size_h</td><td>1024</td><td>Large size max dimensions</td></tr>
+<tr><td>uploads_use_yearmonth</td><td>"yes"</td><td>Organise uploads in /uploads/YYYY/MM/</td></tr>
+<tr><td>upload_allowed_mime</td><td>image/jpeg,image/png,image/gif,image/webp</td><td>Comma-separated allowed MIME types</td></tr>
+<tr><td>max_upload_size</td><td>10</td><td>Max single file size in MB</td></tr>
+<tr><td>media_format</td><td>"original"</td><td>"original" / "webp" / "avif" — format for processed images</td></tr>
+<tr><td>media_quality</td><td>82</td><td>JPEG/WebP/AVIF compression quality (1-100)</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- SHORTCODES -->
+<h2 id="shortcodes">Shortcodes</h2>
+<p>Shortcodes are placeholder tokens resolved server-side in post content before delivery. They allow dynamic content injection without hard-coded values.</p>
+
+<div class="shortcode-grid">
+  <div class="shortcode-item"><div class="shortcode-key">[site_name]</div><div class="shortcode-desc">Site title from settings</div></div>
+  <div class="shortcode-item"><div class="shortcode-key">[site_tagline]</div><div class="shortcode-desc">Site tagline from settings</div></div>
+  <div class="shortcode-item"><div class="shortcode-key">[site_description]</div><div class="shortcode-desc">Site description from settings</div></div>
+  <div class="shortcode-item"><div class="shortcode-key">[site_url]</div><div class="shortcode-desc">Site base URL</div></div>
+  <div class="shortcode-item"><div class="shortcode-key">[year]</div><div class="shortcode-desc">Current 4-digit year</div></div>
+  <div class="shortcode-item"><div class="shortcode-key">[current_date]</div><div class="shortcode-desc">Today's date (formatted by date_format setting)</div></div>
+  <div class="shortcode-item"><div class="shortcode-key">[post_title]</div><div class="shortcode-desc">Title of the current post</div></div>
+  <div class="shortcode-item"><div class="shortcode-key">[post_author]</div><div class="shortcode-desc">Primary author's display name</div></div>
+  <div class="shortcode-item"><div class="shortcode-key">[post_date]</div><div class="shortcode-desc">Post publication date (formatted)</div></div>
+  <div class="shortcode-item"><div class="shortcode-key">[post_excerpt]</div><div class="shortcode-desc">Post excerpt or auto-generated snippet</div></div>
+</div>
+
+<!-- WIDGETS -->
+<h2 id="widgets-ref">Widget System</h2>
+
+<h3>Widget Types</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Type</th><th>Name</th><th>Config Keys</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>text</td><td>Text / HTML</td><td>content (HTML)</td><td>Free-form HTML block</td></tr>
+<tr><td>menu</td><td>Menu / Links</td><td>menuId</td><td>Renders a menu by its ID</td></tr>
+<tr><td>recent-posts</td><td>Recent Posts</td><td>limit, showThumbnail</td><td>Chronological post list</td></tr>
+<tr><td>featured-posts</td><td>Featured Posts</td><td>limit, categoryId</td><td>Grid of featured posts</td></tr>
+<tr><td>latest-posts-compact</td><td>Latest Posts (Compact)</td><td>limit, categoryId</td><td>Compact list with small thumbnails</td></tr>
+<tr><td>category-posts-grid</td><td>Category Posts Grid</td><td>categoryId, limit, showViewAll</td><td>Grid of posts in a category with optional "View All →" link</td></tr>
+<tr><td>categories</td><td>Categories</td><td>showCount, hideEmpty</td><td>Category list with post counts</td></tr>
+<tr><td>tags</td><td>Tag Cloud</td><td>limit</td><td>Tag cloud (all or top N tags)</td></tr>
+<tr><td>calendar</td><td>Calendar</td><td>—</td><td>Monthly calendar with linked post counts per day</td></tr>
+<tr><td>search</td><td>Search</td><td>placeholder</td><td>Search input that navigates to <code>/?search=</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Default Zones</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Zone Name</th><th>Location</th><th>Max Widgets</th></tr></thead>
+<tbody>
+<tr><td>sidebar</td><td>Post/page sidebar</td><td>10</td></tr>
+<tr><td>footer-1</td><td>Footer column 1</td><td>5</td></tr>
+<tr><td>footer-2</td><td>Footer column 2</td><td>5</td></tr>
+<tr><td>footer-3</td><td>Footer column 3</td><td>5</td></tr>
+<tr><td>footer-bottom</td><td>Footer bottom bar (legal/nav)</td><td>3</td></tr>
+<tr><td>front-page-featured</td><td>Static homepage feature sections</td><td>6</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- PERMALINKS -->
+<h2 id="permalinks">Permalink System</h2>
+<p>Configured via the <code>permalink_structure</code> setting. The web frontend's catch-all route (<code>PermalinkPage</code>) calls <code>GET /public/resolve?path=…</code> to map URLs to posts.</p>
+
+<h3>Supported Tokens</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Token</th><th>Resolves to</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>%postname%</td><td>Post slug</td><td>/my-first-post/</td></tr>
+<tr><td>%year%</td><td>4-digit year of publish date</td><td>/2026/my-post/</td></tr>
+<tr><td>%monthnum%</td><td>2-digit month (01–12)</td><td>/2026/06/my-post/</td></tr>
+<tr><td>%day%</td><td>2-digit day (01–31)</td><td>/2026/06/14/my-post/</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Example Structures</h3>
+<pre><code>/%postname%/              →  /my-post/
+/%year%/%postname%/       →  /2026/my-post/
+/%year%/%monthnum%/%postname%/  →  /2026/06/my-post/
+/posts/%postname%/        →  /posts/my-post/</code></pre>
+
+<div class="alert alert-warn">
+  <strong>Changing permalink structure</strong> will break existing indexed URLs. Sitemap is regenerated automatically on the next request to <code>/sitemap/xml</code>.
+</div>
+
+<!-- CELEBRATIONS FEATURE -->
+<h2 id="celebrations-ref">Celebrations Feature</h2>
+<p>The Celebrations system allows editors to set up annual artist birthday and remembrance tributes. Visitors see a modal spotlight on their first visit each day.</p>
+
+<h3>Data Flow</h3>
+<ol>
+  <li>Editor creates a celebration at <strong>Admin → Celebrations</strong> with name, type (birthday/remembrance), month, day, optional year and photo.</li>
+  <li>Public site fetches <code>GET /public/celebrations/today</code> on mount.</li>
+  <li>API resolves "today" using the <code>timezone</code> setting (via <code>Intl.DateTimeFormat</code>), queries active celebrations matching month + day.</li>
+  <li>Response includes <code>{ date: "YYYY-MM-DD", items: [] }</code>. The date string is the localStorage key for the "seen today" gate.</li>
+  <li><code>CelebrationSpotlight</code> checks <code>localStorage['celebration-seen-{date}']</code> — renders nothing if set. Otherwise shows the modal and sets the flag on close.</li>
+</ol>
+
+<h3>Spotlight Behavior</h3>
+<ul>
+  <li>Single item: static spotlight card with type-specific animation.</li>
+  <li>Multiple items: auto-rotating carousel (5-second interval), pauses on hover, dot indicators, prev/next arrows.</li>
+  <li>Close methods: X button, backdrop click, or Escape key.</li>
+  <li>All CSS animations are inside <code>@media (prefers-reduced-motion: no-preference)</code>.</li>
+  <li>Dark mode fully supported via <code>[data-theme='dark']</code> overrides on <code>celebration-*</code> classes.</li>
+</ul>
+
+<h3>Animation Details</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Type</th><th>Elements</th><th>CSS Classes</th></tr></thead>
+<tbody>
+<tr><td>birthday</td><td>48 confetti pieces (varied shapes/colors), balloons, photo glow, card scale-in</td><td>.celebration-confetti, .celebration-confetti--round, .celebration-balloon</td></tr>
+<tr><td>remembrance</td><td>SVG candle with flickering flame, rising ember particles, soft halo, muted palette</td><td>.celebration-candle, .celebration-candle-body, .celebration-flame, .celebration-ember</td></tr>
+<tr><td>both</td><td>Backdrop fade-in, card scale-in</td><td>.celebration-backdrop, .celebration-modal</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Dashboard Integration</h3>
+<p>The Dashboard stats endpoint (<code>GET /dashboard/stats</code>) includes <code>upcomingCelebrations[]</code> via <code>getUpcomingCelebrations()</code> — showing the next N celebrations by calendar day, with <code>daysUntil</code> computed relative to today's date in the site timezone.</p>
+
+<h2 id="predeploy-checklist">Pre-Deployment Checklist</h2>
+<p>Verify each item before making the site publicly accessible. Items marked <strong>Critical</strong> will cause security or functional failures if skipped.</p>
+
+<h3>Environment &amp; Secrets</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Item</th><th>Severity</th><th>How to verify</th></tr></thead>
+<tbody>
+<tr>
+  <td><code>JWT_SECRET</code> is a random string of at least 32 characters — not <code>dev-secret</code> or any default</td>
+  <td><span style="color:var(--red)">Critical</span></td>
+  <td><code>grep JWT_SECRET apps/api/.env</code> — must be long and random. Generate with: <code>openssl rand -hex 32</code></td>
+</tr>
+<tr>
+  <td><code>NODE_ENV=production</code> is set in <code>apps/api/.env</code></td>
+  <td><span style="color:var(--red)">Critical</span></td>
+  <td>Without this, some frameworks expose stack traces to clients.</td>
+</tr>
+<tr>
+  <td><code>SITE_URL</code> matches the actual production domain (no trailing slash)</td>
+  <td><span style="color:var(--yellow)">Important</span></td>
+  <td>Used in CORS origin, sitemap URLs, and robots.txt. A mismatch breaks cross-origin requests.</td>
+</tr>
+<tr>
+  <td><code>WEB_URL</code> and <code>ADMIN_URL</code> match the deployed origins</td>
+  <td><span style="color:var(--yellow)">Important</span></td>
+  <td>CORS will reject requests from the wrong origin.</td>
+</tr>
+<tr>
+  <td>No <code>.env</code> files are committed to git</td>
+  <td><span style="color:var(--red)">Critical</span></td>
+  <td><code>git status --short | grep .env</code> — must return nothing. Check <code>.gitignore</code> includes <code>*.env</code>.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>Database</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Item</th><th>Severity</th><th>How to verify</th></tr></thead>
+<tbody>
+<tr>
+  <td>DB user has only <code>SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP</code> — not <code>GRANT</code>, <code>SUPER</code>, or <code>FILE</code></td>
+  <td><span style="color:var(--red)">Critical</span></td>
+  <td><code>SHOW GRANTS FOR 'headtilts'@'localhost';</code> in MySQL</td>
+</tr>
+<tr>
+  <td>All Prisma migrations have been applied</td>
+  <td><span style="color:var(--red)">Critical</span></td>
+  <td><code>pnpm --filter @headtilts/api exec prisma migrate status</code> — must show no pending migrations.</td>
+</tr>
+<tr>
+  <td>Seed has been run to register permissions and default roles</td>
+  <td><span style="color:var(--yellow)">Important</span></td>
+  <td><code>pnpm --filter @headtilts/api run seed</code> — idempotent, safe to re-run.</td>
+</tr>
+<tr>
+  <td>At least one <code>super-admin</code> user account exists with a strong password</td>
+  <td><span style="color:var(--red)">Critical</span></td>
+  <td>Log into the admin panel. Use a password manager to generate a 20+ character password.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>File System &amp; Uploads</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Item</th><th>Severity</th><th>How to verify</th></tr></thead>
+<tbody>
+<tr>
+  <td><code>UPLOAD_DIR</code> is outside the web root and not directly accessible via URL</td>
+  <td><span style="color:var(--red)">Critical</span></td>
+  <td>The API serves uploads via <code>GET /uploads/:filename</code> — the physical directory must not be served by nginx/Apache directly without the API in front.</td>
+</tr>
+<tr>
+  <td><code>MAX_UPLOAD_SIZE</code> is set to a reasonable value (e.g. <code>20MB</code>)</td>
+  <td><span style="color:var(--yellow)">Important</span></td>
+  <td>Without it the hard ceiling of 100 MB applies.</td>
+</tr>
+<tr>
+  <td>Upload directory is excluded from git (<code>apps/api/uploads/</code> in <code>.gitignore</code>)</td>
+  <td><span style="color:var(--yellow)">Important</span></td>
+  <td><code>git check-ignore -v apps/api/uploads</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>Networking &amp; Reverse Proxy</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Item</th><th>Severity</th><th>How to verify</th></tr></thead>
+<tbody>
+<tr>
+  <td>The Node.js API port (default 3000) is <em>not</em> directly exposed to the internet — it sits behind nginx or a similar reverse proxy</td>
+  <td><span style="color:var(--red)">Critical</span></td>
+  <td><code>sudo ufw status</code> — port 3000 should be blocked. Only 80 and 443 open.</td>
+</tr>
+<tr>
+  <td>HTTPS / TLS is terminated at the reverse proxy with a valid certificate</td>
+  <td><span style="color:var(--red)">Critical</span></td>
+  <td>Use Let's Encrypt (Certbot) or a managed certificate. Without TLS, JWT tokens and passwords travel in plaintext.</td>
+</tr>
+<tr>
+  <td>The reverse proxy forwards the real client IP in <code>X-Forwarded-For</code></td>
+  <td><span style="color:var(--yellow)">Important</span></td>
+  <td>Required for rate limiting to work correctly. Without it, every request appears to come from <code>127.0.0.1</code> and rate limits are bypassed.</td>
+</tr>
+<tr>
+  <td>The admin panel is not publicly indexed — add it to <code>robots.txt</code> <code>Disallow</code> or block at the proxy</td>
+  <td><span style="color:var(--orange)">Recommended</span></td>
+  <td>The CMS already serves <code>Disallow: /admin/</code> in robots.txt when <code>search_engine_visibility</code> is enabled.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>Backups</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Item</th><th>Severity</th><th>How to verify</th></tr></thead>
+<tbody>
+<tr>
+  <td>Automated backup cron is active and has run at least once</td>
+  <td><span style="color:var(--red)">Critical</span></td>
+  <td><code>crontab -l</code> to confirm job exists. Check <code>/backups/</code> for a recent file.</td>
+</tr>
+<tr>
+  <td>Backups are stored on a separate machine or cloud bucket</td>
+  <td><span style="color:var(--red)">Critical</span></td>
+  <td>A backup on the same server is useless if the server is compromised or the disk fails.</td>
+</tr>
+<tr>
+  <td>A test restore has been performed at least once</td>
+  <td><span style="color:var(--yellow)">Important</span></td>
+  <td>Restore to a staging environment and verify data integrity. Untested backups are not backups.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<s<!-- ============================================================ DOCKER -->
+<h2 id="docker-overview">Docker Deployment</h2>
+<p>The entire application — API, admin panel, public website, and MySQL database — runs as five Docker containers orchestrated by a single <code>docker-compose.yml</code>. Only one host port is ever opened; everything else communicates over an internal Docker network.</p>
+
+<pre><code>Host machine
+└── HTTP_PORT (default: 80) ──→ nginx
+                                 ├── /          →  web   (React SPA, nginx)
+                                 ├── /admin/    →  admin (React SPA, nginx)
+                                 ├── /api/      →  api   (Express + Prisma)
+                                 ├── /uploads/  →  api
+                                 ├── /robots.txt →  api
+                                 └── /sitemap.xml →  api
+                                      │
+                                      └── mysql (internal only)</code></pre>
+
+<h2 id="docker-requirements">Requirements</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Tool</th><th>Minimum version</th><th>Install guide</th></tr></thead>
+<tbody>
+<tr><td>Docker Engine</td><td>24+</td><td>docs.docker.com/engine/install</td></tr>
+<tr><td>Docker Compose</td><td>v2 (plugin)</td><td>Bundled with Docker Desktop; on Linux: <code>apt install docker-compose-plugin</code></td></tr>
+<tr><td>RAM</td><td>1 GB free</td><td>2 GB recommended for the build step (Node + TypeScript compilation)</td></tr>
+<tr><td>Disk</td><td>3 GB free</td><td>Docker images ~1.5 GB; leave room for uploads and DB data</td></tr>
+</tbody>
+</table>
+</div>
+<p>Verify your installation before proceeding:</p>
+<pre><code class="bash">docker --version          # Docker version 24.x.x
+docker compose version    # Docker Compose version v2.x.x</code></pre>
+
+<h2 id="docker-setup">First-Time Setup</h2>
+<p>Run these commands once from the project root. Each step is explained in the following sections.</p>
+<pre><code class="bash"># 1. Clone the repository (skip if you already have it)
+git clone &lt;your-repo-url&gt; headtilts &amp;&amp; cd headtilts
+
+# 2. Create your environment file from the template
+cp .env.docker .env
+
+# 3. Open .env and set the required values (see Environment Variables below)
+nano .env          # or: code .env / vim .env
+
+# 4. Build all images and start the containers in the background
+docker compose up -d --build
+
+# 5. Watch the logs until the API prints "Server running" (takes ~30 s first time)
+docker compose logs -f api
+
+# 6. Seed the database (permissions, default roles, super-admin user)
+docker compose exec api sh -c "cd apps/api && node_modules/.bin/ts-node prisma/seed.ts"
+
+# 7. Open the admin panel
+#    Default URL: http://localhost/admin/  (or http://yourserver:HTTP_PORT/admin/)
+#    Default login: admin@headtilts.com / Admin1234!</code></pre>
+
+<h2 id="docker-port">Choosing a Port</h2>
+<p>Set <code>HTTP_PORT</code> in your <code>.env</code> file to any available port. The nginx container binds to that port on the host; no other service is ever exposed.</p>
+<pre><code class="bash"># .env — examples
+
+HTTP_PORT=80      # standard HTTP (requires root or CAP_NET_BIND_SERVICE)
+HTTP_PORT=8080    # common alternative, no root required
+HTTP_PORT=9000    # any free port works</code></pre>
+<p>After changing <code>HTTP_PORT</code>, restart only nginx — no rebuild is needed:</p>
+<pre><code class="bash">docker compose up -d --no-deps nginx</code></pre>
+<p>If your server has a firewall, open the chosen port:</p>
+<pre><code class="bash"># ufw (Ubuntu/Debian)
+sudo ufw allow 8080/tcp
+
+# firewalld (CentOS/RHEL)
+sudo firewall-cmd --permanent --add-port=8080/tcp &amp;&amp; sudo firewall-cmd --reload</code></pre>
+
+<h2 id="docker-services">Services Reference</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Service</th><th>Image / Dockerfile</th><th>Internal port</th><th>Role</th></tr></thead>
+<tbody>
+<tr>
+  <td><code>mysql</code></td>
+  <td><code>mysql:8.0</code></td>
+  <td>3306 (internal only)</td>
+  <td>Stores all application data. A named Docker volume (<code>mysql_data</code>) persists the database across restarts and rebuilds.</td>
+</tr>
+<tr>
+  <td><code>api</code></td>
+  <td><code>docker/Dockerfile.api</code></td>
+  <td>3000 (internal only)</td>
+  <td>Express + Prisma API. Runs <code>prisma migrate deploy</code> on every startup, then starts the Node server. Uploaded files are stored in the <code>uploads_data</code> volume.</td>
+</tr>
+<tr>
+  <td><code>admin</code></td>
+  <td><code>docker/Dockerfile.admin</code></td>
+  <td>80 (internal only)</td>
+  <td>React admin panel pre-built into static files at build time, served by nginx. The <code>VITE_API_URL</code> build arg is baked into the JS bundle.</td>
+</tr>
+<tr>
+  <td><code>web</code></td>
+  <td><code>docker/Dockerfile.web</code></td>
+  <td>80 (internal only)</td>
+  <td>React public website pre-built into static files, served by nginx.</td>
+</tr>
+<tr>
+  <td><code>nginx</code></td>
+  <td><code>nginx:stable-alpine</code></td>
+  <td><code>HTTP_PORT</code> → host</td>
+  <td>Reverse proxy. The only service accessible from outside Docker. Routes traffic to api, admin, and web by URL prefix.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>Named volumes</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Volume</th><th>Mounted in</th><th>Contains</th></tr></thead>
+<tbody>
+<tr><td><code>mysql_data</code></td><td>mysql:/var/lib/mysql</td><td>All database files. Never deleted by <code>docker compose down</code> unless you pass <code>-v</code>.</td></tr>
+<tr><td><code>uploads_data</code></td><td>api:/app/apps/api/uploads</td><td>User-uploaded media files. Survives container restarts and image rebuilds.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="docker-env">Environment Variables</h2>
+<p>Copy <code>.env.docker</code> to <code>.env</code> in the project root. Docker Compose reads <code>.env</code> automatically. All variables are documented in the template; the critical ones that <strong>must</strong> be changed before going live are listed here.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Variable</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr>
+  <td><code>HTTP_PORT</code></td>
+  <td>No (default: 80)</td>
+  <td>The single host port nginx listens on. Change to 8080 or any other free port.</td>
+</tr>
+<tr>
+  <td><code>MYSQL_ROOT_PASSWORD</code></td>
+  <td><span style="color:var(--red)">Yes</span></td>
+  <td>MySQL root password. Only used during database initialisation. Never exposed.</td>
+</tr>
+<tr>
+  <td><code>MYSQL_PASSWORD</code></td>
+  <td><span style="color:var(--red)">Yes</span></td>
+  <td>Password for the <code>MYSQL_USER</code> account the API connects with.</td>
+</tr>
+<tr>
+  <td><code>JWT_SECRET</code></td>
+  <td><span style="color:var(--red)">Yes</span></td>
+  <td>Signs access tokens. Generate with <code>openssl rand -hex 32</code>. Must not be <code>dev-secret</code> — the API will refuse to start in production mode if it is.</td>
+</tr>
+<tr>
+  <td><code>JWT_REFRESH_SECRET</code></td>
+  <td><span style="color:var(--red)">Yes</span></td>
+  <td>Signs refresh tokens. Generate separately: <code>openssl rand -hex 32</code>.</td>
+</tr>
+<tr>
+  <td><code>SITE_URL</code></td>
+  <td>No (default: http://localhost)</td>
+  <td>Public URL of the site. Used in sitemap, CORS, and robots.txt. Include a non-standard port if applicable: <code>http://myserver.com:8080</code>.</td>
+</tr>
+<tr>
+  <td><code>VITE_API_URL</code></td>
+  <td>No (default: /api)</td>
+  <td>URL the browser uses to reach the API. The default <code>/api</code> is a relative path that works for any domain or port because nginx proxies it. Only change if the API is on a different domain entirely.</td>
+</tr>
+<tr>
+  <td><code>SMTP_HOST</code></td>
+  <td>No</td>
+  <td>Leave empty to disable email. Contact forms and notifications are logged to the API console instead.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<p><strong>Generating secrets:</strong></p>
+<pre><code class="bash"># Generate JWT_SECRET
+openssl rand -hex 32
+
+# Generate JWT_REFRESH_SECRET (run again for a different value)
+openssl rand -hex 32</code></pre>
+
+<h2 id="docker-seed">Seed &amp; First Login</h2>
+<p>After the containers are running and the API is healthy, seed the database to create default permissions, roles, and the initial super-admin account.</p>
+<pre><code class="bash">docker compose exec api sh -c "cd apps/api && node_modules/.bin/ts-node prisma/seed.ts"</code></pre>
+<p>The seed is <strong>idempotent</strong> — safe to run multiple times. It will not overwrite an existing super-admin password.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Field</th><th>Default value</th></tr></thead>
+<tbody>
+<tr><td>Admin URL</td><td><code>http://localhost:{HTTP_PORT}/admin/</code></td></tr>
+<tr><td>Email</td><td><code>admin@headtilts.com</code></td></tr>
+<tr><td>Password</td><td><code>Admin1234!</code></td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Change the password immediately</strong> after first login via Admin → Users → Edit Account.</p>
+
+<h2 id="docker-commands">Useful Commands</h2>
+<h3>Day-to-day operations</h3>
+<pre><code class="bash"># Start everything (detached)
+docker compose up -d
+
+# Stop everything (data is preserved)
+docker compose down
+
+# Stop everything AND delete all volumes (⚠ destroys the database and uploads)
+docker compose down -v
+
+# View live logs from all services
+docker compose logs -f
+
+# View logs from a specific service
+docker compose logs -f api
+docker compose logs -f nginx
+
+# Check the status of all containers
+docker compose ps</code></pre>
+
+<h3>Accessing the database</h3>
+<pre><code class="bash"># Open a MySQL shell inside the container
+docker compose exec mysql mysql -u headtilts -p headtilts
+
+# Run a one-off query without an interactive shell
+docker compose exec mysql mysql -u headtilts -p"${MYSQL_PASSWORD}" headtilts \
+  -e "SELECT id, email, username FROM User LIMIT 10;"</code></pre>
+
+<h3>Running Prisma commands</h3>
+<pre><code class="bash"># Check migration status
+docker compose exec api sh -c "cd apps/api && npx prisma migrate status"
+
+# Open Prisma Studio (database browser) on port 5555
+docker compose exec api sh -c "cd apps/api && npx prisma studio"
+# Then visit http://localhost:5555 in your browser</code></pre>
+
+<h3>Backing up inside Docker</h3>
+<pre><code class="bash"># Database dump (saved to the current directory on the host)
+docker compose exec mysql mysqldump \
+  -u root -p"${MYSQL_ROOT_PASSWORD}" \
+  --single-transaction --routines headtilts \
+  > backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Copy the uploads volume to the host
+docker run --rm \
+  -v headtilts_uploads_data:/src \
+  -v "$(pwd)/backups":/dest \
+  alpine tar -czf /dest/uploads_$(date +%Y%m%d).tar.gz -C /src .</code></pre>
+
+<h2 id="docker-rebuild">Rebuilding After Code Changes</h2>
+<p>The Dockerfiles use multi-stage builds with layer caching. Only the layers that changed are rebuilt.</p>
+
+<h3>API code changed</h3>
+<pre><code class="bash"># Rebuild only the api image and restart the container
+docker compose up -d --build api</code></pre>
+
+<h3>Admin or web frontend changed</h3>
+<pre><code class="bash"># Rebuild the admin image (Vite re-runs, VITE_API_URL is re-baked)
+docker compose up -d --build admin
+
+# Rebuild the web image
+docker compose up -d --build web</code></pre>
+
+<h3>Dependency changed (package.json / pnpm-lock.yaml)</h3>
+<pre><code class="bash"># Rebuild all images from scratch — dependency layers are invalidated
+docker compose build --no-cache
+docker compose up -d</code></pre>
+
+<h3>Prisma schema changed</h3>
+<pre><code class="bash"># 1. Rebuild the api image (generates new Prisma client)
+docker compose up -d --build api
+
+# 2. The new migration runs automatically on startup via:
+#    npx prisma migrate deploy</code></pre>
+
+<h2 id="docker-domain">Custom Domain &amp; HTTPS</h2>
+<p>For a production deployment with a real domain and HTTPS, the recommended approach is to place a TLS-terminating reverse proxy (nginx or Caddy) in front of the Docker stack on the host, rather than modifying the nginx container inside Docker.</p>
+
+<h3>Option A — Caddy (simplest, automatic HTTPS)</h3>
+<p>Run Caddy on the host, set <code>HTTP_PORT=8080</code> in <code>.env</code>, then add a <code>Caddyfile</code>:</p>
+<pre><code class="text">mysite.com {
+    reverse_proxy localhost:8080
+}</code></pre>
+<pre><code class="bash">caddy run --config Caddyfile</code></pre>
+<p>Caddy obtains a Let's Encrypt certificate automatically. Update <code>SITE_URL=https://mysite.com</code> in <code>.env</code> and rebuild:</p>
+<pre><code class="bash">docker compose up -d --build</code></pre>
+
+<h3>Option B — nginx on the host with Certbot</h3>
+<p>Set <code>HTTP_PORT=8080</code> in <code>.env</code>, then create a host nginx site config:</p>
+<pre><code class="nginx">server {
+    listen 80;
+    server_name mysite.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name mysite.com;
+
+    ssl_certificate     /etc/letsencrypt/live/mysite.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mysite.com/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+
+        # WebSocket pass-through for Socket.IO
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}</code></pre>
+<pre><code class="bash"># Get a certificate
+sudo certbot --nginx -d mysite.com
+
+# Reload nginx
+sudo nginx -s reload</code></pre>
+<p>Update your <code>.env</code> with <code>SITE_URL=https://mysite.com</code>, <code>WEB_URL=https://mysite.com</code>, <code>ADMIN_URL=https://mysite.com/admin</code>, then rebuild:</p>
+<pre><code class="bash">docker compose up -d --build</code></pre>
+
+<!-- ============================================================ OPERATIONS -->
+<h2 id="backup-what">Operations — What to Back Up</h2>
+<p>Three categories of data cannot be recovered from the git repository and must be backed up independently. A backup is only useful if it is stored <strong>off the server</strong> — a backup on the same machine that gets compromised or corrupted is worthless.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Category</th><th>Default Location</th><th>Why It Matters</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>MySQL database</strong></td>
+  <td>Configured by <code>DATABASE_URL</code> in <code>.env</code></td>
+  <td>All posts, pages, users, roles, comments, settings, categories, tags, menus, widgets, celebrations, media metadata, sitemap entries, notifications, contact submissions, sessions, and revisions live here. Losing it means losing everything.</td>
+</tr>
+<tr>
+  <td><strong>Upload directory</strong></td>
+  <td><code>apps/api/uploads/</code> (or <code>$UPLOAD_DIR</code>)</td>
+  <td>The actual binary files — images, documents, videos — uploaded via the Media Library. The database stores metadata and URLs; the files are on disk. If the disk is wiped the media library rows become dead links.</td>
+</tr>
+<tr>
+  <td><strong>Environment secrets</strong></td>
+  <td><code>apps/api/.env</code>, <code>apps/admin/.env</code>, <code>apps/web/.env</code></td>
+  <td><code>JWT_SECRET</code> cannot be recovered; losing it means every existing access token and signed preview link becomes unverifiable. DB credentials, <code>SMTP_PASS</code>, and <code>SITE_URL</code> must also be preserved. Store these in a password manager or a secrets vault — <em>never</em> commit them to git.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<p>The codebase itself (Prisma schema, migrations, source files) lives in git and does not need a separate backup strategy beyond a remote repository push.</p>
+
+<h2 id="backup-commands">Backup Commands</h2>
+
+<h3>Database backup</h3>
+<p>Use <code>mysqldump</code> with <code>--single-transaction</code> so the dump is consistent without locking tables. The timestamp suffix lets you keep multiple dated copies.</p>
+<pre><code class="bash">mysqldump \
+  --host=127.0.0.1 \
+  --user=YOUR_DB_USER \
+  --password=YOUR_DB_PASS \
+  --single-transaction \
+  --routines \
+  --triggers \
+  --no-tablespaces \
+  YOUR_DB_NAME \
+  > /backups/db_$(date +%Y%m%d_%H%M%S).sql</code></pre>
+<p>If your MySQL server is on a remote host, replace <code>--host=127.0.0.1</code> with the server's IP address. The resulting <code>.sql</code> file is plain text and can be compressed:</p>
+<pre><code class="bash">gzip /backups/db_$(date +%Y%m%d_%H%M%S).sql
+# produces db_20260617_020000.sql.gz (~10–20% of raw size)</code></pre>
+
+<h3>Upload directory backup</h3>
+<p>Create a compressed archive of the entire uploads folder. The <code>-C</code> flag strips the absolute path prefix so the archive is portable.</p>
+<pre><code class="bash">UPLOADS_DIR="${UPLOAD_DIR:-/path/to/apps/api/uploads}"
+
+tar -czf /backups/uploads_$(date +%Y%m%d_%H%M%S).tar.gz \
+  -C "$(dirname "$UPLOADS_DIR")" \
+  "$(basename "$UPLOADS_DIR")"</code></pre>
+<p>For large media libraries, consider an <strong>incremental rsync</strong> instead — only changed files are transferred on each run, which is far faster than repacking the full archive daily:</p>
+<pre><code class="bash"># Sync uploads to a remote server (fast, incremental)
+rsync -az --delete \
+  /path/to/apps/api/uploads/ \
+  user@backup-server:/backups/headtilts-uploads/</code></pre>
+
+<h3>Verify a backup</h3>
+<p>Always confirm your backup file is complete before relying on it. A zero-byte file or a truncated dump is useless.</p>
+<pre><code class="bash"># Check the SQL dump ends with the completion marker
+tail -5 /backups/db_20260617_020000.sql
+# Should end with: -- Dump completed on YYYY-MM-DD HH:MM:SS
+
+# List top-level contents of the uploads archive without extracting
+tar -tzf /backups/uploads_20260617_020000.tar.gz | head -20
+
+# For gzipped SQL, verify integrity
+gzip -t /backups/db_20260617_020000.sql.gz && echo "OK"</code></pre>
+
+<h2 id="backup-automate">Automating Backups</h2>
+
+<h3>Cron schedule</h3>
+<p>Add these entries to <code>crontab -e</code> on the server. Run as the same user that owns the application files. Adjust paths to match your deployment.</p>
+<pre><code class="bash"># ── Headtilts CMS backup cron ──────────────────────────────────────────────
+
+# Daily database dump at 02:00
+0 2 * * * mysqldump --host=127.0.0.1 --user=DB_USER --password=DB_PASS \
+  --single-transaction --routines --no-tablespaces DB_NAME \
+  | gzip > /backups/db_$(date +\%Y\%m\%d).sql.gz
+
+# Daily uploads archive at 02:15 (offset so both don't peak at once)
+15 2 * * * tar -czf /backups/uploads_$(date +\%Y\%m\%d).tar.gz \
+  -C /path/to/apps/api uploads
+
+# Delete backups older than 14 days at 03:00
+0 3 * * * find /backups -name "db_*.sql.gz"      -mtime +14 -delete
+0 3 * * * find /backups -name "uploads_*.tar.gz" -mtime +14 -delete</code></pre>
+<p><strong>Note:</strong> In crontab, the <code>%</code> character must be escaped as <code>\%</code> when used inside a command string.</p>
+
+<h3>Offsite transfer</h3>
+<p>After creating the local archive, push it off the server immediately. Options:</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Destination</th><th>Command</th></tr></thead>
+<tbody>
+<tr><td>Remote server via SSH</td><td><code>rsync -az /backups/ user@backup-host:/backups/headtilts/</code></td></tr>
+<tr><td>Amazon S3 / compatible</td><td><code>aws s3 cp /backups/db_$(date +%Y%m%d).sql.gz s3://your-bucket/headtilts/db/</code></td></tr>
+<tr><td>Backblaze B2</td><td><code>b2 upload-file your-bucket /backups/db_$(date +%Y%m%d).sql.gz headtilts/db/db_$(date +%Y%m%d).sql.gz</code></td></tr>
+<tr><td>Rclone (any cloud)</td><td><code>rclone copy /backups/ remote:headtilts-backups/ --min-age 1s</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Backup script (all-in-one)</h3>
+<p>Save this as <code>/usr/local/bin/headtilts-backup.sh</code>, make it executable (<code>chmod +x</code>), and call it from cron.</p>
+<pre><code class="bash">#!/usr/bin/env bash
+set -euo pipefail
+
+DB_HOST="127.0.0.1"
+DB_USER="YOUR_DB_USER"
+DB_PASS="YOUR_DB_PASS"
+DB_NAME="YOUR_DB_NAME"
+UPLOADS_DIR="/path/to/apps/api/uploads"
+BACKUP_DIR="/backups"
+OFFSITE_DEST="user@backup-server:/backups/headtilts"
+KEEP_DAYS=14
+
+STAMP=$(date +%Y%m%d_%H%M%S)
+
+mkdir -p "$BACKUP_DIR"
+
+echo "[backup] Dumping database..."
+mysqldump --host="$DB_HOST" --user="$DB_USER" --password="$DB_PASS" \
+  --single-transaction --routines --no-tablespaces "$DB_NAME" \
+  | gzip > "$BACKUP_DIR/db_${STAMP}.sql.gz"
+
+echo "[backup] Archiving uploads..."
+tar -czf "$BACKUP_DIR/uploads_${STAMP}.tar.gz" \
+  -C "$(dirname "$UPLOADS_DIR")" "$(basename "$UPLOADS_DIR")"
+
+echo "[backup] Syncing to offsite..."
+rsync -az "$BACKUP_DIR/" "$OFFSITE_DEST/"
+
+echo "[backup] Pruning old backups (>${KEEP_DAYS} days)..."
+find "$BACKUP_DIR" -name "db_*.sql.gz"      -mtime +"$KEEP_DAYS" -delete
+find "$BACKUP_DIR" -name "uploads_*.tar.gz" -mtime +"$KEEP_DAYS" -delete
+
+echo "[backup] Done: db_${STAMP}.sql.gz + uploads_${STAMP}.tar.gz"</code></pre>
+
+<h2 id="backup-restore">Restore Procedure</h2>
+<p>Follow these steps in order after a data loss event. Perform the restore on a staging copy first if possible to confirm the backup is valid before touching production.</p>
+
+<h3>1 — Stop the application</h3>
+<p>Prevent new writes from arriving while the restore is in progress.</p>
+<pre><code class="bash"># If running under systemd
+sudo systemctl stop headtilts-api
+
+# If running under pm2
+pm2 stop headtilts-api
+
+# If running directly, find and kill the process
+pkill -f "tsx src/index.ts"</code></pre>
+
+<h3>2 — Restore the database</h3>
+<pre><code class="bash"># If the backup is gzip-compressed
+gunzip -c /backups/db_20260617_020000.sql.gz | mysql \
+  --host=127.0.0.1 \
+  --user=YOUR_DB_USER \
+  --password=YOUR_DB_PASS \
+  YOUR_DB_NAME
+
+# If the backup is plain SQL
+mysql \
+  --host=127.0.0.1 \
+  --user=YOUR_DB_USER \
+  --password=YOUR_DB_PASS \
+  YOUR_DB_NAME < /backups/db_20260617_020000.sql</code></pre>
+<p><strong>If you are restoring to a fresh MySQL instance</strong>, create the database and user first:</p>
+<pre><code class="sql">CREATE DATABASE headtilts CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'headtilts'@'localhost' IDENTIFIED BY 'strong-password';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP
+  ON headtilts.* TO 'headtilts'@'localhost';
+FLUSH PRIVILEGES;</code></pre>
+
+<h3>3 — Apply any pending Prisma migrations</h3>
+<p>If the backup predates recent schema changes, run migrations to bring the schema forward. Prisma tracks applied migrations in the <code>_prisma_migrations</code> table and skips already-applied ones.</p>
+<pre><code class="bash">pnpm --filter @headtilts/api exec prisma migrate deploy</code></pre>
+
+<h3>4 — Restore uploaded files</h3>
+<pre><code class="bash"># Extract the archive back to its original location
+tar -xzf /backups/uploads_20260617_020000.tar.gz \
+  -C /path/to/apps/api/
+
+# Fix ownership if the API runs as a dedicated user
+chown -R headtilts:headtilts /path/to/apps/api/uploads/</code></pre>
+
+<h3>5 — Verify and restart</h3>
+<pre><code class="bash"># Confirm the upload directory is populated
+ls -lh /path/to/apps/api/uploads/ | head -10
+
+# Start the API
+sudo systemctl start headtilts-api
+# or
+pm2 start headtilts-api
+
+# Tail the logs to confirm clean startup
+sudo journalctl -u headtilts-api -f
+# or
+pm2 logs headtilts-api --lines 50</code></pre>
+
+<h2 id="incident-response">Incident Response — Site Hijacked</h2>
+<p>If you suspect an attacker has gained unauthorised access to the CMS, work through these steps immediately and in order. Speed matters — every minute the site is online gives the attacker more time to exfiltrate data or plant persistence mechanisms.</p>
+
+<h3>Step 1 — Take the site offline</h3>
+<p>Block all inbound traffic to the API and admin panel <em>before</em> doing anything else. This stops the attacker from continuing to use any active session and prevents further data changes.</p>
+<pre><code class="bash"># Stop the application process
+sudo systemctl stop headtilts-api
+
+# Block the API port at the firewall (port 3000 by default)
+# ufw (Ubuntu)
+sudo ufw deny 3000
+
+# iptables
+sudo iptables -I INPUT -p tcp --dport 3000 -j DROP</code></pre>
+
+<h3>Step 2 — Rotate all credentials immediately</h3>
+<p>Assume every secret in <code>.env</code> is known to the attacker. Regenerate all of them before restarting the application.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Secret</th><th>Action</th><th>Effect</th></tr></thead>
+<tbody>
+<tr>
+  <td><code>JWT_SECRET</code></td>
+  <td>Replace with a new random string: <code>openssl rand -hex 32</code></td>
+  <td>Invalidates every existing access token and refresh token. All users are forced to log in again. All signed preview links expire immediately.</td>
+</tr>
+<tr>
+  <td>Database password</td>
+  <td><code>ALTER USER 'headtilts'@'localhost' IDENTIFIED BY 'new-password';</code></td>
+  <td>Prevents DB access via the stolen credential.</td>
+</tr>
+<tr>
+  <td><code>SMTP_PASS</code></td>
+  <td>Revoke the SMTP credential in your mail provider and generate a new one</td>
+  <td>Prevents the attacker from sending mail as your domain.</td>
+</tr>
+<tr>
+  <td>Server SSH keys</td>
+  <td>If the server itself was accessed, rotate SSH keys and audit <code>~/.ssh/authorized_keys</code></td>
+  <td>Removes any backdoor SSH access the attacker may have added.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<pre><code class="bash"># Generate a new JWT_SECRET
+openssl rand -hex 32
+
+# Update apps/api/.env with the new values, then verify:
+grep JWT_SECRET apps/api/.env</code></pre>
+
+<h3>Step 3 — Delete all active sessions</h3>
+<p>Even with a new <code>JWT_SECRET</code>, old refresh tokens stored in the <code>Session</code> table become cryptographically invalid. Truncate the table to be certain:</p>
+<pre><code class="sql">-- Connect to MySQL and run:
+TRUNCATE TABLE Session;</code></pre>
+
+<h3>Step 4 — Audit user accounts</h3>
+<p>Look for accounts the attacker may have created or promoted to <code>super-admin</code>.</p>
+<pre><code class="sql">-- List all active users with their roles
+SELECT u.id, u.username, u.email, u.createdAt, GROUP_CONCAT(r.name) AS roles
+FROM User u
+LEFT JOIN UserRole ur ON ur.userId = u.id
+LEFT JOIN Role r      ON r.id = ur.roleId
+WHERE u.isActive = TRUE
+GROUP BY u.id
+ORDER BY u.createdAt DESC;
+
+-- Deactivate any account you do not recognise
+UPDATE User SET isActive = FALSE WHERE id = 'suspicious-user-id';
+
+-- Or delete it outright
+DELETE FROM UserRole WHERE userId = 'suspicious-user-id';
+DELETE FROM User WHERE id = 'suspicious-user-id';</code></pre>
+
+<h3>Step 5 — Check for planted content</h3>
+<p>Attackers commonly insert hidden posts, scripts in widget text, or malicious settings values.</p>
+<pre><code class="sql">-- Recently created or modified posts (check for injected content)
+SELECT id, title, status, type, createdAt, updatedAt
+FROM Post
+ORDER BY updatedAt DESC
+LIMIT 20;
+
+-- Widget configs that contain script tags or iframes
+SELECT w.name, ws.value
+FROM Widget w
+JOIN WidgetSetting ws ON ws.widgetId = w.id
+WHERE ws.key = 'config'
+  AND (ws.value LIKE '%&lt;script%' OR ws.value LIKE '%&lt;iframe%');
+
+-- Settings that may have been tampered with
+SELECT key, value FROM Setting
+WHERE key IN ('site_logo', 'site_logo_dark', 'admin_email')
+ORDER BY key;</code></pre>
+
+<h3>Step 6 — Review access logs</h3>
+<p>Identify the entry point — was it a stolen credential, a brute-forced password, or exploitation of a vulnerability?</p>
+<pre><code class="bash"># Express/Node logs (if using systemd)
+sudo journalctl -u headtilts-api --since "2 days ago" \
+  | grep -E "POST /api/auth|PUT /api/users|DELETE"
+
+# nginx/Apache access log (if behind a reverse proxy)
+grep "POST /api/auth/login" /var/log/nginx/access.log \
+  | awk '{print $1}' | sort | uniq -c | sort -rn | head -20
+
+# Look for unusual IPs that hit admin endpoints
+grep "/api/" /var/log/nginx/access.log \
+  | awk '{print $1, $7}' \
+  | grep -v "^YOUR_KNOWN_IP" \
+  | sort | uniq -c | sort -rn | head -30</code></pre>
+
+<h3>Step 7 — Restore from backup (if needed)</h3>
+<p>Only required if the attacker deleted or corrupted data. If they only read data, restoration is not needed (the data is gone regardless). Follow the <a href="#backup-restore">Restore Procedure</a> steps above, using the most recent clean backup — typically the one from before the intrusion timestamp you found in the logs.</p>
+
+<h3>Step 8 — Bring the site back online</h3>
+<pre><code class="bash"># Ensure .env has all new credentials
+cat apps/api/.env | grep -E "JWT_SECRET|DATABASE_URL|SMTP"
+
+# Re-open the firewall
+sudo ufw allow 3000
+# or
+sudo iptables -D INPUT -p tcp --dport 3000 -j DROP
+
+# Start the application
+sudo systemctl start headtilts-api
+
+# Monitor logs for the first 10 minutes
+sudo journalctl -u headtilts-api -f</code></pre>
+
+<h3>Step 9 — Post-incident review</h3>
+<p>Once the site is stable, conduct a short review:</p>
+<ul style="margin: 0.75rem 0 0.75rem 1.5rem; line-height: 2;">
+  <li>Document the timeline: when access was gained, what was accessed, when it was detected.</li>
+  <li>Identify the root cause and patch it (weak password, reused credential, unpatched dependency, misconfigured firewall).</li>
+  <li>Notify affected users if personal data (emails, names) was accessed — this may be a legal requirement under GDPR or equivalent.</li>
+  <li>Increase backup frequency or retention window temporarily.</li>
+  <li>Enable two-factor authentication on admin accounts if not already done.</li>
+  <li>Review and tighten firewall rules — the API port should only be accessible via a reverse proxy, not directly from the internet.</li>
+</ul>
+
+cript>
+// Highlight active nav link on scroll
+const sections = document.querySelectorAll('section[id], h2[id], h3[id]');
+const links = document.querySelectorAll('nav a');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      links.forEach(l => l.classList.remove('active'));
+      const active = document.querySelector(`nav a[href="#${entry.target.id}"]`);
+      if (active) active.classList.add('active');
+    }
+  });
+}, { rootMargin: '-10% 0px -80% 0px' });
+sections.forEach(s => observer.observe(s));
+</script>
+</main>
+</body>
+</html>

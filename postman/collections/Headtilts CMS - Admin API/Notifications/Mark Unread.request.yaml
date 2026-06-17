@@ -1,0 +1,14 @@
+$kind: http-request
+name: Mark Unread
+method: POST
+url: '{{baseUrl}}/api/notifications/mark-unread'
+order: 5000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "ids": [1, 2, 3]
+    }

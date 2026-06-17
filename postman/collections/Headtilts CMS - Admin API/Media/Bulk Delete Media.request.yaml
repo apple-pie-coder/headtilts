@@ -1,0 +1,14 @@
+$kind: http-request
+name: Bulk Delete Media
+method: POST
+url: '{{baseUrl}}/api/media/bulk-delete'
+order: 10000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "ids": [1, 2, 3]
+    }

@@ -1,0 +1,5 @@
+$kind: http-request
+name: Delete Widget
+method: DELETE
+url: '{{baseUrl}}/api/widgets/{{widgetId}}'
+order: 8000

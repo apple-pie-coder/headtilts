@@ -1,0 +1,15 @@
+$kind: http-request
+name: Create Menu
+method: POST
+url: '{{baseUrl}}/api/menus'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "Main Navigation",
+      "location": "primary"
+    }

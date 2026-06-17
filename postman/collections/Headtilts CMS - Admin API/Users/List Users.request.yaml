@@ -1,0 +1,12 @@
+$kind: http-request
+name: List Users
+method: GET
+url: '{{baseUrl}}/api/users'
+order: 3000
+queryParams:
+  - key: page
+    value: '1'
+  - key: limit
+    value: '10'
+  - key: search
+    value: ''
