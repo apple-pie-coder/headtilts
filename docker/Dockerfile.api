@@ -9,7 +9,8 @@ COPY .npmrc package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/api/package.json           ./apps/api/
 
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
 
 # Copy source and compile
 COPY packages/shared ./packages/shared
@@ -38,7 +39,8 @@ RUN npm install -g pnpm
 COPY .npmrc package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/api/package.json           ./apps/api/
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
 
 # Copy compiled output from the build stage
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist

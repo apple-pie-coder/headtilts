@@ -8,7 +8,8 @@ COPY .npmrc package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/admin/package.json      ./apps/admin/
 
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
 
 # VITE_API_URL is baked into the JS bundle at build time.
 # When nginx proxies /api/ → the API container, the browser-relative
