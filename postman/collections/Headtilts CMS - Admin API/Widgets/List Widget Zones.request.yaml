@@ -1,0 +1,5 @@
+$kind: http-request
+name: List Widget Zones
+method: GET
+url: '{{baseUrl}}/api/widgets/zones'
+order: 4000

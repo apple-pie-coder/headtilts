@@ -1,0 +1,5 @@
+$kind: http-request
+name: Get Media Item
+method: GET
+url: '{{baseUrl}}/api/media/{{mediaId}}'
+order: 2000

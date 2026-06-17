@@ -1,0 +1,113 @@
+# ── All services share one internal network. ──────────────────────────────────
+# The ONLY port exposed to the host is nginx on HTTP_PORT (default: 80).
+# Change HTTP_PORT in your .env to run on any port you choose (e.g. 8080).
+#
+# Quick start:
+#   cp .env.docker .env        # copy the template
+#   nano .env                  # set your secrets and HTTP_PORT
+#   docker compose up -d --build
+#   docker compose exec api sh -c "cd apps/api && node_modules/.bin/prisma db seed"
+
+services:
+
+  # ── MySQL 8 ─────────────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-headtilts}
+      MYSQL_USER: ${MYSQL_USER:-headtilts}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ── API (Express + Prisma) ───────────────────────────────────────────────────
+  # Not exposed to the host — nginx proxies /api/* and /uploads/* to it.
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: mysql://${MYSQL_USER:-headtilts}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE:-headtilts}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      API_PORT: 3000
+      SITE_URL: ${SITE_URL:-http://localhost}
+      WEB_URL: ${WEB_URL:-http://localhost}
+      ADMIN_URL: ${ADMIN_URL:-http://localhost/admin}
+      UPLOAD_DIR: /app/apps/api/uploads
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+    volumes:
+      - uploads_data:/app/apps/api/uploads
+    networks:
+      - internal
+
+  # ── Admin panel (React SPA → nginx) ─────────────────────────────────────────
+  admin:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.admin
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - internal
+
+  # ── Public website (React SPA → nginx) ──────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - internal
+
+  # ── nginx reverse proxy ──────────────────────────────────────────────────────
+  # This is the ONLY service with a host-port binding.
+  # Set HTTP_PORT in .env to expose on any port you want (e.g. 8080).
+  nginx:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+      - admin
+      - web
+    networks:
+      - internal
+
+volumes:
+  mysql_data:
+  uploads_data:
+
+networks:
+  internal:
+    driver: bridge

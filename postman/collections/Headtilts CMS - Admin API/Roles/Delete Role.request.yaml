@@ -1,0 +1,5 @@
+$kind: http-request
+name: Delete Role
+method: DELETE
+url: '{{baseUrl}}/api/roles/{{roleId}}'
+order: 6000

@@ -1,0 +1,15 @@
+$kind: http-request
+name: Create Folder
+method: POST
+url: '{{baseUrl}}/api/media/folders'
+order: 8000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "2026",
+      "parentId": null
+    }

@@ -1,0 +1,32 @@
+$kind: http-request
+name: Create Post
+method: POST
+url: '{{baseUrl}}/api/posts'
+order: 5000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "title": "My New Post",
+      "slug": "my-new-post",
+      "content": "<p>Post content here</p>",
+      "excerpt": "Short excerpt",
+      "type": "post",
+      "status": "draft",
+      "featuredImage": "",
+      "isFeatured": false,
+      "showSidebar": true,
+      "commentStatus": "default",
+      "categoryIds": [],
+      "tagNames": [],
+      "metaTitle": "",
+      "metaDescription": "",
+      "metaKeywords": "",
+      "canonicalUrl": "",
+      "ogTitle": "",
+      "ogDescription": "",
+      "ogImage": ""
+    }

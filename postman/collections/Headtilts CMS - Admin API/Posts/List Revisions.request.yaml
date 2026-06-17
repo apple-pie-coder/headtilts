@@ -1,0 +1,5 @@
+$kind: http-request
+name: List Revisions
+method: GET
+url: '{{baseUrl}}/api/posts/{{postId}}/revisions'
+order: 8000

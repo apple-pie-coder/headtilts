@@ -1,0 +1,7 @@
+$kind: http-request
+name: Get Setup Status
+method: GET
+url: '{{baseUrl}}/api/auth/setup-status'
+order: 1000
+auth:
+  type: noauth

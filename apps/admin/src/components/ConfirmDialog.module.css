@@ -1,0 +1,96 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  animation: confirmFadeIn 0.15s ease-out;
+}
+
+.dialog {
+  background: var(--surface-overlay);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-shine);
+  border-radius: 20px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 420px;
+  margin: 1rem;
+  animation: confirmPopIn 0.18s ease-out;
+}
+
+.title {
+  margin: 0 0 0.5rem;
+  color: var(--t1);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.message {
+  margin: 0 0 1.25rem;
+  color: var(--t2);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.625rem;
+}
+
+.actions button {
+  padding: 0.5rem 1.125rem;
+  border-radius: var(--r-sm);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--ease), border-color var(--ease), color var(--ease);
+}
+
+.cancelButton {
+  background: var(--ghost);
+  border: 1px solid var(--border-strong);
+  color: var(--t1);
+}
+
+.cancelButton:hover { background: var(--ghost-h); }
+
+.cancelButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--input-ring);
+}
+
+.confirmButton {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #fff;
+}
+
+.confirmButton:hover { filter: brightness(1.08); }
+
+.dangerButton {
+  background: var(--danger);
+  border: 1px solid var(--danger);
+  color: #fff;
+}
+
+.dangerButton:hover { filter: brightness(1.08); }
+
+@keyframes confirmFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes confirmPopIn {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}

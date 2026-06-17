@@ -1,0 +1,5 @@
+$kind: http-request
+name: Get Upload Config
+method: GET
+url: '{{baseUrl}}/api/media/upload-config'
+order: 11000

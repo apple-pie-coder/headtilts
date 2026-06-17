@@ -1,0 +1,14 @@
+$kind: http-request
+name: Mark Read
+method: POST
+url: '{{baseUrl}}/api/notifications/mark-read'
+order: 4000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "ids": [1, 2, 3]
+    }

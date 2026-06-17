@@ -1,0 +1,161 @@
+.container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 1.5rem;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 130% 70% at 15% -5%, rgba(88, 86, 214, 0.3) 0%, transparent 55%),
+    radial-gradient(ellipse 100% 80% at 85% 110%, rgba(0, 113, 227, 0.25) 0%, transparent 55%),
+    radial-gradient(ellipse 80% 60% at 50% 50%, rgba(255, 149, 0, 0.08) 0%, transparent 60%);
+  background-attachment: fixed;
+}
+
+.card {
+  background: var(--surface-overlay);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-shine);
+  border-radius: 20px;
+  padding: 2.5rem 2.25rem;
+  width: 100%;
+  max-width: 400px;
+}
+
+.logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.logoIcon {
+  font-size: 2.25rem;
+  color: var(--accent);
+  margin-bottom: 0.5rem;
+}
+
+.logoImg {
+  max-height: 56px;
+  max-width: 220px;
+  width: auto;
+  object-fit: contain;
+  margin-bottom: 0.75rem;
+}
+
+.card h1 {
+  text-align: center;
+  color: var(--t1);
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  margin: 0 0 0.25rem;
+}
+
+.card h2 {
+  text-align: center;
+  color: var(--t2);
+  font-size: 0.9375rem;
+  font-weight: 400;
+  margin: 0 0 2rem;
+}
+
+.formGroup {
+  margin-bottom: 1.125rem;
+}
+
+.formGroup label {
+  display: block;
+  margin-bottom: 0.4375rem;
+  color: var(--t1);
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.formGroup input {
+  width: 100%;
+  padding: 0.6875rem 0.875rem;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--r-sm);
+  font-size: 1rem;
+  color: var(--t1);
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+
+.formGroup input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--input-ring);
+}
+
+.formGroup input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.button {
+  width: 100%;
+  padding: 0.6875rem;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--r-sm);
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  margin-top: 0.25rem;
+  transition: background var(--ease), opacity var(--ease);
+}
+
+.button:hover:not(:disabled) {
+  background: var(--accent-h);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.error {
+  padding: 0.625rem 0.875rem;
+  background: var(--danger-bg);
+  color: var(--danger-t);
+  border-radius: var(--r-xs);
+  border-left: 3px solid var(--danger);
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.backLink {
+  display: block;
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--accent, #0071e3);
+  text-decoration: none;
+}
+
+.backLink:hover { text-decoration: underline; }
+
+.infoText {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--text-secondary, #6e6e73);
+  text-align: center;
+  margin: 0 0 0.5rem;
+}
+
+.forgotRow {
+  margin-top: 0.75rem;
+  text-align: right;
+}
+
+.forgotRow a {
+  font-size: 0.8125rem;
+  color: var(--accent, #0071e3);
+  text-decoration: none;
+}
+
+.forgotRow a:hover { text-decoration: underline; }

@@ -1,0 +1,15 @@
+$kind: http-request
+name: Update Media
+method: PUT
+url: '{{baseUrl}}/api/media/{{mediaId}}'
+order: 5000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "alt": "Updated alt text",
+      "caption": "Updated caption"
+    }

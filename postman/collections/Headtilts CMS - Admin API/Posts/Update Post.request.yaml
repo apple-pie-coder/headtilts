@@ -1,0 +1,15 @@
+$kind: http-request
+name: Update Post
+method: PUT
+url: '{{baseUrl}}/api/posts/{{postId}}'
+order: 6000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "title": "Updated Post Title",
+      "status": "published"
+    }

@@ -1,0 +1,724 @@
+/* ── Fetch error banner ── */
+
+.fetchError {
+  background: var(--danger-bg);
+  color: var(--danger-t);
+  border-left: 3px solid var(--danger);
+  padding: 0.625rem 0.875rem;
+  border-radius: 0 var(--r-xs) var(--r-xs) 0;
+  margin-bottom: 1rem;
+  font-size: 0.9375rem;
+}
+
+/* ── Welcome ── */
+
+.welcome {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: var(--surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-shine);
+  border-radius: var(--r);
+  padding: 1.375rem 1.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.welcomeText {
+  min-width: 0;
+}
+
+/* ── Customize popover ── */
+
+.customizeWrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.customizeBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  background: var(--ghost);
+  color: var(--t1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background var(--ease), border-color var(--ease);
+}
+
+.customizeBtn:hover { background: var(--ghost-h); }
+
+.customizeBtnActive {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.customizePanel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 41;
+  width: 260px;
+  background: var(--surface-overlay);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-shine);
+  border-radius: var(--r);
+  padding: 0.875rem 1rem 1rem;
+}
+
+.customizeHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--t2);
+}
+
+.resetBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.resetBtn:hover { text-decoration: underline; }
+
+.customizeHint {
+  margin: 0.5rem 0 0.75rem;
+  font-size: 0.75rem;
+  color: var(--t3);
+  line-height: 1.4;
+}
+
+.customizeList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.4375rem 0;
+  font-size: 0.9375rem;
+  color: var(--t1);
+  cursor: pointer;
+}
+
+.switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.slider {
+  position: absolute;
+  inset: 0;
+  background: var(--ghost);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition: background var(--ease), border-color var(--ease);
+}
+
+.slider::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform var(--ease);
+}
+
+.switch input:checked + .slider {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.switch input:checked + .slider::before {
+  transform: translate(16px, -50%);
+}
+
+.welcomeText h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--t1);
+  letter-spacing: -0.3px;
+}
+
+.welcomeText p {
+  margin: 0;
+  color: var(--t2);
+  font-size: 0.9375rem;
+}
+
+/* ── Stat cards ── */
+
+.statRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.875rem;
+  margin-bottom: 1.5rem;
+}
+
+.statCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background: var(--surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-shine);
+  border-radius: var(--r);
+  padding: 1.25rem 1.375rem;
+  text-decoration: none;
+  transition: box-shadow var(--ease), border-color var(--ease), transform var(--ease);
+}
+
+.statCard:hover {
+  border-color: var(--accent);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14), 0 0 0 1px var(--accent), var(--glass-shine);
+  transform: translateY(-1px);
+}
+
+.statNumber {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+  margin-bottom: 0.375rem;
+  letter-spacing: -1px;
+}
+
+.statLabel {
+  font-size: 0.8125rem;
+  color: var(--t2);
+  font-weight: 500;
+}
+
+/* ── Two-column layout ── */
+
+.columns {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.leftCol,
+.rightCol {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ── Panel ── */
+
+.panel {
+  background: var(--surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-shine);
+  border-radius: var(--r);
+  padding: 1.25rem 1.5rem;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--sep);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.panelTitle {
+  margin: 0 0 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--t2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--sep);
+  padding-bottom: 0.75rem;
+  flex: 1;
+}
+
+.panelHeader .panelTitle {
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.panelAction {
+  font-size: 0.8125rem;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.panelAction:hover {
+  text-decoration: underline;
+}
+
+/* ── At a Glance ── */
+
+.glanceList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.glanceList li a {
+  color: var(--t1);
+  text-decoration: none;
+  font-size: 0.9375rem;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  transition: color var(--ease);
+}
+
+.glanceList li a:hover {
+  color: var(--accent);
+}
+
+.glanceList li a strong {
+  color: var(--accent);
+  font-size: 1rem;
+  min-width: 2rem;
+  font-weight: 700;
+}
+
+.glanceMeta {
+  color: var(--t3);
+  font-size: 0.8125rem;
+}
+
+/* ── Recent posts ── */
+
+.postList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.postRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.625rem 0;
+  border-bottom: 1px solid var(--sep);
+}
+
+.postRow:last-child {
+  border-bottom: none;
+}
+
+.postInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.postTitle {
+  display: block;
+  color: var(--t1);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.9375rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.25rem;
+  transition: color var(--ease);
+}
+
+.postTitle:hover {
+  color: var(--accent);
+}
+
+.postMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.badgePublished { background: var(--success-bg); color: var(--success-t); }
+.badgeDraft     { background: var(--ghost); color: var(--t2); }
+.badgeScheduled { background: var(--warning-bg); color: var(--warning-t); }
+.badgeTrash     { background: var(--danger-bg); color: var(--danger-t); }
+
+.badgeBirthday    { background: rgba(255, 149, 0, 0.14); color: #b25000; }
+.badgeRemembrance { background: rgba(120, 120, 128, 0.16); color: var(--t2); }
+
+:global([data-theme='dark']) .badgeBirthday { color: #ffb340; }
+
+.postAuthor { font-size: 0.8125rem; color: var(--t2); }
+.postDate   { font-size: 0.8125rem; color: var(--t3); }
+
+.editLink {
+  font-size: 0.8125rem;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+.editLink:hover { text-decoration: underline; }
+
+/* ── Quick draft ── */
+
+.draftSaved {
+  background: var(--success-bg);
+  border-left: 3px solid var(--success);
+  color: var(--success-t);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0 var(--r-xs) var(--r-xs) 0;
+  font-size: 0.875rem;
+  margin-bottom: 0.875rem;
+}
+
+.draftSaved a {
+  color: var(--success-t);
+  font-weight: 600;
+}
+
+.draftForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.draftTitleInput,
+.draftBody {
+  width: 100%;
+  padding: 0.5625rem 0.75rem;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--r-sm);
+  font-size: 0.9375rem;
+  color: var(--t1);
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+
+.draftTitleInput:focus,
+.draftBody:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--input-ring);
+}
+
+.draftBody {
+  resize: vertical;
+}
+
+.draftButton {
+  align-self: flex-start;
+  padding: 0.4375rem 1.125rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--r-sm);
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: background var(--ease), opacity var(--ease);
+}
+
+.draftButton:hover:not(:disabled) { background: var(--accent-h); }
+.draftButton:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ── Recent media ── */
+
+.mediaGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.mediaTile {
+  display: block;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--border);
+  transition: border-color var(--ease), transform var(--ease);
+}
+
+.mediaTile:hover {
+  border-color: var(--accent);
+  transform: scale(1.03);
+}
+
+.mediaTile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ── Pending comments ── */
+
+.podSummary {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  color: var(--t2);
+}
+
+.podSummary strong { color: var(--accent); }
+
+/* ── Recent users ── */
+
+.userAvatar {
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 0.875rem;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.userAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Upcoming celebrations ── */
+
+.celebAvatar {
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--ghost);
+  color: var(--t2);
+  overflow: hidden;
+}
+
+.celebAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Quick links ── */
+
+.quickLinks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 0.625rem;
+}
+
+.quickLink {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 0.5rem;
+  background: var(--ghost);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--t1);
+  text-decoration: none;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-align: center;
+  transition: background var(--ease), border-color var(--ease), color var(--ease);
+}
+
+.quickLink svg { font-size: 1.125rem; color: var(--accent); }
+
+.quickLink:hover {
+  background: var(--ghost-h);
+  border-color: var(--accent);
+}
+
+/* ── Shared ── */
+
+.loadingText { color: var(--t3); font-size: 0.9375rem; margin: 0; }
+
+.emptyText {
+  color: var(--t2);
+  font-size: 0.9375rem;
+  margin: 0;
+}
+
+.emptyText a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.emptyText a:hover { text-decoration: underline; }
+
+/* ── Pod masonry (reorderable / hideable) ──
+   Multi-column flow packs pods tightly with no row-alignment gaps.
+   column-width makes the column count responsive to the available width. */
+
+.podGrid {
+  column-width: 320px;
+  column-gap: 1.25rem;
+}
+
+.pod {
+  /* keep a pod from being split across two columns */
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  page-break-inside: avoid;
+  margin-bottom: 1.25rem;
+  background: var(--surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-shine);
+  border-radius: var(--r);
+  padding: 1.25rem 1.5rem;
+  /* multicol items render inline-block-ish; ensure full column width */
+  display: block;
+  width: 100%;
+  transition: opacity var(--ease), box-shadow var(--ease), border-color var(--ease);
+}
+
+/* Full-width pods (e.g. the stat-card overview) break out of the columns */
+.podWide {
+  column-span: all;
+  -webkit-column-span: all;
+}
+
+.podDragging { opacity: 0.45; }
+
+.podOver {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), var(--glass-shadow);
+}
+
+.podHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--sep);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.podHandle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--t3);
+  padding: 0.125rem 0.25rem;
+  cursor: grab;
+  border-radius: var(--r-xs);
+  transition: color var(--ease), background var(--ease);
+}
+
+.podHandle:hover { color: var(--t1); background: var(--ghost); }
+.podHandle:active { cursor: grabbing; }
+
+.podTitle {
+  flex: 1;
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--t2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.podActionSlot {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.podBody { min-width: 0; }
+
+/* Stat cards carry their own bottom margin; neutralise it inside a pod. */
+.podBody .statRow { margin-bottom: 0; }
+
+.allHidden {
+  text-align: center;
+  color: var(--t2);
+  font-size: 0.9375rem;
+  padding: 2.5rem 1rem;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--r);
+}

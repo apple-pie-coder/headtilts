@@ -1,0 +1,5 @@
+$kind: http-request
+name: List Widget Types
+method: GET
+url: '{{baseUrl}}/api/widgets/types'
+order: 3000

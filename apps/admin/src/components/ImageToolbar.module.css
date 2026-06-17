@@ -1,0 +1,47 @@
+.toolbar {
+  position: fixed;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface-overlay);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-sm);
+  padding: 5px 8px;
+  box-shadow: var(--glass-shadow), var(--glass-shine);
+  user-select: none;
+}
+
+.group { display: flex; gap: 2px; }
+
+.divider {
+  width: 1px;
+  background: var(--sep);
+  align-self: stretch;
+  margin: 0 4px;
+}
+
+.toolbar button {
+  padding: 3px 8px;
+  border: none;
+  border-radius: var(--r-xs);
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: var(--t2);
+  transition: background var(--ease), color var(--ease);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.toolbar button:hover {
+  background: var(--ghost-h);
+  color: var(--t1);
+}
+
+.active {
+  background: var(--accent) !important;
+  color: #fff !important;
+}

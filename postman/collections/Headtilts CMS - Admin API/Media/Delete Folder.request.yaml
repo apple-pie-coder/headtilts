@@ -1,0 +1,5 @@
+$kind: http-request
+name: Delete Folder
+method: DELETE
+url: '{{baseUrl}}/api/media/folders/{{folderId}}'
+order: 9000

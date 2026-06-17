@@ -1,0 +1,13 @@
+$kind: http-request
+name: Replace Media
+method: POST
+url: '{{baseUrl}}/api/media/{{mediaId}}/replace'
+order: 4000
+description: Replace an existing media file using multipart/form-data. Use the "file" field to attach the replacement file.
+body:
+  type: formdata
+  content:
+    - key: file
+      type: file
+      src: ''
+      description: 'Replacement file'
