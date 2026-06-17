@@ -5,7 +5,7 @@ WORKDIR /app
 RUN npm install -g pnpm
 
 # Copy manifests first — this layer is re-used unless a dependency changes
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
+COPY .npmrc package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/api/package.json           ./apps/api/
 
@@ -35,7 +35,7 @@ RUN npm install -g pnpm
 
 # Install all dependencies (prod + dev). The prisma CLI lives in devDependencies
 # and is required at runtime to run `prisma migrate deploy` on startup.
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY .npmrc package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/api/package.json           ./apps/api/
 RUN pnpm install --frozen-lockfile
