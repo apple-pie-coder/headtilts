@@ -320,6 +320,7 @@
   <a href="#backup-commands">Backup Commands</a>
   <a href="#backup-automate">Automating Backups</a>
   <a href="#backup-restore">Restore Procedure</a>
+  <a href="#auto-deploy">Auto-Deploy Webhook</a>
   <a href="#incident-response">Incident Response</a>
 </nav><main>
 
@@ -344,8 +345,8 @@
 <thead><tr><th>Package</th><th>Path</th><th>Stack</th><th>Port</th></tr></thead>
 <tbody>
 <tr><td><code>@headtilts/api</code></td><td><code>apps/api</code></td><td>Express · Prisma · MySQL · tsx</td><td>3000</td></tr>
-<tr><td><code>@headtilts/admin</code></td><td><code>apps/admin</code></td><td>React 18 · Vite · CSS Modules</td><td>5173</td></tr>
-<tr><td><code>@headtilts/web</code></td><td><code>apps/web</code></td><td>React 18 · Vite · Global CSS</td><td>5174</td></tr>
+<tr><td><code>@headtilts/admin</code></td><td><code>apps/admin</code></td><td>React 18 · Vite · CSS Modules</td><td>5174 (internal; accessed via <code>localhost:5173/admin/</code> in dev)</td></tr>
+<tr><td><code>@headtilts/web</code></td><td><code>apps/web</code></td><td>React 18 · Vite · Global CSS</td><td>5173 (unified dev entry; proxies <code>/admin/*</code> to 5174)</td></tr>
 <tr><td><code>@headtilts/shared</code></td><td><code>packages/shared</code></td><td>TypeScript · permissions constants · types</td><td>—</td></tr>
 </tbody>
 </table>
@@ -357,11 +358,11 @@
 </div>
 
 <h3>Environment Variables</h3>
-<pre><code># apps/api uses a root .env
+<pre><code># apps/api uses the root .env (loaded via --env-file=../../.env)
 DATABASE_URL="mysql://user:pass@localhost:3306/headtilts"
 JWT_SECRET="..."
 JWT_REFRESH_SECRET="..."
-PORT=3000
+API_PORT=3000
 
 # Email (optional — if unset, mail is logged to console)
 SMTP_HOST="smtp.example.com"
@@ -516,6 +517,9 @@ SMTP_FROM="noreply@example.com"</code></pre>
 </ul>
 <p><code>contentHash</code> (SHA-256) enables upload deduplication. <code>mimeType</code> validated against <code>upload_allowed_mime</code> setting.</p>
 
+<h3>MediaFolder</h3>
+<p>Optional grouping for media files. Each folder has a unique <code>name</code> and <code>slug</code>. A <code>Media</code> row has an optional <code>folderId</code> FK; files without a folder appear in the root of the library. Deleting a folder sets <code>folderId</code> to null on contained files (cascade set-null).</p>
+
 <h2 id="model-taxonomy">Data Models — Taxonomy</h2>
 <h3>Category</h3>
 <p>Hierarchical. <code>parentId</code> for nested categories. <code>icon</code> stores a Font Awesome class string. <code>showSidebar</code> controls sidebar widget display.</p>
@@ -536,6 +540,9 @@ SMTP_FROM="noreply@example.com"</code></pre>
 
 <h3>Comment / CommentReaction</h3>
 <p>Comments are threaded via <code>parentId</code>. <code>visitorId</code> is a client-generated anonymous identifier. Reactions are unique per (comment, emoji, visitorId) and toggle on repeat submission.</p>
+
+<h3>ContactSubmission</h3>
+<p>Stores contact form submissions from the public site (<code>POST /public/contact</code>). Fields: <code>name</code>, <code>email</code>, <code>subject</code>, <code>message</code>, <code>isRead</code> (default false). Indexed on <code>(isRead)</code> and <code>(createdAt)</code>. Managed in the admin under Contact (requires <code>SETTING_READ</code>).</p>
 
 <h3>Celebration</h3>
 <p>Annual events stored by month/day (no year in the date). <code>year</code> is the birth year or year of passing — optional. Indexed on <code>(month, day)</code> for fast daily queries.</p>
@@ -736,7 +743,7 @@ SMTP_FROM="noreply@example.com"</code></pre>
 
 <!-- DATA MODELS -->
 <h2 id="admin-pages">Admin Panel — Pages</h2>
-<p>Admin app runs at <code>http://localhost:5173</code>. All routes under <code>/admin</code> require authentication except login/setup.</p>
+<p>Admin app is accessed at <code>http://localhost:5173/admin/</code> in development (the web dev server at 5173 proxies <code>/admin/*</code> to the admin dev server on 5174). All routes under <code>/admin</code> require authentication except login, setup, forgot-password, and reset-password.</p>
 
 <div class="table-wrap">
 <table>
@@ -744,6 +751,8 @@ SMTP_FROM="noreply@example.com"</code></pre>
 <tbody>
 <tr><td>Dashboard</td><td>/admin</td><td>—</td><td>Stats overview, recent posts/media/comments/users, upcoming celebrations</td></tr>
 <tr><td>Login</td><td>/admin/login</td><td>—</td><td>Email or username + password login form</td></tr>
+<tr><td>Forgot Password</td><td>/admin/forgot-password</td><td>—</td><td>Request a password reset email</td></tr>
+<tr><td>Reset Password</td><td>/admin/reset-password</td><td>—</td><td>Set a new password via token from email link</td></tr>
 <tr><td>Setup</td><td>/admin/setup</td><td>—</td><td>First-time super-admin creation (disabled after any user exists)</td></tr>
 <tr><td>Profile</td><td>/admin/profile</td><td>—</td><td>Edit own name, email, password, avatar, bio</td></tr>
 <tr><td>Posts</td><td>/admin/posts</td><td>POST_READ</td><td>Post list with status tabs (all/draft/published/scheduled/trash), search, delete</td></tr>
@@ -791,7 +800,7 @@ SMTP_FROM="noreply@example.com"</code></pre>
 
 <!-- WEB PAGES -->
 <h2 id="web-pages">Public Website — Pages</h2>
-<p>Web app runs at <code>http://localhost:5174</code>. Uses React Router with a catch-all for permalink resolution.</p>
+<p>Web app runs at <code>http://localhost:5173</code>. Uses React Router with a catch-all for permalink resolution.</p>
 
 <div class="table-wrap">
 <table>
@@ -1130,10 +1139,10 @@ ConflictError   → 409 Conflict</code></pre>
 <tr>
   <td><code>JWT_SECRET</code> is a random string of at least 32 characters — not <code>dev-secret</code> or any default</td>
   <td><span style="color:var(--red)">Critical</span></td>
-  <td><code>grep JWT_SECRET apps/api/.env</code> — must be long and random. Generate with: <code>openssl rand -hex 32</code></td>
+  <td><code>grep JWT_SECRET .env</code> — must be long and random. Generate with: <code>openssl rand -hex 32</code></td>
 </tr>
 <tr>
-  <td><code>NODE_ENV=production</code> is set in <code>apps/api/.env</code></td>
+  <td><code>NODE_ENV=production</code> is set (Docker: <code>docker-compose.yml</code> sets this automatically; local dev: set in root <code>.env</code>)</td>
   <td><span style="color:var(--red)">Critical</span></td>
   <td>Without this, some frameworks expose stack traces to clients.</td>
 </tr>
@@ -1310,8 +1319,8 @@ docker compose up -d --build
 # 5. Watch the logs until the API prints "Server running" (takes ~30 s first time)
 docker compose logs -f api
 
-# 6. Seed the database (permissions, default roles, super-admin user)
-docker compose exec api sh -c "cd apps/api && node_modules/.bin/ts-node prisma/seed.ts"
+# 6. Seed the database (permissions, default roles, widget zones, settings)
+docker compose exec api sh -c "cd apps/api && node_modules/.bin/tsx prisma/seed.ts"
 
 # 7. Open the admin panel
 #    Default URL: http://localhost/admin/  (or http://yourserver:HTTP_PORT/admin/)
@@ -1442,20 +1451,12 @@ openssl rand -hex 32
 openssl rand -hex 32</code></pre>
 
 <h2 id="docker-seed">Seed &amp; First Login</h2>
-<p>After the containers are running and the API is healthy, seed the database to create default permissions, roles, and the initial super-admin account.</p>
-<pre><code class="bash">docker compose exec api sh -c "cd apps/api && node_modules/.bin/ts-node prisma/seed.ts"</code></pre>
-<p>The seed is <strong>idempotent</strong> — safe to run multiple times. It will not overwrite an existing super-admin password.</p>
-<div class="table-wrap">
-<table>
-<thead><tr><th>Field</th><th>Default value</th></tr></thead>
-<tbody>
-<tr><td>Admin URL</td><td><code>http://localhost:{HTTP_PORT}/admin/</code></td></tr>
-<tr><td>Email</td><td><code>admin@headtilts.com</code></td></tr>
-<tr><td>Password</td><td><code>Admin1234!</code></td></tr>
-</tbody>
-</table>
-</div>
-<p><strong>Change the password immediately</strong> after first login via Admin → Users → Edit Account.</p>
+<p>After the containers are running and the API is healthy, seed the database to create default permissions, roles, widget zones, and settings:</p>
+<pre><code class="bash">docker compose exec api sh -c "cd apps/api && node_modules/.bin/tsx prisma/seed.ts"</code></pre>
+<p>The seed is <strong>idempotent</strong> — safe to run multiple times. It does <strong>not</strong> create any user accounts.</p>
+<p>To create the first admin account, open the admin panel in a browser:</p>
+<pre><code>http://&lt;your-server&gt;:&lt;HTTP_PORT&gt;/admin/</code></pre>
+<p>Because no users exist yet, the app shows a <strong>setup wizard</strong> instead of the login form. Fill in your name, username, email, and password — this account is automatically granted the <code>super-admin</code> role. Once created, the setup page is permanently disabled (<code>POST /api/auth/setup</code> returns <code>403</code> for all future requests).</p>
 
 <h2 id="docker-commands">Useful Commands</h2>
 <h3>Day-to-day operations</h3>
@@ -1601,7 +1602,7 @@ sudo nginx -s reload</code></pre>
 </tr>
 <tr>
   <td><strong>Environment secrets</strong></td>
-  <td><code>apps/api/.env</code>, <code>apps/admin/.env</code>, <code>apps/web/.env</code></td>
+  <td><code>.env</code> (root — Docker) or <code>apps/api/.env</code> (local dev)</td>
   <td><code>JWT_SECRET</code> cannot be recovered; losing it means every existing access token and signed preview link becomes unverifiable. DB credentials, <code>SMTP_PASS</code>, and <code>SITE_URL</code> must also be preserved. Store these in a password manager or a secrets vault — <em>never</em> commit them to git.</td>
 </tr>
 </tbody>
@@ -1784,6 +1785,60 @@ sudo journalctl -u headtilts-api -f
 # or
 pm2 logs headtilts-api --lines 50</code></pre>
 
+<h2 id="auto-deploy">Auto-Deploy Webhook</h2>
+<p>The <code>deploy/</code> directory contains a lightweight webhook server that triggers a redeploy automatically whenever you push to the configured branch on Gitea or GitHub. This is optional — you can always redeploy manually with <code>git pull &amp;&amp; docker compose up -d --build</code>.</p>
+
+<h3>Files</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>File</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>deploy/webhook.py</code></td><td>Flask HTTP server. Verifies HMAC-SHA256 signatures, then runs <code>git pull</code> + <code>docker compose up -d --build</code> in a background thread so the webhook host receives a fast 200 response.</td></tr>
+<tr><td><code>deploy/headtilts-webhook.service</code></td><td>systemd unit that keeps the webhook server running and restarts it on failure. Configured for a user named <code>flypi</code> — edit <code>User=</code> and the <code>Environment=</code> lines before installing.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Setup on the server</h3>
+<pre><code class="bash"># Install Flask (Python 3 required)
+pip install flask
+
+# Edit the unit file: set User=, WEBHOOK_SECRET=, and REPO_DIR=
+nano deploy/headtilts-webhook.service
+
+# Install and start
+sudo cp deploy/headtilts-webhook.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now headtilts-webhook
+
+# Confirm it is running
+sudo systemctl status headtilts-webhook</code></pre>
+
+<h3>Configure Gitea / GitHub</h3>
+<p>In your repository's webhook settings, add a new webhook:</p>
+<ul>
+  <li><strong>Target URL:</strong> <code>http://&lt;server-ip&gt;:9000/webhook</code></li>
+  <li><strong>Secret:</strong> the same value as <code>WEBHOOK_SECRET</code> in the unit file</li>
+  <li><strong>Events:</strong> Push events only</li>
+</ul>
+<p>Only pushes to <code>DEPLOY_BRANCH</code> (default: <code>main</code>) trigger a redeploy; pushes to other branches are ignored.</p>
+
+<h3>Environment variables (set in the unit file)</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>WEBHOOK_SECRET</code></td><td><em>required</em></td><td>Shared secret used to verify the request signature. Must match the value set in Gitea/GitHub.</td></tr>
+<tr><td><code>REPO_DIR</code></td><td><em>required</em></td><td>Absolute path to the cloned repository on the server (e.g. <code>/home/flypi/headtilts</code>).</td></tr>
+<tr><td><code>DEPLOY_BRANCH</code></td><td><code>main</code></td><td>Branch that triggers a deploy.</td></tr>
+<tr><td><code>WEBHOOK_PORT</code></td><td><code>9000</code></td><td>Port the server listens on.</td></tr>
+<tr><td><code>COMPOSE_CMD</code></td><td><code>docker compose up -d --build</code></td><td>Command run after <code>git pull</code>.</td></tr>
+<tr><td><code>LOG_FILE</code></td><td><code>/var/log/headtilts-deploy.log</code></td><td>Deploy log destination.</td></tr>
+</tbody>
+</table>
+</div>
+<p>A <code>GET /health</code> endpoint returns <code>{"status":"ok"}</code> and can be used by uptime monitors to confirm the webhook server is alive.</p>
+
 <h2 id="incident-response">Incident Response — Site Hijacked</h2>
 <p>If you suspect an attacker has gained unauthorised access to the CMS, work through these steps immediately and in order. Speed matters — every minute the site is online gives the attacker more time to exfiltrate data or plant persistence mechanisms.</p>
 
@@ -1831,8 +1886,8 @@ sudo iptables -I INPUT -p tcp --dport 3000 -j DROP</code></pre>
 <pre><code class="bash"># Generate a new JWT_SECRET
 openssl rand -hex 32
 
-# Update apps/api/.env with the new values, then verify:
-grep JWT_SECRET apps/api/.env</code></pre>
+# Update .env (root) with the new values, then verify:
+grep JWT_SECRET .env</code></pre>
 
 <h3>Step 3 — Delete all active sessions</h3>
 <p>Even with a new <code>JWT_SECRET</code>, old refresh tokens stored in the <code>Session</code> table become cryptographically invalid. Truncate the table to be certain:</p>
@@ -1897,8 +1952,8 @@ grep "/api/" /var/log/nginx/access.log \
 <p>Only required if the attacker deleted or corrupted data. If they only read data, restoration is not needed (the data is gone regardless). Follow the <a href="#backup-restore">Restore Procedure</a> steps above, using the most recent clean backup — typically the one from before the intrusion timestamp you found in the logs.</p>
 
 <h3>Step 8 — Bring the site back online</h3>
-<pre><code class="bash"># Ensure .env has all new credentials
-cat apps/api/.env | grep -E "JWT_SECRET|DATABASE_URL|SMTP"
+<pre><code class="bash"># Ensure .env (root) has all new credentials
+grep -E "JWT_SECRET|DATABASE_URL|SMTP" .env
 
 # Re-open the firewall
 sudo ufw allow 3000

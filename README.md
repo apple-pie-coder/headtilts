@@ -7,8 +7,8 @@ The Headtilts Webzine CMS — a WordPress-style content platform built as a Type
 | App | Description | Port |
 | --- | --- | --- |
 | `apps/api` | Express + Prisma REST API (MySQL 8) | 3000 |
-| `apps/admin` | React admin dashboard (CMS UI) | 5173 |
-| `apps/web` | Public website (the webzine itself) | 4173 |
+| `apps/admin` | React admin dashboard (CMS UI) | 5174 (dev; accessed via `localhost:5173/admin/`) |
+| `apps/web` | Public website (the webzine itself) | 5173 (dev entry point) |
 | `packages/shared` | Shared types, constants, validators | — |
 
 In production all three apps sit behind a single **Nginx** reverse proxy:
@@ -44,35 +44,34 @@ cd headtilts
 
 ## 3. Configure environment variables
 
-Copy the example env file and edit it:
+Copy the template env file and edit it:
 
 ```bash
-cp .env.example .env
+cp .env.docker .env
 ```
+
+All configuration lives in `.env`. `docker-compose.yml` reads everything from there via `${VARIABLE}` substitution — you never need to edit `docker-compose.yml` directly.
 
 | Variable | Purpose | Production guidance |
 | --- | --- | --- |
-| `JWT_SECRET` | Signs access tokens | Generate a long random value, e.g. `openssl rand -base64 48` |
-| `JWT_REFRESH_SECRET` | Signs refresh tokens | Different long random value |
-
-These two are read by `docker-compose.yml` and **must** be changed from their defaults — anyone who knows the default secret can forge valid login tokens.
+| `HTTP_PORT` | Port nginx binds to on the host | Default `80`; use `8080` or any free port if you can't bind 80 |
+| `JWT_SECRET` | Signs access tokens | `openssl rand -hex 32` — must be unique and secret |
+| `JWT_REFRESH_SECRET` | Signs refresh tokens | `openssl rand -hex 32` — use a different value from JWT_SECRET |
+| `MYSQL_ROOT_PASSWORD` | MySQL root password | Strong unique password; only used during DB init |
+| `MYSQL_PASSWORD` | App DB user password | Strong unique password; used by the API at runtime |
 
 ### Domain-specific settings
 
-`docker-compose.yml` also hardcodes a few URLs that assume `http://localhost`. Before building, edit `docker-compose.yml` and replace `http://localhost` with your real domain (e.g. `https://example.com`) in:
+Set these in `.env` to match your production domain:
 
-- `api.environment.ADMIN_URL`, `api.environment.WEB_URL`, `api.environment.SITE_URL` — used for CORS allow-listing
-- `admin.build.args.VITE_API_URL` and `web.build.args.VITE_API_URL` — **baked into the static build at image-build time**, so these must point at the public URL clients will actually use (e.g. `https://example.com/api`)
-- `web.build.args.VITE_SITE_NAME` — display name for the public site
-
-### Other settings to review
-
-- `api.environment.NODE_ENV` is set to `development` in the shipped `docker-compose.yml`. Change it to `production`.
-- `api` and `mysql` ports (`3000` and `3306`) are published directly to the host. Unless you need direct access for debugging, remove these `ports:` mappings so only Nginx (port 80) is reachable from outside.
+- `SITE_URL` — public base URL, e.g. `https://example.com`. Used in CORS, sitemap, and robots.txt.
+- `WEB_URL` — URL of the public site (usually the same as `SITE_URL`).
+- `ADMIN_URL` — URL of the admin panel, e.g. `https://example.com/admin`.
+- `VITE_API_URL` — path the browser uses to reach the API. The default `/api` is a relative path that works for any domain because nginx proxies it. Only change this if the API lives on a completely different domain.
 
 ### Database credentials
 
-The `mysql` service in `docker-compose.yml` ships with default credentials (`headtilts` / `headtilts`, root password `root`). For production, change `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD`, and the matching `DATABASE_URL` in the `api` service to a strong, unique password.
+The `.env.docker` template ships with example passwords. **Change `MYSQL_ROOT_PASSWORD` and `MYSQL_PASSWORD` before going live.**
 
 ---
 
@@ -82,7 +81,7 @@ The `mysql` service in `docker-compose.yml` ships with default credentials (`hea
 docker compose up -d --build
 ```
 
-This starts MySQL, the API, the admin dashboard, the public site, and Nginx (listening on port 80).
+This starts MySQL, the API, the admin dashboard, the public site, and Nginx (listening on `HTTP_PORT`, default 80).
 
 Check everything is healthy:
 
@@ -93,16 +92,15 @@ docker compose logs -f api
 
 ---
 
-## 5. Run database migrations and seed data
+## 5. Run the database seed
 
-The first time you deploy (and after every update that includes new migrations):
+Migrations run automatically every time the API container starts (via `prisma migrate deploy` in the container's startup command). You only need to run the seed manually — once on first deploy:
 
 ```bash
-docker compose exec api npx prisma migrate deploy
-docker compose exec api node --loader ts-node/esm prisma/seed.ts
+docker compose exec api sh -c "cd apps/api && node_modules/.bin/tsx prisma/seed.ts"
 ```
 
-The seed script creates default roles/permissions, widget zones, and baseline settings. It is safe to re-run — it only upserts records that don't already exist.
+The seed script creates default roles, permissions, widget zones, and baseline settings. It is safe to re-run — it only upserts records that don't already exist.
 
 ---
 
@@ -156,7 +154,12 @@ docker run --rm -v headtilts_uploads_data:/data -v "$PWD":/backup alpine \
 ```bash
 git pull
 docker compose up -d --build
-docker compose exec api npx prisma migrate deploy
+```
+
+Migrations run automatically on startup. If the update also added new seed data, re-run the seed (it is idempotent):
+
+```bash
+docker compose exec api sh -c "cd apps/api && node_modules/.bin/tsx prisma/seed.ts"
 ```
 
 ---
@@ -168,6 +171,34 @@ docker compose logs -f            # tail logs for all services
 docker compose restart api        # restart just the API
 docker compose down                # stop the stack (volumes are preserved)
 ```
+
+---
+
+## 11. Auto-deploy webhook (optional)
+
+The `deploy/` directory contains a lightweight webhook server that triggers an automatic redeploy whenever you push to the configured branch on Gitea or GitHub.
+
+**Files:**
+
+- `deploy/webhook.py` — Flask server that verifies HMAC-SHA256 signatures and runs `git pull` + `docker compose up -d --build`
+- `deploy/headtilts-webhook.service` — systemd unit to keep the webhook server running
+
+**Setup (on the server):**
+
+```bash
+pip install flask
+
+# Edit the unit file and fill in WEBHOOK_SECRET and REPO_DIR
+sudo cp deploy/headtilts-webhook.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now headtilts-webhook
+```
+
+**Configure Gitea/GitHub:**
+
+Add a webhook pointing to `http://<server-ip>:9000/webhook` with the same secret as `WEBHOOK_SECRET`. Set the trigger to **Push events** on your deploy branch (default: `main`).
+
+The server also exposes `GET /health` for monitoring. Logs go to `LOG_FILE` (default `/var/log/headtilts-deploy.log`).
 
 ---
 

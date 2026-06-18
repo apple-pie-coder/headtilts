@@ -12,7 +12,7 @@
     "dev": "pnpm --filter @headtilts/api --filter @headtilts/web --filter @headtilts/admin -r --parallel run dev",
     "build": "pnpm -r run build",
     "db:migrate": "cd apps/api && prisma migrate dev",
-    "db:seed": "cd apps/api && node --loader ts-node/esm prisma/seed.ts",
+    "db:seed": "pnpm --filter @headtilts/api run db:seed",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "test": "pnpm -r run test",
