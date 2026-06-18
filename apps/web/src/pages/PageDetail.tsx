@@ -14,6 +14,11 @@ import { PostsArchive } from './PostsArchive';
 
 export function PageDetailPage() {
   const { slug } = useParams<{ slug: string }>();
+  if (!slug) return null;
+  return <PageDetail slug={slug} />;
+}
+
+export function PageDetail({ slug }: { slug: string }) {
   const [page, setPage] = useState<PostFull | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
