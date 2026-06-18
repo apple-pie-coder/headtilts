@@ -22,6 +22,8 @@ const DEFAULTS: SiteSettings = {
   posts_page_id: '',
   contact_page_id: '',
   about_page_id: '',
+  privacy_policy_page_id: '',
+  terms_page_id: '',
 };
 
 const SiteSettingsContext = createContext<SiteSettings>(DEFAULTS);

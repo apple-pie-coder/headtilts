@@ -67,11 +67,11 @@ router.get('/site-settings', publicReadLimiter, asyncHandler(async (_req: Reques
     'site_title', 'site_tagline', 'show_tagline', 'site_logo', 'site_logo_dark', 'site_logo_height', 'admin_logo_height', 'site_description',
     'timezone', 'date_format', 'time_format',
     'posts_per_page', 'front_page_display', 'front_page_id', 'posts_page_id',
-    'contact_page_id', 'about_page_id',
+    'contact_page_id', 'about_page_id', 'privacy_policy_page_id', 'terms_page_id',
     'search_engine_visibility', 'permalink_structure',
     'toc_enabled',
   ];
-  const PAGE_ID_KEYS = ['front_page_id', 'posts_page_id', 'contact_page_id', 'about_page_id'];
+  const PAGE_ID_KEYS = ['front_page_id', 'posts_page_id', 'contact_page_id', 'about_page_id', 'privacy_policy_page_id', 'terms_page_id'];
 
   const rows = await prisma.setting.findMany({ where: { key: { in: SAFE_KEYS } } });
   const settings: Record<string, string> = Object.fromEntries(rows.map((r) => [r.key, r.value]));
