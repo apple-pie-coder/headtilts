@@ -230,10 +230,12 @@ tr:last-child td { border-bottom: none; }
   white-space: nowrap;
 }
 
-.roleFront    { background: var(--accent-bg);   color: var(--accent);   }
-.rolePosts    { background: var(--success-bg);  color: var(--success-t);}
-.roleContact  { background: rgba(191,90,242,0.12); color: #8944ab;      }
-.roleAbout    { background: var(--warning-bg);  color: var(--warning-t);}
+.roleFront    { background: var(--accent-bg);      color: var(--accent);   }
+.rolePosts    { background: var(--success-bg);     color: var(--success-t);}
+.roleContact  { background: rgba(191,90,242,0.12); color: #8944ab;         }
+.roleAbout    { background: var(--warning-bg);     color: var(--warning-t);}
+.rolePrivacy  { background: rgba(90,200,250,0.12); color: #0e79a8;         }
+.roleTerms    { background: rgba(255,149,0,0.12);  color: #c45f00;         }
 
 .templateBadge {
   display: inline-flex;
@@ -250,6 +252,8 @@ tr:last-child td { border-bottom: none; }
 
 @media (prefers-color-scheme: dark) {
   .roleContact { background: rgba(191,90,242,0.18); color: #bf5af2; }
+  .rolePrivacy { background: rgba(90,200,250,0.18); color: #5ac8fa; }
+  .roleTerms   { background: rgba(255,149,0,0.18);  color: #ff9500; }
 }
 
 .statusBadge {
