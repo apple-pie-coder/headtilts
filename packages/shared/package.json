@@ -1,18 +1,18 @@
 {
   "name": "@headtilts/shared",
   "version": "1.0.0",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/cjs/index.js",
+  "types": "./dist/cjs/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/cjs/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
     }
   },
   "files": ["src", "dist"],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --outDir dist/cjs && tsc -m es2020 --outDir dist/esm && cp -r dist/esm/*.d.ts dist/cjs/ && cp -r dist/esm/types dist/cjs/ && cp -r dist/esm/constants dist/cjs/ && cp -r dist/esm/utils dist/cjs/",
     "dev": "tsc --watch"
   },
   "devDependencies": {

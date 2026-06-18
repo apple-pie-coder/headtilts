@@ -22,6 +22,7 @@ export default defineConfig({
   // so named imports (e.g. PERMISSIONS) are available in the browser.
   optimizeDeps: {
     include: ['@headtilts/shared'],
+    force: true,
     esbuildOptions: {
       target: 'es2020',
     },
