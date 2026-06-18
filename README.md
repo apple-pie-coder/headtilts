@@ -116,6 +116,11 @@ Once that first account exists, the setup page is permanently disabled
 created from the admin's Users page or via `/api/auth/register` (which gets
 the low-privilege `subscriber` role).
 
+After creating your account, a **site configuration wizard** guides you through
+the initial site settings (title, tagline, admin email, timezone, and logo).
+Every step is optional and skippable — all values can be changed later in
+**Settings → General**.
+
 ---
 
 ## 7. HTTPS

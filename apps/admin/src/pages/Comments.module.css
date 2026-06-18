@@ -133,7 +133,7 @@
   line-height: 1.6;
   color: var(--t1);
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .itemMeta {

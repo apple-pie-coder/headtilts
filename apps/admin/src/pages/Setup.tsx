@@ -49,7 +49,7 @@ export default function SetupPage() {
         firstName: firstName || undefined,
         lastName: lastName || undefined,
       });
-      navigate('/admin');
+      navigate('/admin/wizard');
     } catch (err: unknown) {
       toast.error(
         (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message ||

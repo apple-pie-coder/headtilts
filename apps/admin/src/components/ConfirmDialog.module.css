@@ -38,7 +38,7 @@
   color: var(--t2);
   font-size: 0.9375rem;
   line-height: 1.6;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .actions {

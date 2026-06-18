@@ -1210,6 +1210,11 @@ ConflictError   → 409 Conflict</code></pre>
   <td>Without it the hard ceiling of 100 MB applies.</td>
 </tr>
 <tr>
+  <td>nginx <code>client_max_body_size</code> is at least as large as <code>MAX_UPLOAD_SIZE</code></td>
+  <td><span style="color:var(--red)">Critical</span></td>
+  <td>nginx rejects the request with <code>413 Request Entity Too Large</code> before it reaches the API. The bundled <code>docker/nginx.conf</code> sets <code>50m</code>; any host-level reverse proxy in front of it must set the same or larger.</td>
+</tr>
+<tr>
   <td>Upload directory is excluded from git (<code>apps/api/uploads/</code> in <code>.gitignore</code>)</td>
   <td><span style="color:var(--yellow)">Important</span></td>
   <td><code>git check-ignore -v apps/api/uploads</code></td>
@@ -1456,7 +1461,14 @@ openssl rand -hex 32</code></pre>
 <p>The seed is <strong>idempotent</strong> — safe to run multiple times. It does <strong>not</strong> create any user accounts.</p>
 <p>To create the first admin account, open the admin panel in a browser:</p>
 <pre><code>http://&lt;your-server&gt;:&lt;HTTP_PORT&gt;/admin/</code></pre>
-<p>Because no users exist yet, the app shows a <strong>setup wizard</strong> instead of the login form. Fill in your name, username, email, and password — this account is automatically granted the <code>super-admin</code> role. Once created, the setup page is permanently disabled (<code>POST /api/auth/setup</code> returns <code>403</code> for all future requests).</p>
+<p>Because no users exist yet, the app shows a <strong>setup page</strong> instead of the login form. Fill in your name, username, email, and password — this account is automatically granted the <code>super-admin</code> role. Once created, the setup page is permanently disabled (<code>POST /api/auth/setup</code> returns <code>403</code> for all future requests).</p>
+<p>After account creation you are redirected to a <strong>site configuration wizard</strong> at <code>/admin/wizard</code>. It walks through three steps:</p>
+<ol>
+  <li><strong>Your site</strong> — site title, tagline, admin email, and timezone</li>
+  <li><strong>Logo</strong> — light-mode and dark-mode logo images (via the Media Library)</li>
+  <li><strong>Done</strong> — shortcut links to write your first post, create categories, and build navigation</li>
+</ol>
+<p>Every step has a Skip button; all values can be changed later in <strong>Settings → General</strong>. The wizard only appears once per browser (tracked via <code>localStorage</code>).</p>
 
 <h2 id="docker-commands">Useful Commands</h2>
 <h3>Day-to-day operations</h3>
@@ -1560,6 +1572,10 @@ server {
 
     ssl_certificate     /etc/letsencrypt/live/mysite.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/mysite.com/privkey.pem;
+
+    # Must be at least as large as the nginx inside Docker (default 50m).
+    # Without this, media uploads return 413 Request Entity Too Large.
+    client_max_body_size 50m;
 
     location / {
         proxy_pass http://127.0.0.1:8080;

@@ -105,7 +105,7 @@ tr:last-child td { border-bottom: none; }
 .url {
   color: var(--accent);
   font-size: 0.875rem;
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .priority {
