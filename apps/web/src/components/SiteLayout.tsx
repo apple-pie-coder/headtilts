@@ -77,89 +77,98 @@ export function SiteLayout({ children }: { children: ReactNode }) {
     applyRobotsPolicy(search_engine_visibility !== 'no');
   }, [search_engine_visibility]);
 
-  if (variant === 'blank') {
-    return <>{children}</>;
-  }
-
-  const withSidebar = variant === 'default' && showSidebar;
+  const isBlank = variant === 'blank';
   const isFullBleed = variant === 'full-bleed';
+  const withSidebar = variant === 'default' && showSidebar;
+
+  // Always render the same root structure so React can reconcile children in-place
+  // rather than unmounting them when variant changes. The early-return pattern for
+  // blank caused PageDetail to unmount → its cleanup reset variant → remount loop →
+  // 429s from the public rate limiter.
+  const outerClass = isBlank || isFullBleed
+    ? undefined
+    : `container site-content${withSidebar ? '' : ' site-content--full'}`;
+  const innerClass = isBlank || isFullBleed ? undefined : 'site-body';
 
   return (
     <div className="site-wrap">
-      <CelebrationSpotlight />
-      <header className={`site-header${isFullBleed ? ' site-header--transparent' : ''}`}>
-        <div className="container header-inner">
-          <div className="site-brand-wrap">
-            <Link to="/" className="site-brand">
-              {(() => {
-                const logo = (theme === 'dark' && site_logo_dark) ? site_logo_dark : site_logo;
-                const logoStyle = site_logo_height ? { height: `${site_logo_height}px`, maxWidth: 'none' } : undefined;
-                return logo
-                  ? <img className="site-logo" src={resolveMediaUrl(logo)} alt={site_title} style={logoStyle} />
-                  : site_title;
-              })()}
-            </Link>
-            {show_tagline !== 'no' && site_tagline && <span className="site-tagline">{site_tagline}</span>}
+      {!isBlank && <CelebrationSpotlight />}
+      {!isBlank && (
+        <header className={`site-header${isFullBleed ? ' site-header--transparent' : ''}`}>
+          <div className="container header-inner">
+            <div className="site-brand-wrap">
+              <Link to="/" className="site-brand">
+                {(() => {
+                  const logo = (theme === 'dark' && site_logo_dark) ? site_logo_dark : site_logo;
+                  const logoStyle = site_logo_height ? { height: `${site_logo_height}px`, maxWidth: 'none' } : undefined;
+                  return logo
+                    ? <img className="site-logo" src={resolveMediaUrl(logo)} alt={site_title} style={logoStyle} />
+                    : site_title;
+                })()}
+              </Link>
+              {show_tagline !== 'no' && site_tagline && <span className="site-tagline">{site_tagline}</span>}
+            </div>
+            <div className="header-right">
+              <nav className={`site-nav${navOpen ? ' open' : ''}`}>
+                {navItems.map((item) => (
+                  <NavLink
+                    key={item.id}
+                    to={item.url || '#'}
+                    className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+                  >
+                    {item.title}
+                  </NavLink>
+                ))}
+              </nav>
+              <Link to="/search" className="nav-search-link" aria-label="Search" title="Search">
+                <FontAwesomeIcon icon={faMagnifyingGlass} />
+              </Link>
+              <ThemeSwitch />
+              <button
+                type="button"
+                className="nav-toggle"
+                onClick={() => setNavOpen((o) => !o)}
+                aria-label="Toggle menu"
+                aria-expanded={navOpen}
+              >
+                <span className={`nav-toggle-bars${navOpen ? ' open' : ''}`} />
+              </button>
+            </div>
           </div>
-          <div className="header-right">
-            <nav className={`site-nav${navOpen ? ' open' : ''}`}>
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.id}
-                  to={item.url || '#'}
-                  className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
-                >
-                  {item.title}
-                </NavLink>
-              ))}
-            </nav>
-            <Link to="/search" className="nav-search-link" aria-label="Search" title="Search">
-              <FontAwesomeIcon icon={faMagnifyingGlass} />
-            </Link>
-            <ThemeSwitch />
-            <button
-              type="button"
-              className="nav-toggle"
-              onClick={() => setNavOpen((o) => !o)}
-              aria-label="Toggle menu"
-              aria-expanded={navOpen}
-            >
-              <span className={`nav-toggle-bars${navOpen ? ' open' : ''}`} />
-            </button>
-          </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       <main className={`site-main${isFullBleed ? ' site-main--full-bleed' : ''}`}>
-        {isFullBleed ? (
-          children
-        ) : (
-          <div className={`container site-content${withSidebar ? '' : ' site-content--full'}`}>
-            <div className="site-body">{children}</div>
-            {withSidebar && <WidgetZone zone="sidebar" className="site-sidebar" />}
+        {/* Stable two-div wrapper: classNames change per variant but the elements
+            stay mounted, keeping children (PageDetail) reconciled in place. */}
+        <div className={outerClass}>
+          <div className={innerClass}>
+            {children}
           </div>
-        )}
+          {withSidebar && <WidgetZone zone="sidebar" className="site-sidebar" />}
+        </div>
       </main>
 
-      <footer className="site-footer">
-        <div className="container footer-widgets">
-          <WidgetZone zone="footer-1" />
-          <WidgetZone zone="footer-2" />
-          <WidgetZone zone="footer-3" />
-        </div>
-        <div className="container footer-bottom">
-          <p>© {new Date().getFullYear()} {site_title}</p>
-          {footerItems.length > 0 && (
-            <nav className="footer-legal-links">
-              {footerItems.map((item) => (
-                <Link key={item.id} to={item.url || '#'}>{item.title}</Link>
-              ))}
-            </nav>
-          )}
-          {/* Legal links (Privacy, Terms, …) are managed via the "footer-bottom" widget zone */}
-          <WidgetZone zone="footer-bottom" className="footer-legal-zone" />
-        </div>
-      </footer>
+      {!isBlank && (
+        <footer className="site-footer">
+          <div className="container footer-widgets">
+            <WidgetZone zone="footer-1" />
+            <WidgetZone zone="footer-2" />
+            <WidgetZone zone="footer-3" />
+          </div>
+          <div className="container footer-bottom">
+            <p>© {new Date().getFullYear()} {site_title}</p>
+            {footerItems.length > 0 && (
+              <nav className="footer-legal-links">
+                {footerItems.map((item) => (
+                  <Link key={item.id} to={item.url || '#'}>{item.title}</Link>
+                ))}
+              </nav>
+            )}
+            <WidgetZone zone="footer-bottom" className="footer-legal-zone" />
+          </div>
+        </footer>
+      )}
     </div>
   );
 }
