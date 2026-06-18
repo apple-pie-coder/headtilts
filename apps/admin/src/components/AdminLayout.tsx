@@ -6,7 +6,7 @@ import {
   faGaugeHigh, faPenToSquare, faFileLines, faImages, faComments, faLayerGroup,
   faTags, faBars, faPuzzlePiece, faUsers, faUserShield, faSitemap, faEnvelope,
   faGear, faSliders, faChevronDown, faFeather, faRightFromBracket, faSun, faMoon, faDesktop,
-  faCakeCandles,
+  faCakeCandles, faChartBar,
 } from '@fortawesome/free-solid-svg-icons';
 import type { ThemeMode } from '../context/ThemeContext';
 import { useAuth } from '../hooks/useAuth';
@@ -31,6 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Categories', to: '/admin/categories', icon: faLayerGroup },
   { label: 'Tags', to: '/admin/tags', icon: faTags },
   { label: 'Celebrations', to: '/admin/celebrations', icon: faCakeCandles },
+  { label: 'Polls', to: '/admin/polls', icon: faChartBar },
   { label: 'Contact', to: '/admin/contact', icon: faEnvelope },
 ];
 

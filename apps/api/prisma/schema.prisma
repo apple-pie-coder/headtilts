@@ -29,6 +29,7 @@ model User {
   sessions      Session[]
   notifications Notification[]
   revisions     PostRevision[]
+  pollVotes     PollVote[]
 
   @@index([email])
   @@index([username])
@@ -165,6 +166,7 @@ model Post {
   seoMetadata     SeoMetadata?
   comments        Comment[]
   revisions       PostRevision[]
+  polls           Poll[]
 
   @@index([slug])
   @@index([status])
@@ -496,4 +498,61 @@ model Celebration {
   updatedAt DateTime @updatedAt
 
   @@index([month, day])
+}
+
+// ===================== Polls =====================
+
+model Poll {
+  id                Int                  @id @default(autoincrement())
+  title             String
+  question          String               @db.Text
+  slug              String               @unique
+  description       String?              @db.Text
+  status            String               @default("draft")
+  voteMode          String               @default("single")
+  resultVisibility  String               @default("after_vote")
+  voterRestriction  String               @default("anonymous")
+  allowVoteChange   Boolean              @default(false)
+  startsAt          DateTime?
+  endsAt            DateTime?
+  featuredImage     String?
+  postId            Int?
+  post              Post?                @relation(fields: [postId], references: [id], onDelete: SetNull)
+  options           PollOption[]
+  votes             PollVote[]
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@index([slug])
+  @@index([status])
+  @@index([postId])
+}
+
+model PollOption {
+  id        Int        @id @default(autoincrement())
+  pollId    Int
+  poll      Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  text      String
+  order     Int        @default(0)
+  votes     PollVote[]
+
+  @@index([pollId])
+}
+
+model PollVote {
+  id              Int        @id @default(autoincrement())
+  pollId          Int
+  poll            Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  optionId        Int
+  option          PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  voterIdentifier String
+  ipAddress       String?
+  userId          String?
+  user            User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@unique([pollId, optionId, voterIdentifier])
+  @@index([pollId])
+  @@index([voterIdentifier])
 }

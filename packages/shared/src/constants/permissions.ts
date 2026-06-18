@@ -72,6 +72,14 @@ export const PERMISSIONS = {
   CELEBRATION_EDIT: 'celebrations_update',
   CELEBRATION_DELETE: 'celebrations_delete',
 
+  // Polls
+  POLL_CREATE: 'polls_create',
+  POLL_READ: 'polls_read',
+  POLL_EDIT: 'polls_update',
+  POLL_DELETE: 'polls_delete',
+  POLL_VOTE: 'polls_vote',
+  POLL_RESET: 'polls_reset',
+
   // Revisions
   REVISION_READ: 'revisions_read',       // view the revision log for posts/pages
   REVISION_ARCHIVE: 'revisions_archive', // archive (soft-hide) individual log entries
@@ -128,6 +136,12 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.CELEBRATION_READ,
       PERMISSIONS.CELEBRATION_EDIT,
       PERMISSIONS.CELEBRATION_DELETE,
+      PERMISSIONS.POLL_CREATE,
+      PERMISSIONS.POLL_READ,
+      PERMISSIONS.POLL_EDIT,
+      PERMISSIONS.POLL_DELETE,
+      PERMISSIONS.POLL_VOTE,
+      PERMISSIONS.POLL_RESET,
       PERMISSIONS.REVISION_READ,
       PERMISSIONS.REVISION_ARCHIVE,
     ],
@@ -148,6 +162,9 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.TAG_EDIT,
       PERMISSIONS.COMMENT_READ,
       PERMISSIONS.COMMENT_MODERATE,
+      PERMISSIONS.POLL_CREATE,
+      PERMISSIONS.POLL_READ,
+      PERMISSIONS.POLL_EDIT,
       PERMISSIONS.REVISION_READ,
       PERMISSIONS.REVISION_ARCHIVE,
     ],
@@ -163,12 +180,13 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.MEDIA_READ,
       PERMISSIONS.CATEGORY_READ,
       PERMISSIONS.TAG_READ,
+      PERMISSIONS.POLL_READ,
       PERMISSIONS.REVISION_READ,
     ],
   },
   SUBSCRIBER: {
     name: 'subscriber',
     description: 'Subscriber access',
-    permissions: [PERMISSIONS.POST_READ, PERMISSIONS.CATEGORY_READ, PERMISSIONS.TAG_READ],
+    permissions: [PERMISSIONS.POST_READ, PERMISSIONS.CATEGORY_READ, PERMISSIONS.TAG_READ, PERMISSIONS.POLL_READ],
   },
 } as const;
