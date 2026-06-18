@@ -9,7 +9,7 @@ import { listPublicComments, createPublicComment, toggleReaction } from '../serv
 import { buildPostPath, getPermalinkStructure, matchPostPath } from '../utils/permalinks';
 import { getCalendarMonth } from '../services/calendar.service';
 import { getTodaysCelebrations } from '../services/celebrations.service';
-import { getPublicPoll, submitVote } from '../services/polls.service';
+import { listPolls, getPublicPoll, submitVote } from '../services/polls.service';
 import rateLimit from 'express-rate-limit';
 import { publicReadLimiter } from '../middleware/rateLimit';
 import { ApiError } from '../utils/errors';
@@ -505,6 +505,14 @@ router.get('/widgets/:zone', publicReadLimiter, asyncHandler(async (req: Request
       sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
     }
   }
+}));
+
+// GET /public/polls
+router.get('/polls', publicReadLimiter, asyncHandler(async (req: Request, res: Response) => {
+  const page  = Math.max(1, parseInt(req.query.page  as string) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+  const { items, total } = await listPolls(page, limit, undefined, 'open');
+  sendSuccess(res, { items, total, page, limit });
 }));
 
 // GET /public/polls/:slug

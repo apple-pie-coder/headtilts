@@ -38,6 +38,28 @@ export async function fetchPublicPoll(slug: string, voterIdentifier?: string): P
   return json.data;
 }
 
+export interface PublicPollSummary {
+  id: number;
+  title: string;
+  question: string;
+  slug: string;
+  description: string | null;
+  status: string;
+  featuredImage: string | null;
+  endsAt: string | null;
+  _count: { votes: number };
+}
+
+export async function fetchPublicPolls(page = 1, limit = 20): Promise<{ items: PublicPollSummary[]; total: number; page: number; limit: number }> {
+  const url = new URL(`${BASE}/public/polls`, window.location.origin);
+  url.searchParams.set('page', String(page));
+  url.searchParams.set('limit', String(limit));
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error('Failed to load polls');
+  const json = await res.json();
+  return json.data;
+}
+
 export async function submitVote(slug: string, optionIds: number[], voterIdentifier: string): Promise<PublicPoll> {
   const url = new URL(`${BASE}/public/polls/${slug}/vote`, window.location.origin);
   const res = await fetch(url.toString(), {

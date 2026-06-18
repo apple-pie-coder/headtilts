@@ -11,8 +11,10 @@ export const WIDGET_TYPES = [
   { value: 'category-posts-grid', label: 'Category Posts (Grid + View All)' },
   { value: 'categories', label: 'Categories' },
   { value: 'tags', label: 'Tags' },
+  { value: 'tag-cloud', label: 'Tag Cloud' },
   { value: 'calendar', label: 'Calendar' },
   { value: 'search', label: 'Search Form' },
+  { value: 'poll', label: 'Poll' },
 ] as const;
 
 const VALID_TYPES = WIDGET_TYPES.map((t) => t.value);
@@ -327,6 +329,34 @@ export async function getPublicZone(zoneName: string) {
           take: maxTags,
           select: { id: true, name: true, slug: true },
         });
+      } else if (zww.widget.type === 'tag-cloud') {
+        const maxTags = Math.min(Number(cfg.maxTags) || 40, 100);
+        const allTags = await prisma.tag.findMany({
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            _count: { select: { posts: { where: { post: { status: 'published', type: 'post' } } } } },
+          },
+        });
+        data = allTags
+          .filter((t) => t._count.posts > 0)
+          .sort((a, b) => b._count.posts - a._count.posts)
+          .slice(0, maxTags);
+      } else if (zww.widget.type === 'poll') {
+        const count = Math.min(Math.max(1, Number(cfg.count) || 1), 10);
+        const specificSlug = typeof cfg.pollSlug === 'string' ? cfg.pollSlug.trim() : '';
+        if (count === 1 && specificSlug) {
+          data = [specificSlug];
+        } else {
+          const polls = await prisma.poll.findMany({
+            where: { status: 'open' },
+            orderBy: { createdAt: 'desc' },
+            take: count,
+            select: { slug: true },
+          });
+          data = polls.map((p) => p.slug);
+        }
       } else if (zww.widget.type === 'calendar') {
         const now = new Date();
         data = await getCalendarMonth(now.getUTCFullYear(), now.getUTCMonth() + 1);
