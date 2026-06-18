@@ -26,6 +26,7 @@ export function createApp(): Express {
   const allowedOrigins = [
     process.env.ADMIN_URL || 'http://localhost:5173',
     process.env.WEB_URL  || 'http://localhost:5173',
+    'http://localhost:5174',
   ].map(u => { try { return new URL(u).origin; } catch { return u; } });
   app.use(cors({
     origin: (origin, callback) => {

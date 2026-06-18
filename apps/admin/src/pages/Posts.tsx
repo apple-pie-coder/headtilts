@@ -10,6 +10,8 @@ import { Category, Post, User } from '../types';
 import { deletePost, duplicatePost, bulkPosts, fetchPosts, updatePost } from '../services/posts';
 import { fetchCategories } from '../services/categories';
 import { fetchUsers } from '../services/users';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
 import styles from './Posts.module.css';
 
 const PAGE_SIZE = 10;
@@ -74,6 +76,26 @@ export default function PostsPage() {
   const [featuredFilter, setFeaturedFilter] = useState<'all' | 'featured' | 'not-featured'>('all');
   const [sortBy, setSortBy] = useState<'publishedAt' | 'updatedAt' | 'title'>('publishedAt');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [density, setDensity] = useState<'compact' | 'condensed' | 'relaxed'>('compact');
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem('postsDensity');
+      if (v === 'compact' || v === 'condensed' || v === 'relaxed') {
+        setDensity(v as 'compact' | 'condensed' | 'relaxed');
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('postsDensity', density);
+    } catch {
+      // ignore
+    }
+  }, [density]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkAction, setBulkAction] = useState('');
@@ -335,6 +357,38 @@ export default function PostsPage() {
               <option value="title:desc">Title (Z → A)</option>
             </select>
           </div>
+          <div className={styles.filter}>
+            <label>Density</label>
+            <div className={styles.densitySwitch} role="group" aria-label="List density">
+              <button
+                type="button"
+                className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`}
+                onClick={() => setDensity('compact')}
+                title="Compact"
+                aria-pressed={density === 'compact'}
+              >
+                <FontAwesomeIcon icon={faCompress} />
+              </button>
+              <button
+                type="button"
+                className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`}
+                onClick={() => setDensity('condensed')}
+                title="Condensed"
+                aria-pressed={density === 'condensed'}
+              >
+                <FontAwesomeIcon icon={faGripVertical} />
+              </button>
+              <button
+                type="button"
+                className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`}
+                onClick={() => setDensity('relaxed')}
+                title="Relaxed"
+                aria-pressed={density === 'relaxed'}
+              >
+                <FontAwesomeIcon icon={faExpand} />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -357,7 +411,7 @@ export default function PostsPage() {
       )}
 
       <div className={styles.tableWrapper}>
-        <table>
+        <table className={styles[`density_${density}`]}>
           <thead>
             <tr>
               <th className={styles.checkCell}>

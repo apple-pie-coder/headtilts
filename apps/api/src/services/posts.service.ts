@@ -92,6 +92,7 @@ interface ListPostsFilters {
   authorId?: string;
   featured?: boolean;
   type?: string;
+  template?: string;
   sortBy?: 'publishedAt' | 'updatedAt' | 'title';
   sortOrder?: 'asc' | 'desc';
 }
@@ -110,6 +111,7 @@ export async function listPosts(page: number, limit: number, filters: ListPostsF
     ...(filters.categoryId !== undefined ? { categories: { some: { categoryId: filters.categoryId } } } : {}),
     ...(filters.authorId !== undefined ? { authorId: filters.authorId } : {}),
     ...(filters.featured !== undefined ? { isFeatured: filters.featured } : {}),
+    ...(filters.template !== undefined ? { template: filters.template || null } : {}),
   };
 
   const orderBy: Prisma.Enumerable<Prisma.PostOrderByWithRelationInput> = [];

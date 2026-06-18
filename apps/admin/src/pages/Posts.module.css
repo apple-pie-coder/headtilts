@@ -390,3 +390,63 @@ tr:last-child td { border-bottom: none; }
 .rowCheck { width: 1rem; height: 1rem; accent-color: var(--accent); cursor: pointer; }
 .duplicateButton { color: var(--t2); }
 .duplicateButton:hover { color: var(--accent); text-decoration: underline; }
+
+/* Density variants: compact, condensed (default), relaxed */
+.density_compact th,
+.density_compact td {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.density_compact .titleLink { font-size: 0.875rem; }
+.density_compact .chip,
+.density_compact .tagChip { padding: 0.0625rem 0.375rem; font-size: 0.6875rem; }
+.density_compact .rowCheck { width: 0.875rem; height: 0.875rem; }
+.density_compact .featuredBadge { padding: 0.0625rem 0.375rem; font-size: 0.625rem; }
+
+.density_condensed th,
+.density_condensed td {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9375rem;
+}
+
+.density_relaxed th,
+.density_relaxed td {
+  padding: 1.25rem 1.5rem;
+  font-size: 1rem;
+}
+
+.density_relaxed .chip,
+.density_relaxed .tagChip { padding: 0.25rem 0.75rem; font-size: 0.8125rem; }
+.density_relaxed .rowCheck { width: 1.25rem; height: 1.25rem; }
+.density_relaxed .featuredBadge { padding: 0.25rem 0.75rem; font-size: 0.875rem; }
+
+/* Density switch buttons (icon group similar to theme switch) */
+.densitySwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem;
+  border-radius: var(--r-sm);
+  background: var(--ghost);
+}
+.densityOption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--t2);
+  border: none;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  transition: background var(--ease), color var(--ease);
+}
+.densityOption:hover { color: var(--t1); }
+.densityOptionActive {
+  background: var(--surface, var(--ghost-h));
+  color: var(--t1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}

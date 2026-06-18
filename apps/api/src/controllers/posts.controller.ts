@@ -100,6 +100,7 @@ export async function list(req: Request, res: Response): Promise<void> {
 
     const type = typeof req.query.type === 'string' ? req.query.type : 'post';
     const authorId = typeof req.query.authorId === 'string' ? req.query.authorId : undefined;
+    const template = typeof req.query.template === 'string' ? req.query.template : undefined;
     const featuredRaw = typeof req.query.featured === 'string' ? req.query.featured : String(req.query.featured);
     const featured = featuredRaw === 'true' ? true : featuredRaw === 'false' ? false : undefined;
     const SORT_BY_VALUES = ['title', 'publishedAt', 'updatedAt'] as const;
@@ -117,6 +118,7 @@ export async function list(req: Request, res: Response): Promise<void> {
       categoryId,
       authorId,
       featured,
+      template,
       sortBy,
       sortOrder,
       type,

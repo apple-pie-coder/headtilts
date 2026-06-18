@@ -6,22 +6,33 @@ import { AdminLayout } from '../components/AdminLayout';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/ToastContext';
 import { useAuth } from '../hooks/useAuth';
-import { Post } from '../types';
+import { Post, User } from '../types';
 import { deletePost, fetchPosts, updatePost } from '../services/posts';
+import { fetchUsers } from '../services/users';
 import { fetchSettings } from '../services/settings';
 import styles from './Posts.module.css';
 
 const ROLE_KEYS: { key: string; label: string; cls: string }[] = [
-  { key: 'front_page_id',   label: 'Front Page',    cls: styles.roleFront   },
-  { key: 'posts_page_id',   label: 'Posts Page',    cls: styles.rolePosts   },
-  { key: 'contact_page_id',        label: 'Contact',        cls: styles.roleContact },
-  { key: 'about_page_id',         label: 'About',          cls: styles.roleAbout   },
+  { key: 'front_page_id',          label: 'Front Page',    cls: styles.roleFront   },
+  { key: 'posts_page_id',          label: 'Posts Page',    cls: styles.rolePosts   },
+  { key: 'contact_page_id',        label: 'Contact',       cls: styles.roleContact },
+  { key: 'about_page_id',          label: 'About',         cls: styles.roleAbout   },
   { key: 'privacy_policy_page_id', label: 'Privacy Policy', cls: styles.rolePrivacy },
-  { key: 'terms_page_id',         label: 'Terms',          cls: styles.roleTerms   },
+  { key: 'terms_page_id',          label: 'Terms',         cls: styles.roleTerms   },
+];
+
+const TEMPLATE_OPTIONS = [
+  { value: '',           label: 'All templates' },
+  { value: 'default',   label: 'Default' },
+  { value: 'full-width', label: 'Full Width' },
+  { value: 'full-bleed', label: 'Full Bleed' },
+  { value: 'blank',     label: 'Blank' },
+  { value: 'contact',   label: 'Contact' },
 ];
 
 const TEMPLATE_LABELS: Record<string, string> = {
   'full-width': 'Full Width',
+  'full-bleed': 'Full Bleed',
   'contact': 'Contact',
   'blank': 'Blank',
 };
@@ -66,11 +77,16 @@ export default function PagesPage() {
   const { hasPermission } = useAuth();
 
   const [pages, setPages] = useState<Post[]>([]);
+  const [authors, setAuthors] = useState<User[]>([]);
   const [total, setTotal] = useState(0);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [authorId, setAuthorId] = useState<string | undefined>(undefined);
+  const [templateFilter, setTemplateFilter] = useState('');
+  const [sortBy, setSortBy] = useState<'publishedAt' | 'updatedAt' | 'title'>('updatedAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [loading, setLoading] = useState(true);
   const [roleMap, setRoleMap] = useState<Record<number, { label: string; cls: string }[]>>({});
 
@@ -90,11 +106,15 @@ export default function PagesPage() {
         setRoleMap(map);
       })
       .catch(() => {});
+
+    fetchUsers(1, 200, '')
+      .then((r) => setAuthors(r.items))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     loadPages();
-  }, [page, search, statusFilter]);
+  }, [page, search, statusFilter, authorId, templateFilter, sortBy, sortOrder]);
 
   async function loadPages() {
     setLoading(true);
@@ -102,6 +122,10 @@ export default function PagesPage() {
       const result = await fetchPosts(page, PAGE_SIZE, {
         search,
         status: statusFilter || undefined,
+        authorId,
+        template: templateFilter || undefined,
+        sortBy,
+        sortOrder,
         type: 'page',
       });
       setPages(result.items);
@@ -181,10 +205,7 @@ export default function PagesPage() {
             <button
               key={tab.key || 'all'}
               className={isActive ? styles.tabActive : styles.tab}
-              onClick={() => {
-                setPage(1);
-                setStatusFilter(tab.key);
-              }}
+              onClick={() => { setPage(1); setStatusFilter(tab.key); }}
             >
               {tab.label} <span className={styles.tabCount}>({count})</span>
             </button>
@@ -193,19 +214,58 @@ export default function PagesPage() {
       </div>
 
       <div className={styles.toolbar}>
-        <div className={styles.search}>
-          <input
-            type="text"
-            placeholder="Search pages..."
-            value={search}
-            onChange={(e) => {
-              setPage(1);
-              setSearch(e.target.value);
-            }}
-          />
+        <div className={styles.filters}>
+          <div className={styles.filter}>
+            <label>Search</label>
+            <input
+              type="text"
+              placeholder="Search pages..."
+              value={search}
+              onChange={(e) => { setPage(1); setSearch(e.target.value); }}
+            />
+          </div>
+          <div className={styles.filter}>
+            <label>Author</label>
+            <select
+              value={authorId ?? ''}
+              onChange={(e) => { setPage(1); setAuthorId(e.target.value || undefined); }}
+            >
+              <option value="">All authors</option>
+              {authors.map((a) => (
+                <option key={a.id} value={a.id}>{a.username}</option>
+              ))}
+            </select>
+          </div>
+          <div className={styles.filter}>
+            <label>Template</label>
+            <select
+              value={templateFilter}
+              onChange={(e) => { setPage(1); setTemplateFilter(e.target.value); }}
+            >
+              {TEMPLATE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className={styles.filter}>
+            <label>Sort</label>
+            <select
+              value={`${sortBy}:${sortOrder}`}
+              onChange={(e) => {
+                const [field, order] = e.target.value.split(':') as [typeof sortBy, typeof sortOrder];
+                setPage(1); setSortBy(field); setSortOrder(order);
+              }}
+            >
+              <option value="updatedAt:desc">Modified (newest)</option>
+              <option value="updatedAt:asc">Modified (oldest)</option>
+              <option value="publishedAt:desc">Published (newest)</option>
+              <option value="publishedAt:asc">Published (oldest)</option>
+              <option value="title:asc">Title (A → Z)</option>
+              <option value="title:desc">Title (Z → A)</option>
+            </select>
+          </div>
         </div>
       </div>
-
 
       <div className={styles.tableWrapper}>
         <table>
@@ -229,14 +289,10 @@ export default function PagesPage() {
                   {(roleMap[pg.id]?.length > 0 || (pg.template && TEMPLATE_LABELS[pg.template])) && (
                     <div className={styles.pageBadges}>
                       {roleMap[pg.id]?.map(({ label, cls }) => (
-                        <span key={label} className={`${styles.roleBadge} ${cls}`}>
-                          {label}
-                        </span>
+                        <span key={label} className={`${styles.roleBadge} ${cls}`}>{label}</span>
                       ))}
                       {pg.template && TEMPLATE_LABELS[pg.template] && (
-                        <span className={styles.templateBadge}>
-                          {TEMPLATE_LABELS[pg.template]}
-                        </span>
+                        <span className={styles.templateBadge}>{TEMPLATE_LABELS[pg.template]}</span>
                       )}
                     </div>
                   )}
@@ -260,9 +316,7 @@ export default function PagesPage() {
                   ) : (
                     <>
                       <button onClick={() => navigate(`/admin/pages/${pg.id}/edit`)}>Edit</button>
-                      <button className={styles.deleteButton} onClick={() => handleTrash(pg)}>
-                        Trash
-                      </button>
+                      <button className={styles.deleteButton} onClick={() => handleTrash(pg)}>Trash</button>
                     </>
                   )}
                 </td>
@@ -280,9 +334,7 @@ export default function PagesPage() {
         <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
           Previous
         </button>
-        <span>
-          Page {page} of {totalPages}
-        </span>
+        <span>Page {page} of {totalPages}</span>
         <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
           Next
         </button>

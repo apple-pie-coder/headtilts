@@ -7,7 +7,8 @@ let io: SocketIOServer | null = null;
 
 const allowedOrigins = [
   process.env.ADMIN_URL || 'http://localhost:5173',
-  process.env.WEB_URL || 'http://localhost:4173',
+  process.env.WEB_URL || 'http://localhost:5173',
+  'http://localhost:5174',
 ];
 
 function tokenFromSocket(socket: Socket): string | undefined {

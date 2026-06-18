@@ -54,6 +54,7 @@ export interface FetchPostsFilters {
   authorId?: string;
   featured?: boolean;
   type?: string;
+  template?: string;
   sortBy?: 'publishedAt' | 'updatedAt' | 'title';
   sortOrder?: 'asc' | 'desc';
 }
@@ -72,6 +73,7 @@ export async function fetchPosts(
       categoryId: filters.categoryId || undefined,
       authorId: filters.authorId || undefined,
       featured: filters.featured !== undefined ? String(filters.featured) : undefined,
+      template: filters.template || undefined,
       sortBy: filters.sortBy || undefined,
       sortOrder: filters.sortOrder || undefined,
       type: filters.type || 'post',
