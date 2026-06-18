@@ -10,6 +10,7 @@ import LoginPage from './pages/Login';
 import ForgotPasswordPage from './pages/ForgotPassword';
 import ResetPasswordPage from './pages/ResetPassword';
 import SetupPage from './pages/Setup';
+import WizardPage from './pages/Wizard';
 import ContactSubmissionsPage from './pages/ContactSubmissions';
 import CommentsPage from './pages/Comments';
 import DashboardPage from './pages/Dashboard';
@@ -39,6 +40,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/admin/setup" element={<SetupPage />} />
+          <Route path="/admin/wizard" element={<ProtectedRoute><WizardPage /></ProtectedRoute>} />
           <Route path="/admin/login" element={<LoginPage />} />
           <Route path="/admin/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/admin/reset-password" element={<ResetPasswordPage />} />

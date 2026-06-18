@@ -405,7 +405,7 @@
   white-space: nowrap;
 }
 
-.previewUrl { color: var(--success-t); font-size: 0.9375rem; word-break: break-all; }
+.previewUrl { color: var(--success-t); font-size: 0.9375rem; overflow-wrap: anywhere; }
 
 .tags {
   display: flex;

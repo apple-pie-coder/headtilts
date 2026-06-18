@@ -729,7 +729,6 @@ button { cursor: pointer; font-family: inherit; }
   color: #1d1d1f;
   max-width: 100%;
   overflow-wrap: break-word;
-  word-break: break-word;
 }
 
 .post-content h1,
@@ -1537,7 +1536,7 @@ button { cursor: pointer; font-family: inherit; }
   line-height: 1.65;
   color: #3a3a3c;
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .comment-actions {

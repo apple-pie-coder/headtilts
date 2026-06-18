@@ -36,10 +36,16 @@ const quillImageHandlerRef = { current: (() => {}) as () => void };
 const QUILL_MODULES = {
   toolbar: {
     container: [
-      [{ header: [1, 2, 3, false] }],
-      ['bold', 'italic', 'underline', 'strike'],
-      [{ list: 'ordered' }, { list: 'bullet' }],
-      ['blockquote', 'link', 'image'],
+      [{ header: [1, 2, 3, 4, 5, 6, false] }],
+      [{ font: [] }, { size: ['small', false, 'large', 'huge'] }],
+      ['bold', 'italic', 'underline', 'strike', 'code'],
+      [{ color: [] }, { background: [] }],
+      [{ script: 'sub' }, { script: 'super' }],
+      [{ list: 'ordered' }, { list: 'bullet' }, { list: 'check' }],
+      [{ indent: '-1' }, { indent: '+1' }],
+      [{ align: [] }],
+      ['blockquote', 'code-block'],
+      ['link', 'image', 'video'],
       ['clean'],
     ],
     handlers: {
@@ -47,6 +53,18 @@ const QUILL_MODULES = {
     },
   },
 };
+
+const QUILL_FORMATS = [
+  'header', 'font', 'size',
+  'bold', 'italic', 'underline', 'strike', 'code',
+  'color', 'background',
+  'script',
+  'list', 'indent',
+  'align',
+  'blockquote', 'code-block',
+  'link', 'image', 'video',
+  'style',
+];
 
 // Extend the built-in image blot to preserve the `style` attribute through
 // Quill's HTML→delta→HTML round-trip so inline alignment/sizing survives saves.
@@ -691,7 +709,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
 
           {editorMode === 'visual' ? (
             <div className={styles.editorWrapper}>
-              <ReactQuill ref={quillRef} theme="snow" value={content} onChange={setContent} modules={QUILL_MODULES} />
+              <ReactQuill ref={quillRef} theme="snow" value={content} onChange={setContent} modules={QUILL_MODULES} formats={QUILL_FORMATS} />
             </div>
           ) : (
             <div className={styles.markdownPane}>

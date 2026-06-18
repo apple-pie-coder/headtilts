@@ -606,7 +606,7 @@
   font-weight: 600;
   grid-column: 1;
   cursor: default;
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .scDesc {
