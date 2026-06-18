@@ -15,6 +15,7 @@ import contactRoutes from './contact.routes';
 import commentRoutes from './comments.routes';
 import notificationRoutes from './notifications.routes';
 import celebrationRoutes from './celebrations.routes';
+import pollRoutes from './polls.routes';
 import publicRoutes from './public.routes';
 
 const router: IRouter = Router();
@@ -35,6 +36,7 @@ router.use('/contact-submissions', contactRoutes);
 router.use('/comments', commentRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/celebrations', celebrationRoutes);
+router.use('/polls', pollRoutes);
 router.use('/public', publicRoutes);
 
 export default router;

@@ -18,6 +18,8 @@ import UsersPage from './pages/Users';
 import CategoriesPage from './pages/Categories';
 import TagsPage from './pages/Tags';
 import CelebrationsPage from './pages/Celebrations';
+import PollsPage from './pages/Polls';
+import PollEditorPage from './pages/PollEditor';
 import PostsPage from './pages/Posts';
 import PagesPage from './pages/Pages';
 import PostEditorPage from './pages/PostEditor';
@@ -153,6 +155,30 @@ function App() {
             element={
               <ProtectedRoute requiredPermission={PERMISSIONS.CELEBRATION_READ}>
                 <CelebrationsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/polls"
+            element={
+              <ProtectedRoute requiredPermission={PERMISSIONS.POLL_READ}>
+                <PollsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/polls/new"
+            element={
+              <ProtectedRoute requiredPermission={PERMISSIONS.POLL_CREATE}>
+                <PollEditorPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/polls/:id/edit"
+            element={
+              <ProtectedRoute requiredPermission={PERMISSIONS.POLL_EDIT}>
+                <PollEditorPage />
               </ProtectedRoute>
             }
           />

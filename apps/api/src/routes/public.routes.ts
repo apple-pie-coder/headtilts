@@ -9,6 +9,7 @@ import { listPublicComments, createPublicComment, toggleReaction } from '../serv
 import { buildPostPath, getPermalinkStructure, matchPostPath } from '../utils/permalinks';
 import { getCalendarMonth } from '../services/calendar.service';
 import { getTodaysCelebrations } from '../services/celebrations.service';
+import { getPublicPoll, submitVote } from '../services/polls.service';
 import rateLimit from 'express-rate-limit';
 import { publicReadLimiter } from '../middleware/rateLimit';
 import { ApiError } from '../utils/errors';
@@ -503,6 +504,35 @@ router.get('/widgets/:zone', publicReadLimiter, asyncHandler(async (req: Request
     } else {
       sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
     }
+  }
+}));
+
+// GET /public/polls/:slug
+router.get('/polls/:slug', publicReadLimiter, asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const voterIdentifier = typeof req.query.voterIdentifier === 'string' ? req.query.voterIdentifier : undefined;
+    const poll = await getPublicPoll(req.params.slug, voterIdentifier);
+    sendSuccess(res, poll);
+  } catch (e) {
+    if (e instanceof ApiError) sendError(res, e.code, e.message, e.statusCode);
+    else sendError(res, 'NOT_FOUND', 'Poll not found', 404);
+  }
+}));
+
+// POST /public/polls/:slug/vote
+router.post('/polls/:slug/vote', asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const { optionIds, voterIdentifier } = req.body as { optionIds: number[]; voterIdentifier: string };
+    if (!voterIdentifier) { sendError(res, 'VALIDATION_ERROR', 'voterIdentifier is required', 400); return; }
+    if (!Array.isArray(optionIds) || optionIds.length === 0) { sendError(res, 'VALIDATION_ERROR', 'optionIds must be a non-empty array', 400); return; }
+    const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
+    const pollRecord = await prisma.poll.findUnique({ where: { slug: req.params.slug }, select: { id: true } });
+    if (!pollRecord) { sendError(res, 'NOT_FOUND', 'Poll not found', 404); return; }
+    const result = await submitVote(pollRecord.id, optionIds, voterIdentifier, ipAddress);
+    sendSuccess(res, result);
+  } catch (e) {
+    if (e instanceof ApiError) sendError(res, e.code, e.message, e.statusCode);
+    else sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
   }
 }));
 
