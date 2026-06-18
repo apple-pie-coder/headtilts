@@ -1,5 +1,7 @@
-import { prisma } from '../src/config/database';
+import { PrismaClient } from '@prisma/client';
 import { DEFAULT_ROLES, PERMISSIONS } from '@headtilts/shared';
+
+const prisma = new PrismaClient();
 
 async function seed() {
   try {
