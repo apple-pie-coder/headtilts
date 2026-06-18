@@ -6,7 +6,7 @@ import { useLayout } from '../context/LayoutContext';
 import { formatDate, formatTime } from '../utils/date';
 import { applySeo, resetSeo } from '../utils/seo';
 import { resolveShortcodes } from '../utils/shortcodes';
-import { sanitizeHtml } from '../utils/sanitize';
+import { RichContent } from './RichContent';
 import { Comments } from './Comments';
 import { Author, PostFull } from '../types';
 
@@ -29,7 +29,7 @@ export function PostArticle({ post }: { post: PostFull }) {
     return list;
   }, [post.author, post.coAuthors]);
 
-  const resolvedContent = useMemo(() => sanitizeHtml(resolveShortcodes(post.content ?? '', {
+  const resolvedContent = useMemo(() => resolveShortcodes(post.content ?? '', {
     siteName: site_title,
     siteTagline: site_tagline,
     siteDescription: site_description,
@@ -41,7 +41,7 @@ export function PostArticle({ post }: { post: PostFull }) {
       publishedAt: post.publishedAt,
       excerpt: post.excerpt ?? null,
     },
-  })), [post, allAuthors, site_title, site_tagline, site_description, date_format, timezone]);
+  }), [post, allAuthors, site_title, site_tagline, site_description, date_format, timezone]);
 
   useEffect(() => {
     setShowSidebar(Boolean(post.showSidebar));
@@ -107,10 +107,7 @@ export function PostArticle({ post }: { post: PostFull }) {
         </div>
       </header>
 
-      <div
-        className="post-content"
-        dangerouslySetInnerHTML={{ __html: resolvedContent }}
-      />
+      <RichContent html={resolvedContent} className="post-content" />
 
       {post.tags.length > 0 && (
         <footer className="post-tags">

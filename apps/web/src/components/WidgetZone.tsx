@@ -7,6 +7,8 @@ import { resolveMediaUrl } from '../services/api';
 import { sanitizeHtml } from '../utils/sanitize';
 import { postPath } from '../utils/permalink';
 import { CalendarMonth, PublicWidget, PublicWidgetZone } from '../types';
+import { PollWidget } from './PollWidget';
+import { PollCarousel } from './PollCarousel';
 
 interface PostItem { id: number; title: string; slug: string; publishedAt: string | null; excerpt: string | null }
 interface CategoryItem { id: number; name: string; slug: string; _count?: { posts: number } }
@@ -221,6 +223,40 @@ function TagsWidget({ widget }: { widget: PublicWidget }) {
   );
 }
 
+interface TagCloudItem extends TagItem { _count: { posts: number } }
+
+function TagCloudWidget({ widget }: { widget: PublicWidget }) {
+  const tags = (widget.data as TagCloudItem[]) || [];
+  if (tags.length === 0) return null;
+  const showCount = Boolean(widget.config.showCount);
+  const counts = tags.map((t) => t._count.posts);
+  const min = Math.min(...counts);
+  const max = Math.max(...counts);
+  const range = max - min || 1;
+  // Map post count to font size between 0.75rem and 1.5rem
+  function fontSize(count: number) {
+    return (0.75 + ((count - min) / range) * 0.75).toFixed(3) + 'rem';
+  }
+  return (
+    <div className="widget">
+      {widget.title && <h3 className="widget-title">{widget.title}</h3>}
+      <div className="widget-tag-cloud">
+        {tags.map((tag) => (
+          <Link
+            key={tag.id}
+            to={`/tags/${tag.slug}`}
+            className="widget-tag-cloud-item"
+            style={{ fontSize: fontSize(tag._count.posts) }}
+            title={`${tag._count.posts} post${tag._count.posts !== 1 ? 's' : ''}`}
+          >
+            {tag.name}{showCount && <sup className="widget-tag-cloud-count">{tag._count.posts}</sup>}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -350,8 +386,14 @@ function renderWidget(widget: PublicWidget) {
     case 'category-posts-grid': return <CategoryGridWidget widget={widget} />;
     case 'categories':    return <CategoriesWidget widget={widget} />;
     case 'tags':          return <TagsWidget widget={widget} />;
+    case 'tag-cloud':     return <TagCloudWidget widget={widget} />;
     case 'calendar':      return <CalendarWidget widget={widget} />;
     case 'search':        return <SearchWidget widget={widget} />;
+    case 'poll': {
+      const slugs = Array.isArray(widget.data) ? (widget.data as string[]) : [];
+      if (slugs.length === 0) return null;
+      return <PollCarousel slugs={slugs} title={widget.title} />;
+    }
     default:              return null;
   }
 }

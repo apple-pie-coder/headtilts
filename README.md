@@ -207,6 +207,94 @@ The server also exposes `GET /health` for monitoring. Logs go to `LOG_FILE` (def
 
 ---
 
+---
+
+## Content features
+
+### Polls
+
+Create and manage polls from **Admin → Polls**. Each poll supports single-choice or multi-choice voting, configurable result visibility, optional vote-change, and scheduled open/close dates.
+
+**Public URLs**
+
+| URL | Description |
+| --- | --- |
+| `/polls` | Listing page — all open polls as a card grid |
+| `/polls/:slug` | Dedicated poll page — full interactive widget |
+
+**Embedding polls in post/page content**
+
+Drop a shortcode anywhere in the Quill editor body:
+
+```
+[poll slug="your-poll-slug"]
+```
+
+The frontend detects and replaces it with a live, interactive poll widget. The shortcode works inside any `<p>` wrapper the editor adds automatically.
+
+**Poll widget in the sidebar**
+
+In **Admin → Widgets**, create a widget with type **Poll**:
+
+| Config field | Description |
+| --- | --- |
+| Number of polls to show | `1` shows a single poll; `2–10` enables a carousel |
+| Specific poll (optional) | Pin a particular poll by slug; leave blank to auto-pull the latest open polls |
+
+When count > 1, the sidebar renders a carousel with ‹ › navigation arrows and dot indicators.
+
+**CSV export** — each poll has a download button on the Polls list page that exports all votes as CSV.
+
+---
+
+### Widgets
+
+All widget zones are managed at **Admin → Widgets**. Drag widgets into zones to arrange them; the sidebar zone is called `sidebar`.
+
+| Widget type | Description |
+| --- | --- |
+| Text / HTML | Free-form HTML content |
+| Menu / Links | A list of links (internal pages or external URLs) |
+| Recent Posts | Latest published posts |
+| Featured Posts (Grid) | Featured-post card grid |
+| Latest Posts (Small Thumbnails) | Compact numbered post list with thumbnails |
+| Category Posts (Grid + View All) | Posts from a chosen category with a "View all" link |
+| Categories | Category list with optional post counts |
+| Tags | Flat tag list |
+| **Tag Cloud** | Tag cloud sized by post count; optional count superscripts; hides tags with zero posts |
+| Calendar | Monthly calendar with post-day links |
+| Search Form | Site search input |
+| **Poll** | Interactive poll widget with optional carousel (see [Polls](#polls)) |
+
+**Tag Cloud config**
+
+| Field | Description |
+| --- | --- |
+| Maximum tags | Cap on how many tags appear (default 40, max 100) |
+| Show post count | Toggle a superscript count next to each tag name |
+
+---
+
+### Shortcodes
+
+Shortcodes can be used inside post and page content in the Quill editor. They are resolved at render time on the public site.
+
+| Shortcode | Output |
+| --- | --- |
+| `[site_name]` | Site title |
+| `[site_tagline]` | Site tagline |
+| `[site_description]` | Site description |
+| `[site_url]` | Public site URL |
+| `[year]` | Current four-digit year |
+| `[current_date]` | Today's date (respects `date_format` setting; override with `format="…"`) |
+| `[post_title]` | Title of the current post or page |
+| `[post_author]` | Author name(s) |
+| `[post_date]` | Publish date (respects `date_format`; override with `format="…"`) |
+| `[post_excerpt]` | Post excerpt |
+| `[poll slug="…"]` | Embeds a live interactive poll widget |
+
+---
+
 ## Local development
 
 For local development without Docker, see the per-app READMEs and use:

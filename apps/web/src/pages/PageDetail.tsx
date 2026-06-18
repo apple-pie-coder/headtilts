@@ -9,7 +9,7 @@ import { useSiteSettings } from '../context/SiteSettingsContext';
 import { ContactForm } from '../components/ContactForm';
 import { applySeo, resetSeo } from '../utils/seo';
 import { resolveShortcodes } from '../utils/shortcodes';
-import { sanitizeHtml } from '../utils/sanitize';
+import { RichContent } from '../components/RichContent';
 import { PostsArchive } from './PostsArchive';
 
 export function PageDetailPage() {
@@ -40,14 +40,14 @@ export function PageDetailPage() {
 
   const resolvedContent = useMemo(() => {
     if (!page) return '';
-    return sanitizeHtml(resolveShortcodes(page.content ?? '', {
+    return resolveShortcodes(page.content ?? '', {
       siteName: site_title,
       siteTagline: site_tagline,
       siteDescription: site_description,
       dateFormat: date_format,
       timezone,
       post: { title: page.title, publishedAt: page.publishedAt, excerpt: page.excerpt ?? null },
-    }));
+    });
   }, [page, site_title, site_tagline, site_description, date_format, timezone]);
 
   useEffect(() => {
@@ -87,7 +87,7 @@ export function PageDetailPage() {
       <header className="post-header">
         <h1 className="post-title">{page.title}</h1>
       </header>
-      <div className="post-content" dangerouslySetInnerHTML={{ __html: resolvedContent }} />
+      <RichContent html={resolvedContent} className="post-content" />
       {template === 'contact' && <ContactForm />}
     </article>
   );

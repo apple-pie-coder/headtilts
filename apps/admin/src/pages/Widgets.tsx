@@ -19,13 +19,14 @@ import {
 } from '../services/widgets';
 import { fetchCategories } from '../services/categories';
 import { fetchPosts } from '../services/posts';
+import { fetchPolls, Poll } from '../services/polls';
 import styles from './Widgets.module.css';
 
 function errMsg(err: unknown, fallback: string) {
   return (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || fallback;
 }
 
-type ConfigField = { key: string; label: string; type: 'text' | 'textarea' | 'number' | 'toggle' | 'category-select' | 'menu-items' };
+type ConfigField = { key: string; label: string; type: 'text' | 'textarea' | 'number' | 'toggle' | 'category-select' | 'poll-select' | 'menu-items' };
 const CONFIG_FIELDS: Record<string, ConfigField[]> = {
   text: [{ key: 'content', label: 'Content (HTML)', type: 'textarea' }],
   menu: [{ key: 'items', label: 'Menu Items', type: 'menu-items' }],
@@ -41,7 +42,15 @@ const CONFIG_FIELDS: Record<string, ConfigField[]> = {
     { key: 'hideEmpty', label: 'Hide empty categories', type: 'toggle' },
   ],
   tags: [{ key: 'maxTags', label: 'Maximum tags', type: 'number' }],
+  'tag-cloud': [
+    { key: 'maxTags', label: 'Maximum tags', type: 'number' },
+    { key: 'showCount', label: 'Show post count', type: 'toggle' },
+  ],
   search: [],
+  poll: [
+    { key: 'count', label: 'Number of polls to show', type: 'number' },
+    { key: 'pollSlug', label: 'Specific poll (leave blank to show latest)', type: 'poll-select' },
+  ],
 };
 
 interface WidgetFormState {
@@ -162,12 +171,14 @@ function WidgetConfigFields({
   config,
   categories,
   pages,
+  polls,
   onChange,
 }: {
   type: string;
   config: Record<string, unknown>;
   categories: Category[];
   pages: Post[];
+  polls: Poll[];
   onChange: (key: string, value: unknown) => void;
 }) {
   const fields = CONFIG_FIELDS[type] ?? [];
@@ -210,6 +221,16 @@ function WidgetConfigFields({
                 <option key={cat.id} value={cat.slug}>{cat.name}</option>
               ))}
             </select>
+          ) : field.type === 'poll-select' ? (
+            <select
+              value={(config[field.key] as string) ?? ''}
+              onChange={(e) => onChange(field.key, e.target.value)}
+            >
+              <option value="">— Select a poll —</option>
+              {polls.map((poll) => (
+                <option key={poll.id} value={poll.slug}>{poll.title}</option>
+              ))}
+            </select>
           ) : (
             <input
               type="number"
@@ -237,6 +258,7 @@ export default function WidgetsPage() {
   const [types,     setTypes]     = useState<WidgetType[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [pages,     setPages]     = useState<Post[]>([]);
+  const [polls,     setPolls]     = useState<Poll[]>([]);
   const [loading,   setLoading]   = useState(true);
 
   // Create / Edit panel
@@ -257,18 +279,20 @@ export default function WidgetsPage() {
     setLoading(true);
     toast.error('');
     try {
-      const [w, z, t, c, p] = await Promise.all([
+      const [w, z, t, c, p, pl] = await Promise.all([
         fetchWidgets(),
         fetchWidgetZones(),
         fetchWidgetTypes(),
         fetchCategories(1, 100),
         fetchPosts(1, 200, { type: 'page', status: 'published' }),
+        fetchPolls(1, 100),
       ]);
       setWidgets(w);
       setZones(z);
       setTypes(t);
       setCategories(c.items);
       setPages(p.items);
+      setPolls(pl.items);
     } catch (err) {
       toast.error(errMsg(err, 'Failed to load widgets'));
     } finally {
@@ -460,7 +484,7 @@ export default function WidgetsPage() {
               </div>
             </div>
 
-            <WidgetConfigFields type={form.type} config={form.config} categories={categories} pages={pages} onChange={setConfigField} />
+            <WidgetConfigFields type={form.type} config={form.config} categories={categories} pages={pages} polls={polls} onChange={setConfigField} />
 
             <div className={styles.formActions}>
               <button type="button" className={styles.cancelBtn} onClick={closePanel} disabled={saving}>

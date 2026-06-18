@@ -13,6 +13,7 @@ import { PreviewPage } from './pages/PreviewPage';
 import { DateArchivePage } from './pages/DateArchive';
 import { AuthorPage } from './pages/AuthorPage';
 import PollPage from './pages/PollPage';
+import PollsListPage from './pages/PollsListPage';
 
 export default function App() {
   return (
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="/date/:year/:month" element={<DateArchivePage />} />
           <Route path="/date/:year/:month/:day" element={<DateArchivePage />} />
           <Route path="/authors/:username" element={<AuthorPage />} />
+          <Route path="/polls" element={<PollsListPage />} />
           <Route path="/polls/:slug" element={<PollPage />} />
           {/* Catch-all: resolves permalink-structure URLs to posts, else 404 */}
           <Route path="*" element={<PermalinkPage />} />
