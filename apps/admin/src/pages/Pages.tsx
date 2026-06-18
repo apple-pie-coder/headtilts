@@ -14,8 +14,10 @@ import styles from './Posts.module.css';
 const ROLE_KEYS: { key: string; label: string; cls: string }[] = [
   { key: 'front_page_id',   label: 'Front Page',    cls: styles.roleFront   },
   { key: 'posts_page_id',   label: 'Posts Page',    cls: styles.rolePosts   },
-  { key: 'contact_page_id', label: 'Contact',       cls: styles.roleContact },
-  { key: 'about_page_id',   label: 'About',         cls: styles.roleAbout   },
+  { key: 'contact_page_id',        label: 'Contact',        cls: styles.roleContact },
+  { key: 'about_page_id',         label: 'About',          cls: styles.roleAbout   },
+  { key: 'privacy_policy_page_id', label: 'Privacy Policy', cls: styles.rolePrivacy },
+  { key: 'terms_page_id',         label: 'Terms',          cls: styles.roleTerms   },
 ];
 
 const TEMPLATE_LABELS: Record<string, string> = {
