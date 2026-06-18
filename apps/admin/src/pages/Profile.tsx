@@ -1,15 +1,18 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { AxiosError } from 'axios';
 import { AdminLayout } from '../components/AdminLayout';
 import { useToast } from '../components/ToastContext';
 import { useAuth } from '../hooks/useAuth';
 import { fetchMe, updateMe } from '../services/profile';
+import { getMfaStatus, setupMfa, enableMfa, disableMfa } from '../services/mfa';
 import { User } from '../types';
 import styles from './Profile.module.css';
 
 function errMsg(err: unknown, fallback: string) {
   return (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || fallback;
 }
+
+type MfaUiState = 'idle' | 'setup' | 'backupCodes' | 'disabling';
 
 export default function ProfilePage() {
   useAuth();
@@ -30,19 +33,31 @@ export default function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [pwdSaving, setPwdSaving] = useState(false);
 
-  useEffect(() => {
-    load();
-  }, []);
+  // MFA state
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaBackupRemaining, setMfaBackupRemaining] = useState(0);
+  const [mfaUi, setMfaUi] = useState<MfaUiState>('idle');
+  const [mfaQr, setMfaQr] = useState('');
+  const [mfaSecret, setMfaSecret] = useState('');
+  const [mfaOtp, setMfaOtp] = useState(['', '', '', '', '', '']);
+  const [mfaBackupCodes, setMfaBackupCodes] = useState<string[]>([]);
+  const [disablePassword, setDisablePassword] = useState('');
+  const [mfaWorking, setMfaWorking] = useState(false);
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  useEffect(() => { load(); }, []);
 
   async function load() {
     setLoading(true);
     try {
-      const me = await fetchMe();
+      const [me, status] = await Promise.all([fetchMe(), getMfaStatus()]);
       setProfile(me);
       setFirstName(me.firstName || '');
       setLastName(me.lastName || '');
       setBio(me.bio || '');
       setAvatar(me.avatar || '');
+      setMfaEnabled(status.enabled);
+      setMfaBackupRemaining(status.backupCodesRemaining);
     } catch (err) {
       toast.error(errMsg(err, 'Failed to load profile'));
     } finally {
@@ -66,16 +81,11 @@ export default function ProfilePage() {
 
   async function handlePasswordSave(e: FormEvent) {
     e.preventDefault();
-    if (newPassword !== confirmPassword) {
-      toast.error('New passwords do not match.');
-      return;
-    }
+    if (newPassword !== confirmPassword) { toast.error('New passwords do not match.'); return; }
     setPwdSaving(true);
     try {
       await updateMe({ currentPassword, password: newPassword });
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
+      setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
       toast.success('Password changed successfully.');
     } catch (err) {
       toast.error(errMsg(err, 'Failed to change password'));
@@ -84,12 +94,85 @@ export default function ProfilePage() {
     }
   }
 
+  async function handleMfaSetupStart() {
+    setMfaWorking(true);
+    try {
+      const data = await setupMfa();
+      setMfaQr(data.qrCodeDataUrl);
+      setMfaSecret(data.secret);
+      setMfaOtp(['', '', '', '', '', '']);
+      setMfaUi('setup');
+      setTimeout(() => otpRefs.current[0]?.focus(), 50);
+    } catch (err) {
+      toast.error(errMsg(err, 'Failed to start MFA setup'));
+    } finally {
+      setMfaWorking(false);
+    }
+  }
+
+  function handleMfaOtpChange(idx: number, val: string) {
+    const digit = val.replace(/\D/g, '').slice(-1);
+    const next = [...mfaOtp];
+    next[idx] = digit;
+    setMfaOtp(next);
+    if (digit && idx < 5) otpRefs.current[idx + 1]?.focus();
+    if (next.every((d) => d !== '')) submitMfaEnable(next.join(''));
+  }
+
+  function handleMfaOtpKeyDown(idx: number, e: React.KeyboardEvent) {
+    if (e.key === 'Backspace' && !mfaOtp[idx] && idx > 0) otpRefs.current[idx - 1]?.focus();
+  }
+
+  function handleMfaOtpPaste(e: React.ClipboardEvent) {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pasted.length === 6) {
+      e.preventDefault();
+      setMfaOtp(pasted.split(''));
+      submitMfaEnable(pasted);
+    }
+  }
+
+  async function submitMfaEnable(code: string) {
+    setMfaWorking(true);
+    try {
+      const result = await enableMfa(code);
+      setMfaBackupCodes(result.backupCodes);
+      setMfaEnabled(true);
+      setMfaUi('backupCodes');
+    } catch (err) {
+      toast.error(errMsg(err, 'Invalid code — try again'));
+      setMfaOtp(['', '', '', '', '', '']);
+      setTimeout(() => otpRefs.current[0]?.focus(), 50);
+    } finally {
+      setMfaWorking(false);
+    }
+  }
+
+  async function handleMfaDisable(e: FormEvent) {
+    e.preventDefault();
+    setMfaWorking(true);
+    try {
+      await disableMfa(disablePassword);
+      setMfaEnabled(false);
+      setMfaBackupRemaining(0);
+      setDisablePassword('');
+      setMfaUi('idle');
+      toast.success('Two-factor authentication disabled.');
+    } catch (err) {
+      toast.error(errMsg(err, 'Failed to disable MFA'));
+    } finally {
+      setMfaWorking(false);
+    }
+  }
+
+  function handleBackupDone() {
+    setMfaBackupRemaining(8);
+    setMfaUi('idle');
+    toast.success('MFA enabled successfully.');
+  }
+
   if (loading) {
-    return (
-      <AdminLayout>
-        <div className={styles.loading}>Loading profile…</div>
-      </AdminLayout>
-    );
+    return <AdminLayout><div className={styles.loading}>Loading profile…</div></AdminLayout>;
   }
 
   const initials = profile
@@ -154,29 +237,152 @@ export default function ProfilePage() {
           </form>
         </div>
 
-        {/* Password card */}
-        <div className={styles.card}>
-          <h3 className={styles.cardTitle}>Change Password</h3>
+        {/* Right column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Password card */}
+          <div className={styles.card}>
+            <h3 className={styles.cardTitle}>Change Password</h3>
+            <form onSubmit={handlePasswordSave} className={styles.form}>
+              <div className={styles.field}>
+                <label>Current Password</label>
+                <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required disabled={pwdSaving} autoComplete="current-password" />
+              </div>
+              <div className={styles.field}>
+                <label>New Password</label>
+                <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required disabled={pwdSaving} autoComplete="new-password" />
+              </div>
+              <div className={styles.field}>
+                <label>Confirm New Password</label>
+                <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required disabled={pwdSaving} autoComplete="new-password" />
+              </div>
+              <div className={styles.formFooter}>
+                <button type="submit" className={styles.saveBtn} disabled={pwdSaving || !currentPassword || !newPassword}>
+                  {pwdSaving ? 'Changing…' : 'Change Password'}
+                </button>
+              </div>
+            </form>
+          </div>
 
-          <form onSubmit={handlePasswordSave} className={styles.form}>
-            <div className={styles.field}>
-              <label>Current Password</label>
-              <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required disabled={pwdSaving} autoComplete="current-password" />
+          {/* MFA card */}
+          <div className={styles.card}>
+            <h3 className={styles.cardTitle}>Two-Factor Authentication</h3>
+
+            {/* Current status */}
+            <div className={styles.mfaStatus}>
+              <span className={styles.mfaStatusLabel}>Status</span>
+              <span className={`${styles.mfaBadge} ${mfaEnabled ? styles.mfaBadgeOn : styles.mfaBadgeOff}`}>
+                {mfaEnabled ? '✓ Enabled' : 'Disabled'}
+              </span>
             </div>
-            <div className={styles.field}>
-              <label>New Password</label>
-              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required disabled={pwdSaving} autoComplete="new-password" />
-            </div>
-            <div className={styles.field}>
-              <label>Confirm New Password</label>
-              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required disabled={pwdSaving} autoComplete="new-password" />
-            </div>
-            <div className={styles.formFooter}>
-              <button type="submit" className={styles.saveBtn} disabled={pwdSaving || !currentPassword || !newPassword}>
-                {pwdSaving ? 'Changing…' : 'Change Password'}
-              </button>
-            </div>
-          </form>
+
+            {/* Idle state — show enable or disable button */}
+            {mfaUi === 'idle' && (
+              <>
+                <p className={styles.mfaDesc}>
+                  {mfaEnabled
+                    ? `Protect your account with a time-based one-time password. You have ${mfaBackupRemaining} backup code${mfaBackupRemaining !== 1 ? 's' : ''} remaining.`
+                    : 'Add an extra layer of security. After enabling, you\'ll need your authenticator app each time you sign in.'}
+                </p>
+                {mfaEnabled ? (
+                  <button className={styles.dangerBtn} onClick={() => setMfaUi('disabling')} disabled={mfaWorking}>
+                    Disable MFA
+                  </button>
+                ) : (
+                  <button className={styles.saveBtn} onClick={handleMfaSetupStart} disabled={mfaWorking}>
+                    {mfaWorking ? 'Loading…' : 'Enable MFA'}
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* Setup: scan QR + confirm TOTP code */}
+            {mfaUi === 'setup' && (
+              <>
+                <p className={styles.mfaDesc}>
+                  Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.), then enter the 6-digit code to confirm.
+                </p>
+                <div className={styles.mfaQr}>
+                  <img src={mfaQr} alt="QR code" />
+                  <span className={styles.mfaSecret}>{mfaSecret}</span>
+                </div>
+                <div className={styles.mfaOtpRow} onPaste={handleMfaOtpPaste}>
+                  {mfaOtp.map((digit, i) => (
+                    <input
+                      key={i}
+                      ref={(el) => { otpRefs.current[i] = el; }}
+                      className={styles.mfaOtpBox}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => handleMfaOtpChange(i, e.target.value)}
+                      onKeyDown={(e) => handleMfaOtpKeyDown(i, e)}
+                      disabled={mfaWorking}
+                      autoComplete="one-time-code"
+                    />
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                  <button type="button" className={styles.dangerBtn} onClick={() => setMfaUi('idle')} disabled={mfaWorking}>
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.saveBtn}
+                    onClick={() => submitMfaEnable(mfaOtp.join(''))}
+                    disabled={mfaWorking || mfaOtp.some((d) => !d)}
+                  >
+                    {mfaWorking ? 'Verifying…' : 'Confirm'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Show backup codes after enabling */}
+            {mfaUi === 'backupCodes' && (
+              <>
+                <div className={styles.backupCodesBox}>
+                  <p>Save these backup codes somewhere safe. Each can only be used once if you lose access to your authenticator app.</p>
+                  <div className={styles.backupCodesList}>
+                    {mfaBackupCodes.map((code) => (
+                      <span key={code} className={styles.backupCode}>{code}</span>
+                    ))}
+                  </div>
+                </div>
+                <div className={styles.formFooter}>
+                  <button type="button" className={styles.saveBtn} onClick={handleBackupDone}>
+                    I've saved my backup codes
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Disable confirmation */}
+            {mfaUi === 'disabling' && (
+              <form onSubmit={handleMfaDisable} className={styles.form}>
+                <div className={styles.field}>
+                  <label>Confirm your password to disable MFA</label>
+                  <input
+                    type="password"
+                    value={disablePassword}
+                    onChange={(e) => setDisablePassword(e.target.value)}
+                    required
+                    disabled={mfaWorking}
+                    autoFocus
+                    autoComplete="current-password"
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                  <button type="button" className={styles.saveBtn} onClick={() => setMfaUi('idle')} disabled={mfaWorking}>
+                    Cancel
+                  </button>
+                  <button type="submit" className={styles.dangerBtn} disabled={mfaWorking || !disablePassword}>
+                    {mfaWorking ? 'Disabling…' : 'Disable MFA'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     </AdminLayout>

@@ -7,6 +7,7 @@ export interface User {
   avatar?: string;
   bio?: string | null;
   isActive: boolean;
+  mfaEnabled?: boolean;
   roles: Role[];
 }
 
@@ -15,6 +16,7 @@ export interface Role {
   name: string;
   description?: string | null;
   isSystem?: boolean;
+  mfaRequired?: boolean;
   permissions?: Permission[];
 }
 
@@ -83,6 +85,7 @@ export interface Post {
   isFeatured?: boolean;
   showSidebar?: boolean;
   commentStatus?: string | null;
+  showToc?: string | null;
   publicUrl?: string;
   authorId?: string | null;
   author?: PostAuthor | null;
@@ -297,11 +300,35 @@ export interface RevisionChangeEntry {
   note?: string;
 }
 
+export interface RevisionSnapshot {
+  title: string;
+  slug: string;
+  content: string;
+  excerpt: string | null;
+  featuredImage: string | null;
+  template: string | null;
+  isFeatured: boolean;
+  showSidebar: boolean;
+  commentStatus: string | null;
+  showToc: string | null;
+  parentId: number | null;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  metaKeywords: string | null;
+  canonicalUrl: string | null;
+  ogTitle: string | null;
+  ogDescription: string | null;
+  ogImage: string | null;
+  categoryIds: number[];
+  tagNames: string[];
+}
+
 export interface PostRevision {
   id: number;
   postId: number;
   action: string;
   changes: RevisionChangeEntry[] | null;
+  snapshot: RevisionSnapshot | null;
   isArchived: boolean;
   createdAt: string;
   user: {
@@ -317,7 +344,9 @@ export interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
-  login: (identifier: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<{ mfaRequired: true; mfaToken: string } | void>;
+  completeMfaLogin: (mfaToken: string, code: string) => Promise<void>;
+  completeMfaBackupLogin: (mfaToken: string, backupCode: string) => Promise<void>;
   setup: (input: SetupInput) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;

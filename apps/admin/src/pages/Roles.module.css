@@ -118,7 +118,6 @@ tr:last-child td { border-bottom: none; }
   position: fixed;
   inset: 0;
   background: var(--overlay);
-  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -330,3 +329,42 @@ form {
 
 .saveBtn:hover:not(:disabled) { background: var(--accent-h); }
 .saveBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--t1);
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.checkboxLabel input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  flex-shrink: 0;
+}
+
+.fieldHint {
+  font-size: 0.8125rem;
+  color: var(--t3);
+}
+
+.mfaBadge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--accent-bg);
+  color: var(--accent);
+}

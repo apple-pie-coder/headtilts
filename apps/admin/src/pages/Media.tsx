@@ -11,7 +11,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Media, MediaFolder } from '../types';
 import {
   bulkDeleteMedia, createFolder, deleteFolder, deleteMedia, fetchFolders, fetchMedia,
-  fetchUploadConfig, replaceMedia, resolveMediaUrl, updateMedia, uploadMediaBatch, UploadConfig,
+  fetchUploadConfig, fetchMediaUsage, replaceMedia, resolveMediaUrl, updateMedia, uploadMediaBatch, UploadConfig,
 } from '../services/media';
 import styles from './Media.module.css';
 
@@ -64,6 +64,7 @@ export default function MediaPage() {
   const [meta, setMeta] = useState({ title: '', altText: '', caption: '', description: '', originalName: '', folderId: '' });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [usageCount, setUsageCount] = useState<number | null>(null);
 
   // Upload
   const [uploading, setUploading] = useState(false);
@@ -81,6 +82,13 @@ export default function MediaPage() {
   useEffect(() => {
     load();
   }, [page, search, folderFilter]);
+
+  useEffect(() => {
+    setUsageCount(null);
+    if (selected) {
+      fetchMediaUsage(selected.id).then((d) => setUsageCount(d.count)).catch(() => {});
+    }
+  }, [selected?.id]);
 
   useEffect(() => {
     setMeta({
@@ -262,9 +270,12 @@ export default function MediaPage() {
 
   async function handleDelete() {
     if (!selected) return;
+    const usageWarning = usageCount && usageCount > 0
+      ? ` It is currently used in ${usageCount} post(s) — deleting it will break those images.`
+      : '';
     if (!(await confirm({
       title: 'Delete Media',
-      message: `Permanently delete "${selected.originalName}"? This cannot be undone.`,
+      message: `Permanently delete "${selected.originalName}"?${usageWarning} This cannot be undone.`,
       confirmLabel: 'Delete Permanently',
       danger: true,
     }))) return;
@@ -492,6 +503,14 @@ export default function MediaPage() {
                       {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                     </select>
                   </div>
+
+                  {usageCount !== null && (
+                    <div className={usageCount > 0 ? styles.usageWarn : styles.usageOk}>
+                      {usageCount > 0
+                        ? `Used in ${usageCount} post${usageCount !== 1 ? 's' : ''} — removing it will break those images`
+                        : 'Not used in any posts'}
+                    </div>
+                  )}
 
                   <div className={styles.actions}>
                     {canUpload && (

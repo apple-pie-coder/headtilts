@@ -19,6 +19,9 @@ model User {
   avatar        String?
   bio           String?  @db.Text
   isActive      Boolean  @default(true)
+  mfaEnabled    Boolean  @default(false)
+  mfaSecret     String?
+  mfaBackupCodes String? @db.Text
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -30,6 +33,7 @@ model User {
   notifications Notification[]
   revisions     PostRevision[]
   pollVotes     PollVote[]
+  apiKeys       ApiKey[]
 
   @@index([email])
   @@index([username])
@@ -81,6 +85,7 @@ model Role {
   name        String        @unique
   description String?       @db.Text
   isSystem    Boolean       @default(false)
+  mfaRequired Boolean       @default(false)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -151,6 +156,7 @@ model Post {
   isFeatured      Boolean   @default(false)
   showSidebar     Boolean   @default(false)
   commentStatus   String?   // null = inherit site default, "open" / "closed" = per-post override
+  showToc         String?   // null = inherit site default, "yes" / "no" = per-post override
 
   metaTitle       String?
   metaDescription String?
@@ -167,6 +173,8 @@ model Post {
   comments        Comment[]
   revisions       PostRevision[]
   polls           Poll[]
+  reactions       PostReaction[]
+  seriesPosts     SeriesPost[]
 
   @@index([slug])
   @@index([status])
@@ -188,6 +196,7 @@ model PostRevision {
   user       User     @relation(fields: [userId], references: [id])
   action     String   // 'created' | 'updated' | 'published' | 'unpublished' | 'scheduled' | 'trashed'
   changes    Json?    // ChangeEntry[] — { field, label, from?, to?, note? }
+  snapshot   Json?    // full restorable post fields at save time
   isArchived Boolean  @default(false)
   createdAt  DateTime @default(now())
 
@@ -555,4 +564,81 @@ model PollVote {
   @@unique([pollId, optionId, voterIdentifier])
   @@index([pollId])
   @@index([voterIdentifier])
+}
+
+// ===================== Post Reactions =====================
+
+model PostReaction {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  emoji     String   // e.g. "❤️", "👏", "🔥", "😮"
+  visitorId String
+  createdAt DateTime @default(now())
+
+  @@unique([postId, emoji, visitorId])
+  @@index([postId])
+}
+
+// ===================== Series / Collections =====================
+
+model Series {
+  id          Int          @id @default(autoincrement())
+  name        String
+  slug        String       @unique
+  description String?      @db.Text
+  coverImage  String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  posts       SeriesPost[]
+
+  @@index([slug])
+}
+
+model SeriesPost {
+  id       Int    @id @default(autoincrement())
+  seriesId Int
+  postId   Int
+  position Int    @default(0)
+  series   Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  post     Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([seriesId, postId])
+  @@index([seriesId])
+  @@index([postId])
+}
+
+// ===================== Redirects =====================
+
+model Redirect {
+  id        Int      @id @default(autoincrement())
+  fromPath  String   @unique
+  toPath    String
+  type      Int      @default(301)
+  hits      Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fromPath])
+}
+
+// ===================== API Keys =====================
+
+model ApiKey {
+  id          Int       @id @default(autoincrement())
+  name        String
+  prefix      String    @unique
+  keyHash     String    @unique
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scopes      String    @db.Text
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([keyHash])
 }

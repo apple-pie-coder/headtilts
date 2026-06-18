@@ -8,9 +8,10 @@ import TurndownService from 'turndown';
 import { slugify, PERMISSIONS } from '@headtilts/shared';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faArrowUpRightFromSquare, faPlus, faMinus, faBold, faCode, faTag, faHistory, faArchive } from '@fortawesome/free-solid-svg-icons';
-import { fetchRevisions, archiveRevision } from '../services/revisions';
+import { fetchRevisions, archiveRevision, restoreRevision } from '../services/revisions';
 import { PostRevision } from '../types';
 import { AdminLayout } from '../components/AdminLayout';
+import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/ToastContext';
 import { ImageToolbar } from '../components/ImageToolbar';
 import { MediaLibraryModal } from '../components/MediaLibraryModal';
@@ -18,6 +19,7 @@ import { MediaPickerInput } from '../components/MediaPickerInput';
 import { useAuth } from '../hooks/useAuth';
 import { Category, Post } from '../types';
 import { fetchCategories } from '../services/categories';
+import { fetchPolls, Poll } from '../services/polls';
 import { resolveMediaUrl } from '../services/media';
 import { createPost, fetchPost, fetchPosts, fetchPreviewLink, updatePost, fetchAuthorList, PostInput, AuthorListItem } from '../services/posts';
 import styles from './PostEditor.module.css';
@@ -244,6 +246,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const toast = useToast();
+  const confirm = useConfirm();
   const isEditing = !!id;
   const canPublish         = hasPermission(PERMISSIONS.POST_PUBLISH);
   const canViewRevisions   = hasPermission(PERMISSIONS.REVISION_READ);
@@ -268,6 +271,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   const [isFeatured, setIsFeatured] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [commentStatus, setCommentStatus] = useState<'default' | 'open' | 'closed'>('default');
+  const [showToc, setShowToc] = useState<'default' | 'yes' | 'no'>('default');
   const [parentId, setParentId] = useState<number | null>(null);
   const [parentPages, setParentPages] = useState<Post[]>([]);
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
@@ -293,6 +297,8 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   const markdownTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [shortcodesOpen, setShortcodesOpen] = useState(false);
+  const [scPolls, setScPolls] = useState<Poll[]>([]);
+  const [scPollsLoaded, setScPollsLoaded] = useState(false);
   const [revisions, setRevisions] = useState<PostRevision[]>([]);
   const [showArchivedRevisions, setShowArchivedRevisions] = useState(false);
 
@@ -301,6 +307,53 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   const [authorList, setAuthorList] = useState<AuthorListItem[]>([]);
 
   const [saving, setSaving] = useState(false);
+  const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const buildInputRef = useRef<((s: string) => PostInput) | null>(null);
+  const postRef = useRef<Post | null>(null);
+  const savingRef = useRef(false);
+
+  // Keep refs in sync so autosave timer always has current values
+  postRef.current = post;
+  savingRef.current = saving;
+
+  const scheduleAutosave = useCallback(() => {
+    if (!isEditing || !postRef.current) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(async () => {
+      if (!postRef.current || savingRef.current || !buildInputRef.current) return;
+      setAutosaveStatus('saving');
+      try {
+        const input = buildInputRef.current(postRef.current.status);
+        await updatePost(postRef.current.id, input);
+        setAutosaveStatus('saved');
+        setTimeout(() => setAutosaveStatus('idle'), 3000);
+      } catch {
+        setAutosaveStatus('idle');
+      }
+    }, 5000);
+  }, [isEditing]);
+
+  // Stable modal callbacks — state setters and refs never change identity,
+  // so these callbacks are safe to use with empty deps and won't cause
+  // MediaLibraryModal to re-render on every PostEditor render.
+  const closeMediaModal = useCallback(() => setMediaModalOpen(false), []);
+  const closeInlineMedia = useCallback(() => setInlineMediaModalOpen(false), []);
+
+  const handleFeaturedImageSelect = useCallback((media: { url: string }) => {
+    setFeaturedImage(media.url);
+    setMediaModalOpen(false);
+  }, []);
+
+  const handleInlineMediaSelect = useCallback((media: { url: string }) => {
+    const quill = quillRef.current?.getEditor();
+    if (quill) {
+      const { index } = inlineInsertRange.current;
+      quill.insertEmbed(index, 'image', resolveMediaUrl(media.url), 'user');
+      quill.setSelection(index + 1, 0, 'user');
+    }
+    setInlineMediaModalOpen(false);
+  }, []);
 
   useEffect(() => {
     if (!isPage) {
@@ -413,6 +466,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
     setIsFeatured(loaded.isFeatured ?? false);
     setShowSidebar(loaded.showSidebar ?? false);
     setCommentStatus(loaded.commentStatus === 'open' || loaded.commentStatus === 'closed' ? loaded.commentStatus : 'default');
+    setShowToc(loaded.showToc === 'yes' || loaded.showToc === 'no' ? loaded.showToc : 'default');
     setParentId(loaded.parentId ?? null);
     setTagsInput(loaded.tags.map(({ tag }) => tag.name).join(', '));
     setCategoryIds(loaded.categories.map(({ category }) => category.id));
@@ -508,11 +562,31 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
     setRevisions((prev) => prev.map((r) => r.id === revId ? { ...r, isArchived: true } : r));
   }
 
+  async function handleRestoreRevision(revId: number, revTime: string) {
+    if (!post) return;
+    const confirmed = await confirm({
+      title: 'Restore this version?',
+      message: `The editor will be overwritten with the content from ${new Date(revTime).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}. The current content will be saved as a new revision first so nothing is lost.`,
+      confirmLabel: 'Restore',
+      danger: false,
+    });
+    if (!confirmed) return;
+    try {
+      const restored = await restoreRevision(post.id, revId);
+      applyPost(restored);
+      await loadRevisions(post.id);
+      toast.success('Version restored successfully.');
+    } catch (err: unknown) {
+      toast.error((err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || 'Failed to restore version');
+    }
+  }
+
   function handleTitleChange(value: string) {
     setTitle(value);
     if (!slugTouched) {
       setSlug(slugify(value));
     }
+    scheduleAutosave();
   }
 
   function toggleCategory(categoryId: number) {
@@ -520,6 +594,9 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
       prev.includes(categoryId) ? prev.filter((existing) => existing !== categoryId) : [...prev, categoryId]
     );
   }
+
+  // Keep buildInputRef current on every render so the autosave timer has latest state
+  buildInputRef.current = buildInput;
 
   function buildInput(targetStatus: string): PostInput {
     const tagNames = tagsInput
@@ -542,6 +619,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
       isFeatured: isPage ? undefined : isFeatured,
       showSidebar,
       commentStatus: isPage ? undefined : (commentStatus === 'default' ? null : commentStatus),
+      showToc: showToc === 'default' ? null : showToc,
       categoryIds: isPage ? [] : categoryIds,
       tagNames: isPage ? [] : tagNames,
       authorId: selectedAuthorId || null,
@@ -657,9 +735,13 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
     <AdminLayout>
       <div className={styles.header}>
         <h2 className={styles.title}>{isEditing ? `Edit ${noun}` : `Add New ${noun}`}</h2>
-        <button className={styles.backButton} onClick={() => navigate(listPath)}>
-          <FontAwesomeIcon icon={faArrowLeft} /> Back to {noun}s
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          {autosaveStatus === 'saving' && <span style={{ fontSize: '0.8rem', color: '#6e6e73' }}>Saving…</span>}
+          {autosaveStatus === 'saved' && <span style={{ fontSize: '0.8rem', color: '#34c759' }}>Autosaved</span>}
+          <button className={styles.backButton} onClick={() => navigate(listPath)}>
+            <FontAwesomeIcon icon={faArrowLeft} /> Back to {noun}s
+          </button>
+        </div>
       </div>
 
 
@@ -709,7 +791,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
 
           {editorMode === 'visual' ? (
             <div className={styles.editorWrapper}>
-              <ReactQuill ref={quillRef} theme="snow" value={content} onChange={setContent} modules={QUILL_MODULES} formats={QUILL_FORMATS} />
+              <ReactQuill ref={quillRef} theme="snow" value={content} onChange={(v) => { setContent(v); scheduleAutosave(); }} modules={QUILL_MODULES} formats={QUILL_FORMATS} />
             </div>
           ) : (
             <div className={styles.markdownPane}>
@@ -847,6 +929,16 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
                           <span className={styles.revTime} title={new Date(rev.createdAt).toLocaleString()}>
                             {revTimeAgo(rev.createdAt)}
                           </span>
+                          {rev.snapshot && !rev.isArchived && (
+                            <button
+                              type="button"
+                              className={styles.revRestoreBtn}
+                              title="Restore the editor to this version"
+                              onClick={() => handleRestoreRevision(rev.id, rev.createdAt)}
+                            >
+                              Restore
+                            </button>
+                          )}
                           {canArchiveRevisions && !rev.isArchived && (
                             <button
                               type="button"
@@ -1022,6 +1114,20 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
               </div>
             )}
 
+            <div className={styles.formGroup}>
+              <label>Table of Contents</label>
+              <select
+                value={showToc}
+                onChange={(e) => setShowToc(e.target.value as 'default' | 'yes' | 'no')}
+                disabled={saving}
+              >
+                <option value="default">Use site default</option>
+                <option value="yes">Always show</option>
+                <option value="no">Never show</option>
+              </select>
+              <p className={styles.hint}>Overrides the site-wide Table of Contents setting for this {isPage ? 'page' : 'post'}.</p>
+            </div>
+
             {!canPublish && (
               <p className={styles.hint}>You do not have permission to publish or schedule {isPage ? 'pages' : 'posts'}.</p>
             )}
@@ -1184,7 +1290,14 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
           </div>
 
           <div className={styles.panel}>
-            <button type="button" className={styles.scToggle} onClick={() => setShortcodesOpen((o) => !o)}>
+            <button type="button" className={styles.scToggle} onClick={() => {
+              setShortcodesOpen((o) => {
+                if (!o && !scPollsLoaded) {
+                  fetchPolls(1, 100).then((d) => { setScPolls(d.items); setScPollsLoaded(true); }).catch(() => {});
+                }
+                return !o;
+              });
+            }}>
               <h3><FontAwesomeIcon icon={faTag} style={{ marginRight: '0.4em', opacity: 0.7 }} /> Shortcodes</h3>
               <span><FontAwesomeIcon icon={shortcodesOpen ? faMinus : faPlus} /></span>
             </button>
@@ -1222,6 +1335,34 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
                   </div>
                 ))}
 
+                <div className={styles.scSection}>
+                  <p className={styles.scSectionTitle}>Polls</p>
+                  <p className={styles.scDesc} style={{ marginBottom: '0.5rem' }}>
+                    Embeds a live, interactive poll inside the post. The poll must be published with status&nbsp;<strong>Open</strong>.
+                  </p>
+                  {scPolls.length === 0 && scPollsLoaded && (
+                    <p className={styles.scExample}>No open polls found. Create one in Admin → Polls first.</p>
+                  )}
+                  {!scPollsLoaded && (
+                    <p className={styles.scExample}>Loading polls…</p>
+                  )}
+                  {scPolls.map((poll) => (
+                    <div key={poll.id} className={styles.scRow}>
+                      <span className={styles.scTag}>[poll slug="{poll.slug}"]</span>
+                      <p className={styles.scDesc}>{poll.title}</p>
+                      <p className={styles.scExample}>Status: {poll.status} · {poll._count.votes} vote{poll._count.votes !== 1 ? 's' : ''}</p>
+                      <button
+                        type="button"
+                        className={styles.scInsert}
+                        onClick={() => insertShortcode(`[poll slug="${poll.slug}"]`)}
+                        title={`Insert poll: ${poll.title}`}
+                      >
+                        Insert
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
                 <div className={styles.scFormatRef}>
                   <p className={styles.scFormatTitle}>PHP Date Format Tokens</p>
                   <div className={styles.scFormatGrid}>
@@ -1250,26 +1391,15 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
 
       {inlineMediaModalOpen && (
         <MediaLibraryModal
-          onSelect={(media) => {
-            const quill = quillRef.current?.getEditor();
-            if (quill) {
-              const { index } = inlineInsertRange.current;
-              quill.insertEmbed(index, 'image', resolveMediaUrl(media.url), 'user');
-              quill.setSelection(index + 1, 0, 'user');
-            }
-            setInlineMediaModalOpen(false);
-          }}
-          onClose={() => setInlineMediaModalOpen(false)}
+          onSelect={handleInlineMediaSelect}
+          onClose={closeInlineMedia}
         />
       )}
 
       {mediaModalOpen && (
         <MediaLibraryModal
-          onSelect={(media) => {
-            setFeaturedImage(media.url);
-            setMediaModalOpen(false);
-          }}
-          onClose={() => setMediaModalOpen(false)}
+          onSelect={handleFeaturedImageSelect}
+          onClose={closeMediaModal}
         />
       )}
     </AdminLayout>

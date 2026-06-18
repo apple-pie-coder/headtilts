@@ -32,8 +32,8 @@ export async function getOne(req: Request, res: Response): Promise<void> {
 
 export async function create(req: Request, res: Response): Promise<void> {
   try {
-    const { name, description, permissionIds } = req.body;
-    const role = await rolesService.createRole({ name, description, permissionIds });
+    const { name, description, permissionIds, mfaRequired } = req.body;
+    const role = await rolesService.createRole({ name, description, permissionIds, mfaRequired });
     sendSuccess(res, role, 201, 'Role created successfully');
   } catch (error) {
     handleError(res, error);
@@ -43,8 +43,8 @@ export async function create(req: Request, res: Response): Promise<void> {
 export async function update(req: Request, res: Response): Promise<void> {
   try {
     const id = parseIntParam(req.params.id);
-    const { name, description, permissionIds } = req.body;
-    const role = await rolesService.updateRole(id, { name, description, permissionIds });
+    const { name, description, permissionIds, mfaRequired } = req.body;
+    const role = await rolesService.updateRole(id, { name, description, permissionIds, mfaRequired });
     sendSuccess(res, role, 200, 'Role updated successfully');
   } catch (error) {
     handleError(res, error);

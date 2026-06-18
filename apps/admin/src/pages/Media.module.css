@@ -418,3 +418,21 @@
   border-radius: var(--r-sm);
   font-size: 0.875rem;
 }
+
+.usageOk {
+  font-size: 0.8125rem;
+  color: var(--success);
+  background: var(--success-bg);
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--r-xs);
+  margin-bottom: 0.5rem;
+}
+
+.usageWarn {
+  font-size: 0.8125rem;
+  color: var(--danger);
+  background: var(--danger-bg);
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--r-xs);
+  margin-bottom: 0.5rem;
+}

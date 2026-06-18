@@ -170,6 +170,7 @@ interface PostInput {
   isFeatured?: boolean;
   showSidebar?: boolean;
   commentStatus?: string | null;
+  showToc?: string | null;
   categoryIds?: number[];
   tagNames?: string[];
   authorId?: string | null;
@@ -282,6 +283,7 @@ export async function createPost(input: PostInput, authorId: string) {
         isFeatured: input.isFeatured ?? false,
         showSidebar: input.showSidebar ?? false,
         commentStatus: input.commentStatus ?? null,
+        showToc: input.showToc ?? null,
         metaTitle: input.metaTitle || undefined,
         metaDescription: input.metaDescription || undefined,
         metaKeywords: input.metaKeywords || undefined,
@@ -366,6 +368,7 @@ export async function updatePost(id: number, input: PostInput) {
         ...(input.isFeatured !== undefined ? { isFeatured: input.isFeatured } : {}),
         ...(input.showSidebar !== undefined ? { showSidebar: input.showSidebar } : {}),
         ...(input.commentStatus !== undefined ? { commentStatus: input.commentStatus } : {}),
+        ...(input.showToc !== undefined ? { showToc: input.showToc } : {}),
         ...(input.authorId !== undefined ? { authorId: input.authorId || null } : {}),
         ...(resolvedStatus
           ? {
@@ -426,4 +429,64 @@ export async function deletePost(id: number) {
   }
 
   await prisma.post.delete({ where: { id } });
+}
+
+export async function duplicatePost(id: number, authorId: string) {
+  const original = await prisma.post.findUnique({
+    where: { id },
+    include: { categories: true, tags: true },
+  });
+  if (!original) throw new NotFoundError('Post not found');
+
+  const baseSlug = slugify(`copy-of-${original.title}`);
+  let slug = baseSlug;
+  let counter = 1;
+  while (await prisma.post.findFirst({ where: { slug } })) {
+    slug = `${baseSlug}-${counter++}`;
+  }
+
+  const copy = await prisma.post.create({
+    data: {
+      title: `Copy of ${original.title}`,
+      slug,
+      content: original.content,
+      excerpt: original.excerpt,
+      type: original.type,
+      parentId: original.parentId,
+      status: 'draft',
+      featuredImage: original.featuredImage,
+      template: original.template,
+      isFeatured: false,
+      showSidebar: original.showSidebar,
+      commentStatus: original.commentStatus,
+      showToc: original.showToc,
+      metaTitle: original.metaTitle,
+      metaDescription: original.metaDescription,
+      metaKeywords: original.metaKeywords,
+      ogTitle: original.ogTitle,
+      ogDescription: original.ogDescription,
+      ogImage: original.ogImage,
+      authorId,
+      categories: { create: original.categories.map((c) => ({ categoryId: c.categoryId })) },
+      tags: { create: original.tags.map((t) => ({ tagId: t.tagId })) },
+    },
+    include: postInclude,
+  });
+
+  return withPublicUrl(copy);
+}
+
+export async function bulkUpdatePosts(ids: number[], action: string) {
+  if (action === 'delete') {
+    const { count } = await prisma.post.deleteMany({ where: { id: { in: ids } } });
+    return count;
+  }
+  const statusMap: Record<string, string> = { publish: 'published', draft: 'draft', trash: 'trash' };
+  const status = statusMap[action];
+  if (!status) throw new ValidationError(`Unknown action: ${action}`);
+  const { count } = await prisma.post.updateMany({
+    where: { id: { in: ids } },
+    data: { status, ...(action === 'publish' ? { publishedAt: new Date() } : {}) },
+  });
+  return count;
 }

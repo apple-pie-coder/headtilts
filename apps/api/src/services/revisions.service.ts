@@ -10,6 +10,30 @@ export interface ChangeEntry {
   note?: string;
 }
 
+// Fields that are snapshotted and restored
+export interface PostSnapshot {
+  title: string;
+  slug: string;
+  content: string;
+  excerpt: string | null;
+  featuredImage: string | null;
+  template: string | null;
+  isFeatured: boolean;
+  showSidebar: boolean;
+  commentStatus: string | null;
+  showToc: string | null;
+  parentId: number | null;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  metaKeywords: string | null;
+  canonicalUrl: string | null;
+  ogTitle: string | null;
+  ogDescription: string | null;
+  ogImage: string | null;
+  categoryIds: number[];
+  tagNames: string[];
+}
+
 const revisionUserSelect = {
   id: true,
   username: true,
@@ -23,6 +47,7 @@ export async function recordRevision(data: {
   userId: string;
   action: string;
   changes: ChangeEntry[];
+  snapshot?: PostSnapshot;
 }): Promise<void> {
   await prisma.postRevision.create({
     data: {
@@ -30,6 +55,7 @@ export async function recordRevision(data: {
       userId: data.userId,
       action: data.action,
       changes: data.changes.length ? (data.changes as unknown as Prisma.InputJsonValue) : undefined,
+      snapshot: data.snapshot ? (data.snapshot as unknown as Prisma.InputJsonValue) : undefined,
       isArchived: false,
     },
   });
@@ -52,9 +78,16 @@ export async function archiveRevision(id: number, postId: number) {
   return prisma.postRevision.update({ where: { id }, data: { isArchived: true } });
 }
 
+export async function restoreRevision(id: number, postId: number): Promise<PostSnapshot> {
+  const revision = await prisma.postRevision.findFirst({ where: { id, postId } });
+  if (!revision) throw new NotFoundError('Revision not found');
+  if (!revision.snapshot) throw new NotFoundError('This revision has no saved snapshot — it was created before content snapshots were enabled');
+  return revision.snapshot as unknown as PostSnapshot;
+}
+
 // ── Diff helpers (used by posts.controller) ────────────────────────────────
 
-interface PostSnapshot {
+interface OldSnapshot {
   title: string;
   slug: string;
   status: string;
@@ -113,7 +146,7 @@ function fmtDate(d: Date | null): string {
 
 function fmtBool(v: boolean): string { return v ? 'Yes' : 'No'; }
 
-export function computeDiff(old: PostSnapshot, updated: PostSnapshot, input: PostInput): ChangeEntry[] {
+export function computeDiff(old: OldSnapshot, updated: OldSnapshot, input: PostInput): ChangeEntry[] {
   const c: ChangeEntry[] = [];
   const str = (v: string | null | undefined) => v ?? '';
 
@@ -203,7 +236,7 @@ export function computeDiff(old: PostSnapshot, updated: PostSnapshot, input: Pos
   ];
   const changedSeo: string[] = [];
   for (const [key, label] of seoFields) {
-    if (input[key] !== undefined && str(old[key as keyof PostSnapshot] as string) !== str(input[key] as string))
+    if (input[key] !== undefined && str(old[key as keyof OldSnapshot] as string) !== str(input[key] as string))
       changedSeo.push(label);
   }
   if (changedSeo.length)
@@ -218,4 +251,51 @@ export function deriveAction(oldStatus: string, newStatus: string): string {
   if (newStatus === 'trash') return 'trashed';
   if (oldStatus === 'published' && newStatus !== 'published') return 'unpublished';
   return 'updated';
+}
+
+// Build a restorable snapshot from the current post state returned by getPostById
+export function buildSnapshot(post: {
+  title: string;
+  slug: string;
+  content: string;
+  excerpt: string | null;
+  featuredImage: string | null;
+  template: string | null;
+  isFeatured: boolean;
+  showSidebar: boolean;
+  commentStatus: string | null;
+  showToc: string | null;
+  parentId: number | null;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  metaKeywords: string | null;
+  canonicalUrl: string | null;
+  ogTitle: string | null;
+  ogDescription: string | null;
+  ogImage: string | null;
+  categories: { categoryId: number; category: { name: string } }[];
+  tags: { tag: { name: string } }[];
+}): PostSnapshot {
+  return {
+    title: post.title,
+    slug: post.slug,
+    content: post.content,
+    excerpt: post.excerpt,
+    featuredImage: post.featuredImage,
+    template: post.template,
+    isFeatured: post.isFeatured,
+    showSidebar: post.showSidebar,
+    commentStatus: post.commentStatus,
+    showToc: post.showToc,
+    parentId: post.parentId,
+    metaTitle: post.metaTitle,
+    metaDescription: post.metaDescription,
+    metaKeywords: post.metaKeywords,
+    canonicalUrl: post.canonicalUrl,
+    ogTitle: post.ogTitle,
+    ogDescription: post.ogDescription,
+    ogImage: post.ogImage,
+    categoryIds: post.categories.map((c) => c.categoryId),
+    tagNames: post.tags.map((t) => t.tag.name),
+  };
 }

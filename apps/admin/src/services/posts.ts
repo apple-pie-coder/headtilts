@@ -16,6 +16,7 @@ export interface PostInput {
   isFeatured?: boolean;
   showSidebar?: boolean;
   commentStatus?: string | null;
+  showToc?: string | null;
   categoryIds?: number[];
   tagNames?: string[];
   authorId?: string | null;
@@ -100,5 +101,15 @@ export async function deletePost(id: number): Promise<void> {
 
 export async function fetchPreviewLink(id: number): Promise<{ url: string; expiresAt: string }> {
   const response = await apiClient.get(`/posts/${id}/preview-link`);
+  return response.data.data;
+}
+
+export async function duplicatePost(id: number): Promise<Post> {
+  const response = await apiClient.post(`/posts/${id}/duplicate`);
+  return response.data.data;
+}
+
+export async function bulkPosts(ids: number[], action: string): Promise<{ count: number }> {
+  const response = await apiClient.post('/posts/bulk', { ids, action });
   return response.data.data;
 }

@@ -11,7 +11,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load user from token on mount
   useEffect(() => {
     loadUser();
   }, []);
@@ -22,7 +21,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-
     try {
       const response = await apiClient.get('/auth/me');
       setUser(response.data.data);
@@ -36,20 +34,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function login(identifier: string, password: string) {
+  async function login(identifier: string, password: string): Promise<{ mfaRequired: true; mfaToken: string } | void> {
     setLoading(true);
     setError(null);
     try {
       const response = await apiClient.post('/auth/login', { identifier, password });
-      const { accessToken, refreshToken, user: userData } = response.data.data;
+      const data = response.data.data;
 
-      localStorage.setItem('accessToken', accessToken);
-      if (refreshToken) {
-        localStorage.setItem('refreshToken', refreshToken);
+      if (data.mfaRequired) {
+        return { mfaRequired: true as const, mfaToken: data.mfaToken as string };
       }
-      setUser(userData);
+
+      localStorage.setItem('accessToken', data.accessToken);
+      if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
+      setUser(data.user);
     } catch (err: unknown) {
       const message = (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || 'Login failed';
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function completeMfaLogin(mfaToken: string, code: string) {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await apiClient.post('/auth/mfa/verify', { mfaToken, code });
+      const { accessToken, refreshToken, user: userData } = response.data.data;
+      localStorage.setItem('accessToken', accessToken);
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+      setUser(userData);
+    } catch (err: unknown) {
+      const message = (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || 'Invalid code';
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function completeMfaBackupLogin(mfaToken: string, backupCode: string) {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await apiClient.post('/auth/mfa/verify-backup', { mfaToken, backupCode });
+      const { accessToken, refreshToken, user: userData } = response.data.data;
+      localStorage.setItem('accessToken', accessToken);
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+      setUser(userData);
+    } catch (err: unknown) {
+      const message = (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || 'Invalid backup code';
       setError(message);
       throw err;
     } finally {
@@ -62,11 +98,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const { accessToken, refreshToken, user: userData } = await setupAdmin(input);
-
       localStorage.setItem('accessToken', accessToken);
-      if (refreshToken) {
-        localStorage.setItem('refreshToken', refreshToken);
-      }
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
       setUser(userData);
     } catch (err: unknown) {
       const message = (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || 'Setup failed';
@@ -102,6 +135,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     error,
     login,
+    completeMfaLogin,
+    completeMfaBackupLogin,
     setup,
     logout,
     isAuthenticated: !!user,

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as mediaService from '../services/media.service';
+import { prisma } from '../config/database';
 import { MAX_FILES } from '../middleware/upload';
 import { sendSuccess, sendPaginatedSuccess, sendError } from '../utils/response';
 import { ApiError, ValidationError, parseIntParam } from '../utils/errors';
@@ -156,6 +157,30 @@ export async function deleteFolder(req: Request, res: Response): Promise<void> {
   try {
     await mediaService.deleteFolder(parseIntParam(req.params.id));
     sendSuccess(res, { message: 'Folder deleted' });
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function usage(req: Request, res: Response): Promise<void> {
+  try {
+    const id = parseIntParam(req.params.id);
+    const media = await prisma.media.findUnique({ where: { id }, select: { url: true, originalName: true } });
+    if (!media) { sendError(res, 'NOT_FOUND', 'Media not found', 404); return; }
+
+    const posts = await prisma.post.findMany({
+      where: {
+        status: { not: 'trash' },
+        OR: [
+          { content: { contains: media.url } },
+          { featuredImage: { contains: media.url } },
+          { ogImage: { contains: media.url } },
+        ],
+      },
+      select: { id: true, title: true, slug: true, status: true, type: true },
+    });
+
+    sendSuccess(res, { count: posts.length, posts });
   } catch (error) {
     handleError(res, error);
   }

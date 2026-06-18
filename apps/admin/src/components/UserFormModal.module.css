@@ -2,21 +2,18 @@
   position: fixed;
   inset: 0;
   background: var(--overlay);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 1000;
 }
 
 .card {
   background: var(--surface-overlay);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow), var(--glass-shine);
   border-radius: 20px;
+  will-change: transform;
   padding: 2rem;
   width: 100%;
   max-width: 480px;

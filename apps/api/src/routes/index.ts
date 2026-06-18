@@ -16,6 +16,8 @@ import commentRoutes from './comments.routes';
 import notificationRoutes from './notifications.routes';
 import celebrationRoutes from './celebrations.routes';
 import pollRoutes from './polls.routes';
+import apiKeyRoutes from './apiKey.routes';
+import redirectRoutes from './redirects.routes';
 import publicRoutes from './public.routes';
 
 const router: IRouter = Router();
@@ -37,6 +39,8 @@ router.use('/comments', commentRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/celebrations', celebrationRoutes);
 router.use('/polls', pollRoutes);
+router.use('/api-keys', apiKeyRoutes);
+router.use('/redirects', redirectRoutes);
 router.use('/public', publicRoutes);
 
 export default router;

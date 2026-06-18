@@ -192,3 +192,156 @@
 
 .saveBtn:hover:not(:disabled) { background: var(--accent-h); }
 .saveBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* MFA section */
+.mfaStatus {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--sep);
+}
+
+.mfaBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.mfaBadgeOn {
+  background: var(--success-bg);
+  color: var(--success-t);
+}
+
+.mfaBadgeOff {
+  background: var(--surface-alt, var(--sep));
+  color: var(--t2);
+}
+
+.mfaStatusLabel {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--t1);
+}
+
+.mfaDesc {
+  font-size: 0.875rem;
+  color: var(--t2);
+  margin: 0 0 1.25rem;
+  line-height: 1.55;
+}
+
+.mfaQr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.mfaQr img {
+  width: 160px;
+  height: 160px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--sep);
+  background: #fff;
+  padding: 4px;
+}
+
+.mfaSecret {
+  font-family: monospace;
+  font-size: 0.8125rem;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--r-xs);
+  padding: 0.4rem 0.75rem;
+  color: var(--t2);
+  letter-spacing: 0.08em;
+  word-break: break-all;
+  text-align: center;
+}
+
+.mfaOtpRow {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.mfaOtpBox {
+  width: 2.5rem;
+  height: 2.75rem;
+  text-align: center;
+  font-size: 1.125rem;
+  font-weight: 600;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--r-sm);
+  color: var(--t1);
+  transition: border-color var(--ease), box-shadow var(--ease);
+  caret-color: var(--accent);
+}
+
+.mfaOtpBox:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--input-ring);
+}
+
+.backupCodesBox {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--r-sm);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.backupCodesBox p {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  color: var(--t2);
+}
+
+.backupCodesList {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.375rem;
+}
+
+.backupCode {
+  font-family: monospace;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--t1);
+  letter-spacing: 0.08em;
+}
+
+.dangerBtn {
+  padding: 0.5rem 1.125rem;
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: var(--r-sm);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  transition: background var(--ease), color var(--ease);
+}
+
+.dangerBtn:hover:not(:disabled) {
+  background: var(--danger);
+  color: #fff;
+}
+
+.dangerBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.backupCodesRemaining {
+  font-size: 0.8125rem;
+  color: var(--t3);
+  margin-top: 0.25rem;
+}

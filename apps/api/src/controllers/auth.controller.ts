@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
 import * as authService from '../services/auth.service';
+import * as mfaService from '../services/mfa.service';
 import { sendSuccess, sendError } from '../utils/response';
 import { ApiError } from '../utils/errors';
+import { verifyMfaToken } from '../utils/jwt';
 
 export async function register(req: Request, res: Response): Promise<void> {
   try {
@@ -123,6 +125,128 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
     const { token, password } = req.body;
     await authService.resetPassword(token, password);
     sendSuccess(res, { message: 'Password updated. You can now log in.' });
+  } catch (error) {
+    if (error instanceof ApiError) {
+      sendError(res, error.code, error.message, error.statusCode, error.details);
+    } else {
+      sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+    }
+  }
+}
+
+// ── MFA endpoints ─────────────────────────────────────────────────────────────
+
+export async function mfaVerify(req: Request, res: Response): Promise<void> {
+  try {
+    const { mfaToken, code } = req.body;
+    if (!mfaToken || !code) {
+      sendError(res, 'VALIDATION_ERROR', 'mfaToken and code are required', 400);
+      return;
+    }
+    const payload = verifyMfaToken(mfaToken);
+    if (!payload) {
+      sendError(res, 'UNAUTHORIZED', 'Invalid or expired MFA token', 401);
+      return;
+    }
+    const user = await import('../config/database').then((m) =>
+      m.prisma.user.findUnique({ where: { id: payload.sub }, select: { mfaSecret: true, mfaEnabled: true } }),
+    );
+    if (!user?.mfaSecret || !mfaService.verifyTotp(user.mfaSecret, code)) {
+      sendError(res, 'UNAUTHORIZED', 'Invalid authentication code', 401);
+      return;
+    }
+    const result = await authService.completeMfaLogin(payload.sub);
+    sendSuccess(res, result);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      sendError(res, error.code, error.message, error.statusCode, error.details);
+    } else {
+      sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+    }
+  }
+}
+
+export async function mfaVerifyBackup(req: Request, res: Response): Promise<void> {
+  try {
+    const { mfaToken, backupCode } = req.body;
+    if (!mfaToken || !backupCode) {
+      sendError(res, 'VALIDATION_ERROR', 'mfaToken and backupCode are required', 400);
+      return;
+    }
+    const payload = verifyMfaToken(mfaToken);
+    if (!payload) {
+      sendError(res, 'UNAUTHORIZED', 'Invalid or expired MFA token', 401);
+      return;
+    }
+    const ok = await mfaService.consumeBackupCode(payload.sub, backupCode);
+    if (!ok) {
+      sendError(res, 'UNAUTHORIZED', 'Invalid backup code', 401);
+      return;
+    }
+    const result = await authService.completeMfaLogin(payload.sub);
+    sendSuccess(res, result);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      sendError(res, error.code, error.message, error.statusCode, error.details);
+    } else {
+      sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+    }
+  }
+}
+
+export async function mfaSetup(req: Request, res: Response): Promise<void> {
+  try {
+    const result = await authService.setupMfa(req.user!.sub);
+    sendSuccess(res, result);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      sendError(res, error.code, error.message, error.statusCode, error.details);
+    } else {
+      sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+    }
+  }
+}
+
+export async function mfaEnable(req: Request, res: Response): Promise<void> {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      sendError(res, 'VALIDATION_ERROR', 'TOTP code is required', 400);
+      return;
+    }
+    const result = await authService.enableMfa(req.user!.sub, code);
+    sendSuccess(res, result);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      sendError(res, error.code, error.message, error.statusCode, error.details);
+    } else {
+      sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+    }
+  }
+}
+
+export async function mfaDisable(req: Request, res: Response): Promise<void> {
+  try {
+    const { password } = req.body;
+    if (!password) {
+      sendError(res, 'VALIDATION_ERROR', 'Password is required', 400);
+      return;
+    }
+    await authService.disableMfa(req.user!.sub, password);
+    sendSuccess(res, { message: 'MFA disabled' });
+  } catch (error) {
+    if (error instanceof ApiError) {
+      sendError(res, error.code, error.message, error.statusCode, error.details);
+    } else {
+      sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+    }
+  }
+}
+
+export async function mfaStatus(req: Request, res: Response): Promise<void> {
+  try {
+    const result = await mfaService.getMfaStatus(req.user!.sub);
+    sendSuccess(res, result);
   } catch (error) {
     if (error instanceof ApiError) {
       sendError(res, error.code, error.message, error.statusCode, error.details);

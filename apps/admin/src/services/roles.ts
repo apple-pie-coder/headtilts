@@ -5,6 +5,7 @@ export interface RoleInput {
   name: string;
   description?: string;
   permissionIds: number[];
+  mfaRequired?: boolean;
 }
 
 export async function fetchRoles(): Promise<Role[]> {

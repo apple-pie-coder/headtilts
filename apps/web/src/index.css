@@ -93,6 +93,21 @@ button { cursor: pointer; font-family: inherit; }
 .nav-link:hover { background: rgba(0,0,0,0.05); color: #1d1d1f; }
 .nav-link.active { background: rgba(0,113,227,0.1); color: #0071e3; font-weight: 600; }
 
+/* Search icon link in header */
+.nav-search-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  color: var(--text-secondary, #6e6e73);
+  transition: background 0.15s, color 0.15s;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.nav-search-link:hover { background: rgba(0,0,0,0.06); color: #1d1d1f; }
+
 /* Mobile nav hamburger (hidden on desktop; shown via the mobile media query). */
 .nav-toggle {
   display: none;
@@ -169,7 +184,7 @@ button { cursor: pointer; font-family: inherit; }
 
 @media (max-width: 800px) {
   .site-content { grid-template-columns: 1fr; }
-  .site-sidebar { order: -1; }
+  .site-sidebar { order: 1; }
 }
 
 /* ── Mobile navigation ── */
@@ -2059,6 +2074,233 @@ button { cursor: pointer; font-family: inherit; }
 .site-header--transparent .theme-option.active { background: rgba(255, 255, 255, 0.95); color: #0071e3; }
 
 /* ═══════════════════════════════════════════════════════════════════════
+   READING PROGRESS BAR
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #0071e3, #5ac8fa);
+  z-index: 200;
+  transition: width 0.1s linear;
+  border-radius: 0 2px 2px 0;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TABLE OF CONTENTS
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.toc {
+  background: rgba(0,0,0,0.025);
+  border: 1px solid rgba(0,0,0,0.07);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 2rem;
+  font-size: 0.9rem;
+}
+
+.toc-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #aeaeb2;
+  margin: 0 0 0.75rem;
+}
+
+.toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.toc-item--h3 { padding-left: 1rem; }
+
+.toc-link {
+  color: #3a3a3c;
+  text-decoration: none;
+  line-height: 1.4;
+  transition: color 0.15s;
+  display: block;
+}
+
+.toc-link:hover { color: #0071e3; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   POST REACTIONS
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.post-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(0,0,0,0.08);
+  align-items: center;
+}
+
+.post-reactions-label {
+  font-size: 0.85rem;
+  color: #aeaeb2;
+  margin-right: 0.25rem;
+}
+
+.post-reaction-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,0.12);
+  background: #fff;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  user-select: none;
+  line-height: 1;
+}
+
+.post-reaction-btn:hover { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.2); transform: scale(1.08); }
+
+.post-reaction-btn--active { background: rgba(0,113,227,0.08); border-color: #0071e3; }
+
+.post-reaction-emoji { font-size: 1.1em; }
+
+.post-reaction-count { font-size: 0.8125rem; font-weight: 600; color: #6e6e73; }
+
+.post-reaction-btn--active .post-reaction-count { color: #0071e3; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RELATED POSTS
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.related-posts {
+  margin-top: 2.5rem;
+  padding-top: 2rem;
+  border-top: 1px solid rgba(0,0,0,0.08);
+}
+
+.related-posts-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1d1d1f;
+  margin: 0 0 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.8rem;
+  color: #aeaeb2;
+}
+
+.related-posts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.related-post-card {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.07);
+  border-radius: 12px;
+  overflow: hidden;
+  text-decoration: none;
+  transition: box-shadow 0.2s, transform 0.15s;
+  display: flex;
+  flex-direction: column;
+}
+
+.related-post-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.1); transform: translateY(-2px); }
+
+.related-post-img {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+}
+
+.related-post-img-placeholder {
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: rgba(0,0,0,0.05);
+}
+
+.related-post-body { padding: 0.75rem; flex: 1; }
+
+.related-post-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1d1d1f;
+  line-height: 1.35;
+  margin: 0 0 0.375rem;
+}
+
+.related-post-card:hover .related-post-title { color: #0071e3; }
+
+.related-post-date { font-size: 0.78rem; color: #aeaeb2; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SERIES NAV (post series / collections)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.series-nav {
+  background: rgba(0,113,227,0.05);
+  border: 1px solid rgba(0,113,227,0.15);
+  border-radius: 14px;
+  padding: 1.125rem 1.375rem;
+  margin-bottom: 2rem;
+}
+
+.series-nav-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #0071e3;
+  margin: 0 0 0.25rem;
+}
+
+.series-nav-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1d1d1f;
+  margin: 0 0 0.875rem;
+}
+
+.series-nav-links {
+  display: flex;
+  gap: 0.625rem;
+  flex-wrap: wrap;
+}
+
+.series-nav-btn {
+  padding: 0.4rem 0.9rem;
+  border-radius: 9px;
+  border: 1px solid rgba(0,113,227,0.3);
+  background: #fff;
+  color: #0071e3;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.series-nav-btn:hover { background: rgba(0,113,227,0.08); border-color: #0071e3; }
+
+.series-nav-progress {
+  font-size: 0.8rem;
+  color: #6e6e73;
+  margin-top: 0.625rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
    DARK THEME
    Layered over the (untouched) light styles. Selectors are prefixed with
    [data-theme='dark'] so they win by specificity and only apply when the
@@ -2310,6 +2552,28 @@ button { cursor: pointer; font-family: inherit; }
   [data-theme='dark'] .site-nav .nav-link:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
   [data-theme='dark'] .site-nav .nav-link.active { background: rgba(41, 151, 255, 0.18); color: #2997ff; }
 }
+
+/* New feature elements — dark */
+[data-theme='dark'] .reading-progress { background: linear-gradient(90deg, #2997ff, #5ac8fa); }
+[data-theme='dark'] .toc { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1); }
+[data-theme='dark'] .toc-link { color: #d1d1d6; }
+[data-theme='dark'] .toc-link:hover { color: #2997ff; }
+[data-theme='dark'] .post-reactions { border-top-color: rgba(255,255,255,0.1); }
+[data-theme='dark'] .post-reaction-btn { background: #1c1c1e; border-color: rgba(255,255,255,0.12); }
+[data-theme='dark'] .post-reaction-btn:hover { background: rgba(255,255,255,0.07); }
+[data-theme='dark'] .post-reaction-btn--active { background: rgba(41,151,255,0.15); border-color: #2997ff; }
+[data-theme='dark'] .post-reaction-count { color: #a1a1a6; }
+[data-theme='dark'] .post-reaction-btn--active .post-reaction-count { color: #2997ff; }
+[data-theme='dark'] .related-posts { border-top-color: rgba(255,255,255,0.1); }
+[data-theme='dark'] .related-post-card { background: #1c1c1e; border-color: rgba(255,255,255,0.1); }
+[data-theme='dark'] .related-post-title { color: #f5f5f7; }
+[data-theme='dark'] .related-post-card:hover .related-post-title { color: #2997ff; }
+[data-theme='dark'] .related-post-img-placeholder { background: rgba(255,255,255,0.06); }
+[data-theme='dark'] .series-nav { background: rgba(41,151,255,0.07); border-color: rgba(41,151,255,0.2); }
+[data-theme='dark'] .series-nav-title { color: #f5f5f7; }
+[data-theme='dark'] .series-nav-btn { background: #1c1c1e; border-color: rgba(41,151,255,0.35); color: #2997ff; }
+[data-theme='dark'] .series-nav-btn:hover { background: rgba(41,151,255,0.12); }
+[data-theme='dark'] .series-nav-progress { color: #a1a1a6; }
 
 /* ═══════════════════════════════════════════════════════════════════════
    CELEBRATION SPOTLIGHT — artist birthdays & remembrances

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AxiosError } from 'axios';
 import { PERMISSIONS } from '@headtilts/shared';
 import { AdminLayout } from '../components/AdminLayout';
@@ -7,7 +7,7 @@ import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/ToastContext';
 import { useAuth } from '../hooks/useAuth';
 import { Category, Post, User } from '../types';
-import { deletePost, fetchPosts, updatePost } from '../services/posts';
+import { deletePost, duplicatePost, bulkPosts, fetchPosts, updatePost } from '../services/posts';
 import { fetchCategories } from '../services/categories';
 import { fetchUsers } from '../services/users';
 import styles from './Posts.module.css';
@@ -54,6 +54,7 @@ export default function PostsPage() {
   const confirm = useConfirm();
   const toast = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { hasPermission } = useAuth();
 
   const [posts, setPosts] = useState<Post[]>([]);
@@ -63,13 +64,20 @@ export default function PostsPage() {
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(() => {
+    const s = searchParams.get('status') ?? '';
+    const valid = ['published', 'draft', 'scheduled', 'trash'];
+    return valid.includes(s) ? s : '';
+  });
   const [authorId, setAuthorId] = useState<string | undefined>(undefined);
   const [categoryId, setCategoryId] = useState<number | undefined>(undefined);
   const [featuredFilter, setFeaturedFilter] = useState<'all' | 'featured' | 'not-featured'>('all');
   const [sortBy, setSortBy] = useState<'publishedAt' | 'updatedAt' | 'title'>('publishedAt');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkAction, setBulkAction] = useState('');
+  const [bulkWorking, setBulkWorking] = useState(false);
 
   useEffect(() => {
     loadPosts();
@@ -140,6 +148,50 @@ export default function PostsPage() {
         (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message ||
           'Failed to restore post'
       );
+    }
+  }
+
+  function toggleSelect(id: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === posts.length) setSelected(new Set());
+    else setSelected(new Set(posts.map((p) => p.id)));
+  }
+
+  async function handleDuplicate(post: Post) {
+    try {
+      const copy = await duplicatePost(post.id);
+      toast.success(`Duplicated as "${copy.title}"`);
+      await loadPosts();
+    } catch (err: unknown) {
+      toast.error((err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || 'Failed to duplicate post');
+    }
+  }
+
+  async function handleBulkApply() {
+    if (!bulkAction || selected.size === 0) return;
+    const ids = Array.from(selected);
+    const label = bulkAction === 'delete' ? `permanently delete ${ids.length} post(s)` : `${bulkAction} ${ids.length} post(s)`;
+    if (bulkAction === 'delete') {
+      if (!(await confirm({ title: 'Bulk Delete', message: `Permanently delete ${ids.length} post(s)? This cannot be undone.`, confirmLabel: 'Delete All', danger: true }))) return;
+    }
+    setBulkWorking(true);
+    try {
+      const { count } = await bulkPosts(ids, bulkAction);
+      toast.success(`${count} post(s) updated`);
+      setSelected(new Set());
+      setBulkAction('');
+      await loadPosts();
+    } catch (err: unknown) {
+      toast.error((err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || `Failed to ${label}`);
+    } finally {
+      setBulkWorking(false);
     }
   }
 
@@ -287,10 +339,30 @@ export default function PostsPage() {
       </div>
 
 
+      {selected.size > 0 && (
+        <div className={styles.bulkBar}>
+          <span className={styles.bulkCount}>{selected.size} selected</span>
+          <select className={styles.bulkSelect} value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+            <option value="">— Bulk action —</option>
+            {hasPermission(PERMISSIONS.POST_PUBLISH) && <option value="publish">Publish</option>}
+            <option value="draft">Set to Draft</option>
+            <option value="trash">Move to Trash</option>
+            {hasPermission(PERMISSIONS.POST_DELETE) && <option value="delete">Delete Permanently</option>}
+          </select>
+          <button className={styles.bulkApply} disabled={!bulkAction || bulkWorking} onClick={handleBulkApply}>
+            Apply
+          </button>
+          <button className={styles.bulkClear} onClick={() => setSelected(new Set())}>Clear selection</button>
+        </div>
+      )}
+
       <div className={styles.tableWrapper}>
         <table>
           <thead>
             <tr>
+              <th className={styles.checkCell}>
+                <input type="checkbox" className={styles.rowCheck} checked={posts.length > 0 && selected.size === posts.length} onChange={toggleSelectAll} />
+              </th>
               <th>Title</th>
               <th>Featured</th>
               <th>Author</th>
@@ -304,6 +376,9 @@ export default function PostsPage() {
           <tbody>
             {posts.map((post) => (
               <tr key={post.id}>
+                <td className={styles.checkCell}>
+                  <input type="checkbox" className={styles.rowCheck} checked={selected.has(post.id)} onChange={() => toggleSelect(post.id)} />
+                </td>
                 <td>
                   <button className={styles.titleLink} onClick={() => navigate(`/admin/posts/${post.id}/edit`)}>
                     {post.title}
@@ -339,16 +414,13 @@ export default function PostsPage() {
                   {post.status === 'trash' ? (
                     <>
                       <button onClick={() => handleRestore(post)}>Restore</button>
-                      <button className={styles.deleteButton} onClick={() => handleDeletePermanently(post)}>
-                        Delete Permanently
-                      </button>
+                      <button className={styles.deleteButton} onClick={() => handleDeletePermanently(post)}>Delete Permanently</button>
                     </>
                   ) : (
                     <>
                       <button onClick={() => navigate(`/admin/posts/${post.id}/edit`)}>Edit</button>
-                      <button className={styles.deleteButton} onClick={() => handleTrash(post)}>
-                        Trash
-                      </button>
+                      <button className={styles.duplicateButton} onClick={() => handleDuplicate(post)}>Duplicate</button>
+                      <button className={styles.deleteButton} onClick={() => handleTrash(post)}>Trash</button>
                     </>
                   )}
                 </td>

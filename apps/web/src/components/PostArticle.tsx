@@ -1,6 +1,8 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { resolveMediaUrl } from '../services/api';
+
+const API_BASE = (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000/api';
 import { useSiteSettings } from '../context/SiteSettingsContext';
 import { useLayout } from '../context/LayoutContext';
 import { formatDate, formatTime } from '../utils/date';
@@ -8,7 +10,13 @@ import { applySeo, resetSeo } from '../utils/seo';
 import { resolveShortcodes } from '../utils/shortcodes';
 import { RichContent } from './RichContent';
 import { Comments } from './Comments';
+import { ReadingProgress } from './ReadingProgress';
+import { TableOfContents } from './TableOfContents';
+import { PostReactions } from './PostReactions';
+import { RelatedPosts } from './RelatedPosts';
+import { SeriesNav } from './SeriesNav';
 import { Author, PostFull } from '../types';
+import { readingTime } from '../utils/readingTime';
 
 function displayName(author: Author): string {
   const name = [author.firstName, author.lastName].filter(Boolean).join(' ');
@@ -16,8 +24,9 @@ function displayName(author: Author): string {
 }
 
 export function PostArticle({ post }: { post: PostFull }) {
-  const { date_format, time_format, timezone, site_title, site_tagline, site_description } = useSiteSettings();
+  const { date_format, time_format, timezone, site_title, site_tagline, site_description, toc_enabled } = useSiteSettings();
   const { setShowSidebar } = useLayout();
+  const articleRef = useRef<HTMLElement>(null);
 
   // Ordered list: primary author first, then co-authors
   const allAuthors: Author[] = useMemo(() => {
@@ -28,6 +37,8 @@ export function PostArticle({ post }: { post: PostFull }) {
     });
     return list;
   }, [post.author, post.coAuthors]);
+
+  const readMins = useMemo(() => readingTime(post.content ?? ''), [post.content]);
 
   const resolvedContent = useMemo(() => resolveShortcodes(post.content ?? '', {
     siteName: site_title,
@@ -56,14 +67,15 @@ export function PostArticle({ post }: { post: PostFull }) {
       canonicalUrl: post.canonicalUrl,
       ogTitle: post.ogTitle,
       ogDescription: post.ogDescription,
-      ogImage: post.ogImage || post.featuredImage,
+      ogImage: post.ogImage || post.featuredImage || `${API_BASE}/public/posts/${post.slug}/og-image`,
       ogType: 'article',
     });
     return () => resetSeo(site_title);
   }, [post, site_title]);
 
   return (
-    <article className="post-full">
+    <article className="post-full" ref={articleRef}>
+      <ReadingProgress targetRef={articleRef} />
 
       {post.featuredImage && (
         <img src={resolveMediaUrl(post.featuredImage)} alt={post.title} className="post-featured-img" />
@@ -104,9 +116,18 @@ export function PostArticle({ post }: { post: PostFull }) {
               {formatDate(post.publishedAt, date_format, timezone)}
             </span>
           )}
+          <span className="post-byline-sep">·</span>
+          <span className="post-reading-time">{readMins} min read</span>
         </div>
       </header>
 
+      <SeriesNav slug={post.slug} />
+      {(() => {
+        // Per-post override wins; fall back to sitewide toc_enabled (default: show)
+        const perPost = post.showToc;
+        const show = perPost === 'yes' || (perPost !== 'no' && toc_enabled !== 'no');
+        return show ? <TableOfContents html={resolvedContent} /> : null;
+      })()}
       <RichContent html={resolvedContent} className="post-content" />
 
       {post.tags.length > 0 && (
@@ -148,6 +169,8 @@ export function PostArticle({ post }: { post: PostFull }) {
         </div>
       )}
 
+      <PostReactions slug={post.slug} />
+      <RelatedPosts slug={post.slug} />
       <Comments slug={post.slug} />
     </article>
   );

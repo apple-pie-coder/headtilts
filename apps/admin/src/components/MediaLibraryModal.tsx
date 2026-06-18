@@ -2,14 +2,14 @@ import { ChangeEvent, DragEvent, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AxiosError } from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTableCellsLarge, faList } from '@fortawesome/free-solid-svg-icons';
+import { faTableCellsLarge, faList, faArrowUpFromBracket, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { Media } from '../types';
 import { fetchMedia, uploadMedia } from '../services/media';
 import { MediaGrid } from './MediaGrid';
 import { useToast } from './ToastContext';
 import styles from './MediaLibraryModal.module.css';
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 20;
 
 interface MediaLibraryModalProps {
   onSelect: (media: Media) => void;
@@ -69,28 +69,57 @@ export function MediaLibraryModal({ onSelect, onClose }: MediaLibraryModalProps)
 
   function handleFileInputChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) {
-      handleUpload(file);
-    }
+    if (file) handleUpload(file);
     e.target.value = '';
+  }
+
+  function handleDragOver(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragActive(true);
+  }
+
+  function handleDragLeave(e: DragEvent<HTMLDivElement>) {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragActive(false);
+    }
   }
 
   function handleDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault();
     setDragActive(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) {
-      handleUpload(file);
-    }
+    if (file) handleUpload(file);
   }
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return createPortal(
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.card} onClick={(e) => e.stopPropagation()}>
-        <div className={styles.cardHeader}>
-          <h2>Media Library</h2>
+      <div
+        className={styles.card}
+        onClick={(e) => e.stopPropagation()}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {dragActive && (
+          <div className={styles.dropOverlay}>
+            <FontAwesomeIcon icon={faArrowUpFromBracket} />
+            Drop to upload
+          </div>
+        )}
+
+        {/* Header: title · search · view toggle · close */}
+        <div className={styles.header}>
+          <span className={styles.title}>Media Library</span>
+          <div className={styles.searchWrap}>
+            <input
+              type="text"
+              placeholder="Search…"
+              value={search}
+              onChange={(e) => { setPage(1); setSearch(e.target.value); }}
+            />
+          </div>
           <div className={styles.viewToggle}>
             <button
               type="button"
@@ -109,22 +138,29 @@ export function MediaLibraryModal({ onSelect, onClose }: MediaLibraryModalProps)
               <FontAwesomeIcon icon={faList} />
             </button>
           </div>
+          <button type="button" className={styles.closeBtn} onClick={onClose} title="Close">
+            <FontAwesomeIcon icon={faXmark} />
+          </button>
         </div>
 
-
-        <div
-          className={`${styles.dropzone} ${dragActive ? styles.dropzoneActive : ''}`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragActive(true);
-          }}
-          onDragLeave={() => setDragActive(false)}
-          onDrop={handleDrop}
-        >
-          <p>Drag and drop an image here, or</p>
-          <button type="button" className={styles.uploadButton} onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-            {uploading ? 'Uploading…' : 'Select File'}
+        {/* Upload strip */}
+        <div className={styles.uploadStrip}>
+          <button
+            type="button"
+            className={styles.uploadButton}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+          >
+            <FontAwesomeIcon icon={faArrowUpFromBracket} />
+            {uploading ? 'Uploading…' : 'Upload file'}
           </button>
+          {uploading ? (
+            <div className={styles.progressBar}>
+              <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+            </div>
+          ) : (
+            <span className={styles.uploadHint}>or drag & drop anywhere in this window</span>
+          )}
           <input
             ref={fileInputRef}
             type="file"
@@ -132,25 +168,9 @@ export function MediaLibraryModal({ onSelect, onClose }: MediaLibraryModalProps)
             onChange={handleFileInputChange}
             hidden
           />
-          {uploading && (
-            <div className={styles.progressTrack}>
-              <div className={styles.progressFill} style={{ width: `${progress}%` }} />
-            </div>
-          )}
         </div>
 
-        <div className={styles.search}>
-          <input
-            type="text"
-            placeholder="Search media..."
-            value={search}
-            onChange={(e) => {
-              setPage(1);
-              setSearch(e.target.value);
-            }}
-          />
-        </div>
-
+        {/* Scrollable grid */}
         <div className={styles.gridWrapper}>
           <MediaGrid
             items={items}
@@ -164,7 +184,8 @@ export function MediaLibraryModal({ onSelect, onClose }: MediaLibraryModalProps)
           />
         </div>
 
-        <div className={styles.actions}>
+        {/* Footer: actions */}
+        <div className={styles.footer}>
           <button type="button" className={styles.cancelButton} onClick={onClose}>
             Cancel
           </button>
@@ -172,11 +193,7 @@ export function MediaLibraryModal({ onSelect, onClose }: MediaLibraryModalProps)
             type="button"
             className={styles.selectButton}
             disabled={!selected}
-            onClick={() => {
-              if (selected) {
-                onSelect(selected);
-              }
-            }}
+            onClick={() => { if (selected) onSelect(selected); }}
           >
             Use this image
           </button>

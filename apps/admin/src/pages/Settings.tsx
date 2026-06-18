@@ -199,7 +199,7 @@ function CheckField({
 // Main component
 // ---------------------------------------------------------------------------
 
-const TABS = ['General', 'Reading', 'Discussion', 'Media', 'Permalinks'] as const;
+const TABS = ['General', 'Reading', 'Discussion', 'Media', 'Permalinks', 'Email'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function SettingsPage() {
@@ -217,6 +217,8 @@ export default function SettingsPage() {
   const [showTagline,     setShowTagline]     = useState('yes');
   const [siteLogo,        setSiteLogo]        = useState('');
   const [siteLogoDark,    setSiteLogoDark]    = useState('');
+  const [siteLogoHeight,  setSiteLogoHeight]  = useState('');
+  const [adminLogoHeight, setAdminLogoHeight] = useState('');
   const [siteDescription, setSiteDescription] = useState('');
   const [adminEmail,      setAdminEmail]      = useState('');
   const [timezone,        setTimezone]        = useState('UTC');
@@ -237,6 +239,7 @@ export default function SettingsPage() {
   const [postsPerRss,      setPostsPerRss]       = useState('10');
   const [rssContent,       setRssContent]        = useState('excerpt');
   const [searchVisibility, setSearchVisibility]  = useState('yes');
+  const [tocEnabled,       setTocEnabled]        = useState('yes');
   const [savedReading,     setSavedReading]      = useState<Record<string, string>>({});
 
   // ── Discussion ──
@@ -272,6 +275,15 @@ export default function SettingsPage() {
   const [savedStructure,  setSavedStructure]  = useState('/%postname%/');
   const [customStructure, setCustomStructure] = useState('');
 
+  // ── Email (SMTP) ──
+  const [smtpHost,   setSmtpHost]   = useState('');
+  const [smtpPort,   setSmtpPort]   = useState('587');
+  const [smtpSecure, setSmtpSecure] = useState('false');
+  const [smtpUser,   setSmtpUser]   = useState('');
+  const [smtpPass,   setSmtpPass]   = useState('');
+  const [smtpFrom,   setSmtpFrom]   = useState('');
+  const [savedEmail, setSavedEmail] = useState<Record<string, string>>({});
+
   useEffect(() => {
     load();
     fetchPosts(1, 100, { type: 'page', status: 'published' })
@@ -290,18 +302,22 @@ export default function SettingsPage() {
       const stg  = g(all, 'show_tagline', 'yes');
       const slg  = g(all, 'site_logo');
       const slgd = g(all, 'site_logo_dark');
+      const slgh = g(all, 'site_logo_height');
+      const algh = g(all, 'admin_logo_height');
       const sd   = g(all, 'site_description');
       const em   = g(all, 'admin_email');
       const tz   = g(all, 'timezone', 'UTC');
       const df   = g(all, 'date_format', 'F j, Y');
       const tf   = g(all, 'time_format', 'g:i a');
       const wso  = g(all, 'week_starts_on', '0');
-      setSiteTitle(st); setSiteTagline(stag); setShowTagline(stg); setSiteLogo(slg); setSiteLogoDark(slgd); setSiteDescription(sd);
+      setSiteTitle(st); setSiteTagline(stag); setShowTagline(stg); setSiteLogo(slg); setSiteLogoDark(slgd);
+      setSiteLogoHeight(slgh); setAdminLogoHeight(algh); setSiteDescription(sd);
       setAdminEmail(em); setTimezone(tz); setDateFormat(df); setTimeFormat(tf);
       setWeekStartsOn(wso);
       if (!DATE_FORMAT_PRESETS.includes(df)) setCustomDate(df);
       if (!TIME_FORMAT_PRESETS.includes(tf)) setCustomTime(tf);
-      setSavedGeneral({ site_title: st, site_tagline: stag, show_tagline: stg, site_logo: slg, site_logo_dark: slgd, site_description: sd,
+      setSavedGeneral({ site_title: st, site_tagline: stag, show_tagline: stg, site_logo: slg, site_logo_dark: slgd,
+        site_logo_height: slgh, admin_logo_height: algh, site_description: sd,
         admin_email: em, timezone: tz, date_format: df, time_format: tf, week_starts_on: wso });
 
       // Reading
@@ -314,12 +330,13 @@ export default function SettingsPage() {
       const prss  = g(all, 'posts_per_rss', '10');
       const rc    = g(all, 'rss_content', 'excerpt');
       const sv    = g(all, 'search_engine_visibility', 'yes');
+      const toc   = g(all, 'toc_enabled', 'yes');
       setFrontPageDisplay(fpd); setFrontPageId(fpid); setPostsPageId(ppid);
       setContactPageId(cpid); setAboutPageId(apid);
-      setPostsPerPage(ppp); setPostsPerRss(prss); setRssContent(rc); setSearchVisibility(sv);
+      setPostsPerPage(ppp); setPostsPerRss(prss); setRssContent(rc); setSearchVisibility(sv); setTocEnabled(toc);
       setSavedReading({ front_page_display: fpd, front_page_id: fpid, posts_page_id: ppid,
         contact_page_id: cpid, about_page_id: apid,
-        posts_per_page: ppp, posts_per_rss: prss, rss_content: rc, search_engine_visibility: sv });
+        posts_per_page: ppp, posts_per_rss: prss, rss_content: rc, search_engine_visibility: sv, toc_enabled: toc });
 
       // Discussion
       const cs  = g(all, 'default_comment_status', 'open');
@@ -368,6 +385,16 @@ export default function SettingsPage() {
       const perm = g(all, 'permalink_structure', '/%postname%/');
       setStructure(perm); setSavedStructure(perm);
       if (!PERMALINK_PRESETS.some((p) => p.structure === perm)) setCustomStructure(perm);
+
+      // Email
+      const sh  = g(all, 'smtp_host');
+      const sp  = g(all, 'smtp_port', '587');
+      const ss  = g(all, 'smtp_secure', 'false');
+      const su  = g(all, 'smtp_user');
+      const spw = g(all, 'smtp_pass');
+      const sf  = g(all, 'smtp_from');
+      setSmtpHost(sh); setSmtpPort(sp); setSmtpSecure(ss); setSmtpUser(su); setSmtpPass(spw); setSmtpFrom(sf);
+      setSavedEmail({ smtp_host: sh, smtp_port: sp, smtp_secure: ss, smtp_user: su, smtp_pass: spw, smtp_from: sf });
     } catch (err) {
       toast.error(errMsg(err, 'Failed to load settings'));
     } finally {
@@ -395,13 +422,14 @@ export default function SettingsPage() {
   // ── Dirty checks ──
   const curGeneral: Record<string, string> = { site_title: siteTitle, site_tagline: siteTagline,
     show_tagline: showTagline, site_logo: siteLogo, site_logo_dark: siteLogoDark,
+    site_logo_height: siteLogoHeight, admin_logo_height: adminLogoHeight,
     site_description: siteDescription, admin_email: adminEmail, timezone, date_format: dateFormat,
     time_format: timeFormat, week_starts_on: weekStartsOn };
   const curReading: Record<string, string> = { front_page_display: frontPageDisplay,
     front_page_id: frontPageId, posts_page_id: postsPageId,
     contact_page_id: contactPageId, about_page_id: aboutPageId,
     posts_per_page: postsPerPage, posts_per_rss: postsPerRss,
-    rss_content: rssContent, search_engine_visibility: searchVisibility };
+    rss_content: rssContent, search_engine_visibility: searchVisibility, toc_enabled: tocEnabled };
   const curDiscussion: Record<string, string> = { default_comment_status: commentStatus,
     require_name_email_for_comments: requireNameEmail,
     close_comments_days: closeCommentsDays, moderate_first_comment: moderateFirst,
@@ -420,6 +448,11 @@ export default function SettingsPage() {
     if (on) next.add(mime);
     else next.delete(mime);
     setAllowedMime(Array.from(next).join(','));
+  };
+
+  const curEmail: Record<string, string> = {
+    smtp_host: smtpHost, smtp_port: smtpPort, smtp_secure: smtpSecure,
+    smtp_user: smtpUser, smtp_pass: smtpPass, smtp_from: smtpFrom,
   };
 
   const isDirty = (cur: Record<string, string>, saved: Record<string, string>) =>
@@ -496,6 +529,32 @@ export default function SettingsPage() {
               <div className={styles.formField}>
                 <MediaPickerInput value={siteLogoDark} onChange={setSiteLogoDark} disabled={saving} />
                 <p className={styles.fieldHint}>Used in the site header when a visitor has dark mode enabled. Leave empty to reuse the logo above.</p>
+              </div>
+
+              <label className={styles.formLabel} htmlFor="site_logo_height">Public Logo Height</label>
+              <div className={styles.formField}>
+                <input
+                  id="site_logo_height" type="number" min="16" max="200" step="1"
+                  className={styles.regularText} style={{ width: '120px' }}
+                  placeholder="32"
+                  value={siteLogoHeight}
+                  onChange={(e) => setSiteLogoHeight(e.target.value)}
+                  disabled={saving}
+                />
+                <p className={styles.fieldHint}>Logo height in pixels for the public site header. Leave empty for the default (32 px).</p>
+              </div>
+
+              <label className={styles.formLabel} htmlFor="admin_logo_height">Admin Logo Height</label>
+              <div className={styles.formField}>
+                <input
+                  id="admin_logo_height" type="number" min="16" max="200" step="1"
+                  className={styles.regularText} style={{ width: '120px' }}
+                  placeholder="32"
+                  value={adminLogoHeight}
+                  onChange={(e) => setAdminLogoHeight(e.target.value)}
+                  disabled={saving}
+                />
+                <p className={styles.fieldHint}>Logo height in pixels for the admin sidebar. Leave empty for the default (32 px).</p>
               </div>
 
               <label className={styles.formLabel} htmlFor="site_description">Site Description</label>
@@ -726,6 +785,23 @@ export default function SettingsPage() {
                   </div>
                 </React.Fragment>
               ))}
+            </div>
+          </div>
+
+          <div className={styles.panel}>
+            <h3 className={styles.sectionTitle}>Table of Contents</h3>
+            <div className={styles.formTable}>
+              <span className={styles.formLabel}>Show Table of Contents</span>
+              <div className={styles.formField}>
+                <CheckField
+                  id="toc_enabled"
+                  label="Automatically show a Table of Contents on posts and pages"
+                  hint="Only appears when a post has 3 or more headings (h2/h3). Can be overridden per post."
+                  checked={tocEnabled === 'yes'}
+                  onChange={(v) => setTocEnabled(v ? 'yes' : 'no')}
+                  disabled={saving}
+                />
+              </div>
             </div>
           </div>
 
@@ -1044,7 +1120,7 @@ export default function SettingsPage() {
           </div>
         </form>
 
-      ) : (
+      ) : tab === 'Permalinks' ? (
         /* ═══════════════ PERMALINKS ═══════════════ */
         <div className={styles.panel}>
           <form onSubmit={(e: FormEvent) => {
@@ -1101,7 +1177,87 @@ export default function SettingsPage() {
             </div>
           </form>
         </div>
-      )}
+      ) : tab === 'Email' ? (
+        /* ═══════════════ EMAIL (SMTP) ═══════════════ */
+        <form onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          save(curEmail, () => setSavedEmail({ ...curEmail }));
+        }}>
+          <div className={styles.panel}>
+            <h3 className={styles.sectionTitle}>SMTP Configuration</h3>
+            <p className={styles.sectionDesc}>
+              Configure an outgoing mail server so the CMS can send comment notifications and
+              password reset emails. Settings saved here override environment variables.
+            </p>
+
+            <div className={styles.formTable}>
+              <label className={styles.formLabel} htmlFor="smtp_host">SMTP Host</label>
+              <div className={styles.formField}>
+                <input id="smtp_host" type="text" className={styles.regularText}
+                  placeholder="smtp.example.com" value={smtpHost}
+                  onChange={(e) => setSmtpHost(e.target.value)} disabled={saving} />
+              </div>
+            </div>
+
+            <div className={styles.formTable}>
+              <label className={styles.formLabel} htmlFor="smtp_port">SMTP Port</label>
+              <div className={styles.formField}>
+                <input id="smtp_port" type="number" className={styles.smallText}
+                  placeholder="587" value={smtpPort}
+                  onChange={(e) => setSmtpPort(e.target.value)} disabled={saving} />
+                <p className={styles.description}>Common ports: 587 (STARTTLS), 465 (SSL/TLS), 25 (unencrypted)</p>
+              </div>
+            </div>
+
+            <div className={styles.formTable}>
+              <label className={styles.formLabel} htmlFor="smtp_secure">Encryption</label>
+              <div className={styles.formField}>
+                <select id="smtp_secure" className={styles.selectInput}
+                  value={smtpSecure}
+                  onChange={(e) => setSmtpSecure(e.target.value)} disabled={saving}>
+                  <option value="false">STARTTLS (port 587)</option>
+                  <option value="true">SSL / TLS (port 465)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className={styles.formTable}>
+              <label className={styles.formLabel} htmlFor="smtp_user">Username</label>
+              <div className={styles.formField}>
+                <input id="smtp_user" type="text" className={styles.regularText} autoComplete="off"
+                  placeholder="user@example.com" value={smtpUser}
+                  onChange={(e) => setSmtpUser(e.target.value)} disabled={saving} />
+              </div>
+            </div>
+
+            <div className={styles.formTable}>
+              <label className={styles.formLabel} htmlFor="smtp_pass">Password</label>
+              <div className={styles.formField}>
+                <input id="smtp_pass" type="password" className={styles.regularText} autoComplete="new-password"
+                  placeholder="••••••••" value={smtpPass}
+                  onChange={(e) => setSmtpPass(e.target.value)} disabled={saving} />
+              </div>
+            </div>
+
+            <div className={styles.formTable}>
+              <label className={styles.formLabel} htmlFor="smtp_from">From Address</label>
+              <div className={styles.formField}>
+                <input id="smtp_from" type="email" className={styles.regularText}
+                  placeholder="no-reply@example.com" value={smtpFrom}
+                  onChange={(e) => setSmtpFrom(e.target.value)} disabled={saving} />
+                <p className={styles.description}>The address that appears in the From field of outgoing emails. Defaults to the username if blank.</p>
+              </div>
+            </div>
+
+            <div className={styles.actions}>
+              <button type="submit" className={styles.saveButton}
+                disabled={saving || !isDirty(curEmail, savedEmail)}>
+                {saving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </form>
+      ) : null}
     </AdminLayout>
   );
 }
