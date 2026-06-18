@@ -9,6 +9,7 @@ import { faReply } from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from '../hooks/useAuth';
 import { AdminComment } from '../types';
 import { deleteComment, fetchComments, setCommentStatus } from '../services/comments';
+import postsStyles from './Posts.module.css';
 import styles from './Comments.module.css';
 
 const PAGE_SIZE = 20;
@@ -21,10 +22,21 @@ const STATUS_TABS = [
   { value: 'trash', label: 'Trash' },
 ];
 
+const STATUS_LABELS: Record<string, string> = {
+  approved: 'Approved',
+  pending: 'Pending',
+  spam: 'Spam',
+  trash: 'Trash',
+};
+
 function errorMessage(err: unknown, fallback: string): string {
   return (
     (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || fallback
   );
+}
+
+function truncate(text: string, maxLen: number = 100): string {
+  return text.length > maxLen ? text.slice(0, maxLen) + '…' : text;
 }
 
 export default function CommentsPage() {
@@ -85,103 +97,121 @@ export default function CommentsPage() {
 
   return (
     <AdminLayout>
-      <div className={styles.header}>
-        <h2 className={styles.title}>Comments</h2>
-        <div className={styles.search}>
-          <input
-            type="text"
-            placeholder="Search comments..."
-            value={search}
-            onChange={(e) => {
-              setPage(1);
-              setSearch(e.target.value);
-            }}
-          />
-        </div>
+      <div className={postsStyles.header}>
+        <h2 className={postsStyles.title}>Comments</h2>
       </div>
 
-      <div className={styles.tabs}>
+      <div className={postsStyles.tabs}>
         {STATUS_TABS.map((tab) => {
           const count = tab.value === '' ? allCount : statusCounts[tab.value] || 0;
           return (
             <button
               key={tab.value}
               type="button"
-              className={status === tab.value ? styles.tabActive : styles.tab}
-              onClick={() => {
-                setPage(1);
-                setStatus(tab.value);
-              }}
+              className={status === tab.value ? postsStyles.tabActive : postsStyles.tab}
+              onClick={() => { setPage(1); setStatus(tab.value); }}
             >
-              {tab.label}
-              <span className={styles.tabCount}>{count}</span>
+              {tab.label} <span className={postsStyles.tabCount}>({count})</span>
             </button>
           );
         })}
       </div>
 
-
-      {loading ? (
-        <div className={styles.empty}>Loading…</div>
-      ) : items.length === 0 ? (
-        <div className={styles.empty}>No comments found.</div>
-      ) : (
-        <div className={styles.list}>
-          {items.map((comment) => (
-            <div key={comment.id} className={styles.item}>
-              <div className={styles.itemTop}>
-                <div className={styles.itemAuthor}>
-                  <strong>{comment.authorName}</strong>
-                  {comment.authorEmail && <span className={styles.itemEmail}>{comment.authorEmail}</span>}
-                </div>
-                <span className={`${styles.statusBadge} ${styles[`status_${comment.status}`] || ''}`}>
-                  {comment.status}
-                </span>
-              </div>
-
-              <p className={styles.itemContent}>{comment.content}</p>
-
-              <div className={styles.itemMeta}>
-                <span>On: <em>{comment.post.title}</em></span>
-                {comment.parent && <span><FontAwesomeIcon icon={faReply} /> reply to {comment.parent.authorName}</span>}
-                {comment._count.reactions > 0 && <span>{comment._count.reactions} reactions</span>}
-                <span>{new Date(comment.createdAt).toLocaleString()}</span>
-              </div>
-
-              {canModerate && (
-                <div className={styles.itemActions}>
-                  {comment.status !== 'approved' && (
-                    <button type="button" className={styles.approveButton} onClick={() => changeStatus(comment, 'approved')}>
-                      Approve
-                    </button>
-                  )}
-                  {comment.status === 'approved' && (
-                    <button type="button" onClick={() => changeStatus(comment, 'pending')}>
-                      Unapprove
-                    </button>
-                  )}
-                  {comment.status !== 'spam' && (
-                    <button type="button" onClick={() => changeStatus(comment, 'spam')}>
-                      Spam
-                    </button>
-                  )}
-                  {comment.status !== 'trash' ? (
-                    <button type="button" onClick={() => changeStatus(comment, 'trash')}>
-                      Trash
-                    </button>
-                  ) : (
-                    <button type="button" className={styles.deleteButton} onClick={() => handleDelete(comment)}>
-                      Delete Permanently
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
+      <div className={postsStyles.toolbar}>
+        <div className={postsStyles.filters}>
+          <div className={postsStyles.filter}>
+            <label>Search</label>
+            <input
+              type="text"
+              placeholder="Search comments, authors, emails..."
+              value={search}
+              onChange={(e) => { setPage(1); setSearch(e.target.value); }}
+            />
+          </div>
         </div>
-      )}
+      </div>
 
-      <div className={styles.pagination}>
+      <div className={postsStyles.tableWrapper}>
+        <table>
+          <thead>
+            <tr>
+              <th>Author</th>
+              <th>Content</th>
+              <th>On</th>
+              <th>Date</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((comment) => (
+              <tr key={comment.id}>
+                <td>
+                  <div>
+                    <strong>{comment.authorName}</strong>
+                    {comment.authorEmail && (
+                      <div className={styles.itemEmail}>{comment.authorEmail}</div>
+                    )}
+                  </div>
+                </td>
+                <td>
+                  <div>{truncate(comment.content)}</div>
+                  {comment.parent && (
+                    <div className={styles.itemMeta}>
+                      <FontAwesomeIcon icon={faReply} /> reply to {comment.parent.authorName}
+                    </div>
+                  )}
+                </td>
+                <td className={styles.date}>{comment.post.title}</td>
+                <td className={styles.date}>{new Date(comment.createdAt).toLocaleString()}</td>
+                <td>
+                  <span className={`${postsStyles.statusBadge} ${styles[`status_${comment.status}`] || ''}`}>
+                    {STATUS_LABELS[comment.status] || comment.status}
+                  </span>
+                </td>
+                <td className={postsStyles.actions}>
+                  {canModerate ? (
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      {comment.status !== 'approved' && (
+                        <button className={styles.approveButton} onClick={() => changeStatus(comment, 'approved')}>
+                          Approve
+                        </button>
+                      )}
+                      {comment.status === 'approved' && (
+                        <button onClick={() => changeStatus(comment, 'pending')}>
+                          Unapprove
+                        </button>
+                      )}
+                      {comment.status !== 'spam' && (
+                        <button onClick={() => changeStatus(comment, 'spam')}>
+                          Spam
+                        </button>
+                      )}
+                      {comment.status !== 'trash' ? (
+                        <button onClick={() => changeStatus(comment, 'trash')}>
+                          Trash
+                        </button>
+                      ) : (
+                        <button className={styles.deleteButton} onClick={() => handleDelete(comment)}>
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    '—'
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {!loading && items.length === 0 && (
+          <div className={postsStyles.empty}>No comments found.</div>
+        )}
+      </div>
+
+      <div className={postsStyles.pagination}>
         <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
           Previous
         </button>
