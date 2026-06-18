@@ -59,3 +59,55 @@ export function toggleCommentReaction(
 export function fetchPreview(id: string, token: string, exp: string): Promise<PostFull> {
   return get(`/public/preview/${id}`, { token, exp });
 }
+
+export interface PostReactionSummary { emoji: string; count: number; reacted: boolean }
+
+export function fetchPostReactions(slug: string, visitorId: string): Promise<PostReactionSummary[]> {
+  return get(`/public/posts/${slug}/reactions`, { visitorId });
+}
+
+export function togglePostReaction(
+  slug: string,
+  emoji: string,
+  visitorId: string,
+): Promise<PostReactionSummary> {
+  return post(`/public/posts/${slug}/reactions`, { emoji, visitorId });
+}
+
+export interface RelatedPost {
+  id: number; title: string; slug: string; publishedAt: string | null;
+  featuredImage: string | null; excerpt: string | null;
+}
+
+export function fetchRelatedPosts(slug: string, limit?: number): Promise<RelatedPost[]> {
+  return get(`/public/posts/${slug}/related`, { limit });
+}
+
+export interface SeriesInfo {
+  id: number; name: string; slug: string; totalParts: number; currentPart: number;
+  prev: { title: string; slug: string } | null;
+  next: { title: string; slug: string } | null;
+}
+
+export function fetchPostSeries(slug: string): Promise<SeriesInfo | null> {
+  return get(`/public/posts/${slug}/series`);
+}
+
+export interface SearchResult {
+  items: {
+    id: number;
+    title: string;
+    slug: string;
+    excerpt: string | null;
+    publishedAt: string | null;
+    featuredImage: string | null;
+    author: { username: string; firstName: string | null; lastName: string | null } | null;
+    categories: { category: { name: string; slug: string } }[];
+  }[];
+  pagination: { total: number; page: number; limit: number; pages: number };
+  query: string;
+}
+
+export function searchPosts(q: string, page?: number): Promise<SearchResult> {
+  return get('/public/search', { q, page });
+}

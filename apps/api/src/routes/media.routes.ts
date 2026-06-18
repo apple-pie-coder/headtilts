@@ -23,6 +23,7 @@ router.get('/upload-config', requirePermission(PERMISSIONS.MEDIA_READ), asyncHan
 router.get('/', requirePermission(PERMISSIONS.MEDIA_READ), asyncHandler(mediaController.list));
 router.get('/:id', requirePermission(PERMISSIONS.MEDIA_READ), asyncHandler(mediaController.getOne));
 router.post('/', requirePermission(PERMISSIONS.MEDIA_UPLOAD), uploadManyImages, asyncHandler(mediaController.upload));
+router.get('/:id/usage', requirePermission(PERMISSIONS.MEDIA_READ), asyncHandler(mediaController.usage));
 router.post('/:id/replace', requirePermission(PERMISSIONS.MEDIA_UPLOAD), uploadSingleImage, asyncHandler(mediaController.replace));
 router.put('/:id', requirePermission(PERMISSIONS.MEDIA_UPLOAD), asyncHandler(mediaController.update));
 router.delete('/:id', requirePermission(PERMISSIONS.MEDIA_DELETE), asyncHandler(mediaController.remove));

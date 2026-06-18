@@ -15,4 +15,14 @@ router.post('/reset-password', authLimiter, asyncHandler(authController.resetPas
 router.post('/logout', authenticate, asyncHandler(authController.logout));
 router.get('/me', authenticate, asyncHandler(authController.me));
 
+// MFA — unauthenticated step-2 login
+router.post('/mfa/verify', authLimiter, asyncHandler(authController.mfaVerify));
+router.post('/mfa/verify-backup', authLimiter, asyncHandler(authController.mfaVerifyBackup));
+
+// MFA — authenticated setup/management
+router.get('/mfa/status', authenticate, asyncHandler(authController.mfaStatus));
+router.post('/mfa/setup', authenticate, asyncHandler(authController.mfaSetup));
+router.post('/mfa/enable', authenticate, asyncHandler(authController.mfaEnable));
+router.post('/mfa/disable', authenticate, asyncHandler(authController.mfaDisable));
+
 export default router;

@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import sharp from 'sharp';
 import { Router, IRouter, Request, Response } from 'express';
 import { asyncHandler } from '../middleware/errorHandler';
 import { prisma } from '../config/database';
@@ -50,6 +51,7 @@ const postPublicSelect = {
 const postPublicFullSelect = {
   ...postPublicSelect,
   content: true,
+  showToc: true,
   metaTitle: true,
   metaDescription: true,
   metaKeywords: true,
@@ -62,11 +64,12 @@ const postPublicFullSelect = {
 // GET /public/site-settings — safe subset of settings for the web frontend
 router.get('/site-settings', publicReadLimiter, asyncHandler(async (_req: Request, res: Response) => {
   const SAFE_KEYS = [
-    'site_title', 'site_tagline', 'show_tagline', 'site_logo', 'site_logo_dark', 'site_description',
+    'site_title', 'site_tagline', 'show_tagline', 'site_logo', 'site_logo_dark', 'site_logo_height', 'admin_logo_height', 'site_description',
     'timezone', 'date_format', 'time_format',
     'posts_per_page', 'front_page_display', 'front_page_id', 'posts_page_id',
     'contact_page_id', 'about_page_id',
     'search_engine_visibility', 'permalink_structure',
+    'toc_enabled',
   ];
   const PAGE_ID_KEYS = ['front_page_id', 'posts_page_id', 'contact_page_id', 'about_page_id'];
 
@@ -507,6 +510,142 @@ router.get('/widgets/:zone', publicReadLimiter, asyncHandler(async (req: Request
   }
 }));
 
+// GET /public/posts/:slug/reactions?visitorId=
+router.get('/posts/:slug/reactions', publicReadLimiter, asyncHandler(async (req: Request, res: Response) => {
+  const visitorId = typeof req.query.visitorId === 'string' ? req.query.visitorId : '';
+  const post = await prisma.post.findFirst({ where: { slug: req.params.slug, status: 'published' }, select: { id: true } });
+  if (!post) { sendError(res, 'NOT_FOUND', 'Post not found', 404); return; }
+
+  const rows = await prisma.postReaction.groupBy({
+    by: ['emoji'],
+    where: { postId: post.id },
+    _count: { emoji: true },
+  });
+  const myReactions = visitorId
+    ? await prisma.postReaction.findMany({ where: { postId: post.id, visitorId }, select: { emoji: true } })
+    : [];
+  const reacted = new Set(myReactions.map((r) => r.emoji));
+  const reactions = rows.map((r) => ({ emoji: r.emoji, count: r._count.emoji, reacted: reacted.has(r.emoji) }));
+  sendSuccess(res, reactions);
+}));
+
+// POST /public/posts/:slug/reactions — toggle an emoji reaction
+router.post('/posts/:slug/reactions', commentLimiter, asyncHandler(async (req: Request, res: Response) => {
+  const { emoji, visitorId } = req.body as { emoji?: string; visitorId?: string };
+  if (!emoji || !visitorId) { sendError(res, 'VALIDATION_ERROR', 'emoji and visitorId are required', 400); return; }
+
+  const ALLOWED_EMOJIS = ['❤️', '👏', '🔥', '😮', '😢', '🙌'];
+  if (!ALLOWED_EMOJIS.includes(emoji)) { sendError(res, 'VALIDATION_ERROR', 'Invalid emoji', 400); return; }
+
+  const post = await prisma.post.findFirst({ where: { slug: req.params.slug, status: 'published' }, select: { id: true } });
+  if (!post) { sendError(res, 'NOT_FOUND', 'Post not found', 404); return; }
+
+  const existing = await prisma.postReaction.findUnique({ where: { postId_emoji_visitorId: { postId: post.id, emoji, visitorId } } });
+  let reacted: boolean;
+  if (existing) {
+    await prisma.postReaction.delete({ where: { id: existing.id } });
+    reacted = false;
+  } else {
+    await prisma.postReaction.create({ data: { postId: post.id, emoji, visitorId } });
+    reacted = true;
+  }
+  const count = await prisma.postReaction.count({ where: { postId: post.id, emoji } });
+  sendSuccess(res, { emoji, count, reacted });
+}));
+
+// GET /public/posts/:slug/related — posts sharing the most tags/categories
+router.get('/posts/:slug/related', publicReadLimiter, asyncHandler(async (req: Request, res: Response) => {
+  const limit = Math.min(6, Math.max(1, Number(req.query.limit) || 4));
+  const post = await prisma.post.findFirst({
+    where: { slug: req.params.slug, status: 'published' },
+    select: { id: true, categories: { select: { categoryId: true } }, tags: { select: { tagId: true } } },
+  });
+  if (!post) { sendSuccess(res, []); return; }
+
+  const catIds = post.categories.map((c) => c.categoryId);
+  const tagIds = post.tags.map((t) => t.tagId);
+  if (catIds.length === 0 && tagIds.length === 0) { sendSuccess(res, []); return; }
+
+  const related = await prisma.post.findMany({
+    where: {
+      status: 'published',
+      type: 'post',
+      id: { not: post.id },
+      OR: [
+        ...(catIds.length ? [{ categories: { some: { categoryId: { in: catIds } } } }] : []),
+        ...(tagIds.length ? [{ tags: { some: { tagId: { in: tagIds } } } }] : []),
+      ],
+    },
+    select: postPublicSelect,
+    orderBy: { publishedAt: 'desc' },
+    take: limit,
+  });
+  sendSuccess(res, related);
+}));
+
+// GET /public/series/:slug — series info + ordered post list
+router.get('/series/:slug', publicReadLimiter, asyncHandler(async (req: Request, res: Response) => {
+  const series = await prisma.series.findUnique({
+    where: { slug: req.params.slug },
+    include: {
+      posts: {
+        orderBy: { position: 'asc' },
+        include: { post: { select: { ...postPublicSelect, status: true } } },
+      },
+    },
+  });
+  if (!series) { sendError(res, 'NOT_FOUND', 'Series not found', 404); return; }
+  sendSuccess(res, {
+    id: series.id,
+    name: series.name,
+    slug: series.slug,
+    description: series.description,
+    coverImage: series.coverImage,
+    posts: series.posts
+      .filter((sp) => sp.post.status === 'published')
+      .map((sp) => ({ ...sp.post, position: sp.position })),
+  });
+}));
+
+// GET /public/posts/:slug/series — series membership for a post
+router.get('/posts/:slug/series', publicReadLimiter, asyncHandler(async (req: Request, res: Response) => {
+  const post = await prisma.post.findFirst({
+    where: { slug: req.params.slug, status: 'published' },
+    select: {
+      id: true,
+      seriesPosts: {
+        include: {
+          series: {
+            include: {
+              posts: {
+                orderBy: { position: 'asc' },
+                include: { post: { select: { id: true, title: true, slug: true, status: true } } },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!post || post.seriesPosts.length === 0) { sendSuccess(res, null); return; }
+
+  const sp = post.seriesPosts[0];
+  const publishedPosts = sp.series.posts.filter((p) => p.post.status === 'published');
+  const currentIndex = publishedPosts.findIndex((p) => p.postId === post.id);
+  const prev = currentIndex > 0 ? publishedPosts[currentIndex - 1].post : null;
+  const next = currentIndex < publishedPosts.length - 1 ? publishedPosts[currentIndex + 1].post : null;
+
+  sendSuccess(res, {
+    id: sp.series.id,
+    name: sp.series.name,
+    slug: sp.series.slug,
+    totalParts: publishedPosts.length,
+    currentPart: currentIndex + 1,
+    prev: prev ? { title: prev.title, slug: prev.slug } : null,
+    next: next ? { title: next.title, slug: next.slug } : null,
+  });
+}));
+
 // GET /public/polls
 router.get('/polls', publicReadLimiter, asyncHandler(async (req: Request, res: Response) => {
   const page  = Math.max(1, parseInt(req.query.page  as string) || 1);
@@ -542,6 +681,123 @@ router.post('/polls/:slug/vote', asyncHandler(async (req: Request, res: Response
     if (e instanceof ApiError) sendError(res, e.code, e.message, e.statusCode);
     else sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
   }
+}));
+
+// GET /public/posts/:slug/og-image — generates a 1200×630 PNG OG card
+router.get('/posts/:slug/og-image', asyncHandler(async (req: Request, res: Response) => {
+  const post = await prisma.post.findFirst({
+    where: { slug: req.params.slug, status: 'published' },
+    select: {
+      title: true,
+      excerpt: true,
+      author: { select: { firstName: true, lastName: true, username: true } },
+      categories: { select: { category: { select: { name: true } } }, take: 1 },
+    },
+  });
+
+  if (!post) { res.status(404).end(); return; }
+
+  const siteName = await prisma.setting.findUnique({ where: { key: 'site_title' } });
+  const site = siteName?.value || 'Headtilts';
+
+  const authorName = post.author
+    ? [post.author.firstName, post.author.lastName].filter(Boolean).join(' ') || post.author.username
+    : '';
+  const category = post.categories[0]?.category.name || '';
+
+  // Wrap title at ~40 chars per line
+  const wrapText = (text: string, maxLen: number): string[] => {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let line = '';
+    for (const word of words) {
+      if ((line + ' ' + word).trim().length > maxLen) { lines.push(line.trim()); line = word; }
+      else { line = (line + ' ' + word).trim(); }
+    }
+    if (line) lines.push(line.trim());
+    return lines;
+  };
+  const titleLines = wrapText(post.title, 38);
+  const titleSvgLines = titleLines.slice(0, 3)
+    .map((l, i) => `<text x="80" y="${200 + i * 72}" font-size="56" font-weight="700" fill="#1d1d1f">${l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</text>`)
+    .join('\n');
+
+  const svg = `<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="630" fill="#f5f5f7"/>
+    <rect x="0" y="0" width="8" height="630" fill="#0071e3"/>
+    <text x="80" y="130" font-size="28" font-weight="700" fill="#0071e3" font-family="sans-serif">${site.replace(/&/g, '&amp;')}</text>
+    ${category ? `<text x="80" y="168" font-size="22" fill="#6e6e73" font-family="sans-serif">${category.replace(/&/g, '&amp;')}</text>` : ''}
+    <g font-family="sans-serif">${titleSvgLines}</g>
+    ${authorName ? `<text x="80" y="${200 + titleLines.slice(0, 3).length * 72 + 40}" font-size="26" fill="#6e6e73" font-family="sans-serif">By ${authorName.replace(/&/g, '&amp;')}</text>` : ''}
+  </svg>`;
+
+  const png = await sharp(Buffer.from(svg)).png().toBuffer();
+
+  res.set({
+    'Content-Type': 'image/png',
+    'Cache-Control': 'public, max-age=86400',
+    'Content-Length': String(png.byteLength),
+  });
+  res.end(png);
+}));
+
+// GET /public/search — full-text post search for the public site
+router.get('/search', publicReadLimiter, asyncHandler(async (req: Request, res: Response) => {
+  const q = String(req.query.q || '').trim();
+  const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+  const limit = 10;
+
+  if (!q) {
+    sendSuccess(res, { items: [], pagination: { total: 0, page, limit, pages: 0 }, query: q });
+    return;
+  }
+
+  const where = {
+    status: 'published' as const,
+    type: 'post' as const,
+    OR: [
+      { title: { contains: q } },
+      { excerpt: { contains: q } },
+      { content: { contains: q } },
+    ],
+  };
+
+  const [total, items] = await Promise.all([
+    prisma.post.count({ where }),
+    prisma.post.findMany({
+      where,
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        excerpt: true,
+        publishedAt: true,
+        featuredImage: true,
+        author: { select: { username: true, firstName: true, lastName: true } },
+        categories: { select: { category: { select: { name: true, slug: true } } } },
+      },
+      orderBy: { publishedAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+  ]);
+
+  sendSuccess(res, {
+    items,
+    pagination: { total, page, limit, pages: Math.ceil(total / limit) },
+    query: q,
+  });
+}));
+
+// GET /public/redirects/resolve?from=<path> — look up a redirect by source path
+router.get('/redirects/resolve', publicReadLimiter, asyncHandler(async (req: Request, res: Response) => {
+  const from = String(req.query.from || '').trim();
+  if (!from) { sendSuccess(res, { redirect: null }); return; }
+  const redirect = await prisma.redirect.findUnique({ where: { fromPath: from } });
+  if (redirect) {
+    prisma.redirect.update({ where: { id: redirect.id }, data: { hits: { increment: 1 } } }).catch(() => {});
+  }
+  sendSuccess(res, { redirect: redirect ? { toPath: redirect.toPath, type: redirect.type } : null });
 }));
 
 export default router;

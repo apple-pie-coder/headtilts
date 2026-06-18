@@ -6,7 +6,7 @@ import {
   faGaugeHigh, faPenToSquare, faFileLines, faImages, faComments, faLayerGroup,
   faTags, faBars, faPuzzlePiece, faUsers, faUserShield, faSitemap, faEnvelope,
   faGear, faSliders, faChevronDown, faFeather, faRightFromBracket, faSun, faMoon, faDesktop,
-  faCakeCandles, faChartBar,
+  faCakeCandles, faChartBar, faKey, faArrowRight,
 } from '@fortawesome/free-solid-svg-icons';
 import type { ThemeMode } from '../context/ThemeContext';
 import { useAuth } from '../hooks/useAuth';
@@ -38,11 +38,13 @@ const NAV_ITEMS: NavItem[] = [
 // Grouped under the collapsible "Settings" section.
 const SETTINGS_ITEMS: NavItem[] = [
   { label: 'General', to: '/admin/settings', icon: faSliders },
+  { label: 'API Keys', to: '/admin/api-keys', icon: faKey },
   { label: 'Users', to: '/admin/users', icon: faUsers },
   { label: 'Roles', to: '/admin/roles', icon: faUserShield },
   { label: 'Menus', to: '/admin/menus', icon: faBars },
   { label: 'Widgets', to: '/admin/widgets', icon: faPuzzlePiece },
   { label: 'Sitemap', to: '/admin/sitemap', icon: faSitemap },
+  { label: 'Redirects', to: '/admin/redirects', icon: faArrowRight },
 ];
 
 interface AdminLayoutProps {
@@ -55,9 +57,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const inSettings = SETTINGS_ITEMS.some(
-    (item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`),
-  );
+  const inSettings =
+    SETTINGS_ITEMS.some((item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)) ||
+    location.pathname.startsWith('/admin/api-keys');
   const [settingsOpen, setSettingsOpen] = useState(inSettings);
   // Mobile off-canvas sidebar
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -65,10 +67,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const [logo, setLogo] = useState('');
   const [logoDark, setLogoDark] = useState('');
   const [siteTitle, setSiteTitle] = useState('');
+  const [adminLogoHeight, setAdminLogoHeight] = useState('');
 
   useEffect(() => {
     fetchPublicSettings()
-      .then((s) => { setLogo(s.site_logo || ''); setLogoDark(s.site_logo_dark || ''); setSiteTitle(s.site_title || ''); })
+      .then((s) => { setLogo(s.site_logo || ''); setLogoDark(s.site_logo_dark || ''); setSiteTitle(s.site_title || ''); setAdminLogoHeight(s.admin_logo_height || ''); })
       .catch(() => {});
   }, []);
 
@@ -97,7 +100,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
         <div className={styles.brand}>
           {activeLogo ? (
-            <img className={styles.brandLogo} src={resolveMediaUrl(activeLogo)} alt={siteTitle || 'Logo'} />
+            <img className={styles.brandLogo} src={resolveMediaUrl(activeLogo)} alt={siteTitle || 'Logo'}
+              style={adminLogoHeight ? { maxHeight: `${adminLogoHeight}px` } : undefined} />
           ) : (
             <>
               <span className={styles.brandIcon}><FontAwesomeIcon icon={faFeather} /></span>

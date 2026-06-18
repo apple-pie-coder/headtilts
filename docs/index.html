@@ -264,6 +264,7 @@
 
   <div class="nav-section">Data Models</div>
   <a href="#model-user">User &amp; Auth</a>
+  <a href="#model-apikey">API Keys</a>
   <a href="#model-post">Posts</a>
   <a href="#model-media">Media</a>
   <a href="#model-taxonomy">Taxonomy</a>
@@ -282,7 +283,9 @@
   <a href="#api-widgets">Widgets</a>
   <a href="#api-roles">Roles</a>
   <a href="#api-celebrations">Celebrations</a>
+  <a href="#api-polls">Polls</a>
   <a href="#api-settings">Settings</a>
+  <a href="#api-api-keys">API Keys</a>
   <a href="#api-seo">SEO &amp; Sitemap</a>
   <a href="#api-notifications">Notifications</a>
   <a href="#api-public">Public Endpoints</a>
@@ -469,6 +472,30 @@ SMTP_FROM="noreply@example.com"</code></pre>
 
 <h3>PasswordResetToken</h3>
 <p>Token stored as SHA-256 hash. Expires in 1 hour. <code>usedAt</code> set on successful reset to prevent reuse.</p>
+
+<h2 id="model-apikey">Data Models — API Keys</h2>
+<h3>ApiKey</h3>
+<p>Represents a long-lived secret key belonging to a user, used to authenticate REST API requests from external scripts and integrations. The raw key is shown exactly once at creation; only its SHA-256 hash is stored.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>id</td><td>Int</td><td>Primary key</td></tr>
+<tr><td>name</td><td>String</td><td>Human-readable label (e.g. "CI pipeline")</td></tr>
+<tr><td>prefix</td><td>String</td><td>First 12 characters of the raw key (<code>htk_xxxxxxxx</code>), shown in list views. Unique.</td></tr>
+<tr><td>keyHash</td><td>String</td><td>SHA-256 hex digest of the raw key. Used for lookup on every request. Unique.</td></tr>
+<tr><td>userId</td><td>String</td><td>FK → User.id. Keys are owned by the creating user.</td></tr>
+<tr><td>scopes</td><td>Text (JSON array)</td><td>Allowed scope strings, e.g. <code>["posts:read","media:write"]</code></td></tr>
+<tr><td>expiresAt</td><td>DateTime?</td><td>Optional expiry. Null = never expires. Checked on every request.</td></tr>
+<tr><td>lastUsedAt</td><td>DateTime?</td><td>Fire-and-forget updated on each successful request. Null until first use.</td></tr>
+<tr><td>active</td><td>Boolean</td><td>Soft-disable without deletion (currently always true; revoke deletes the row).</td></tr>
+<tr><td>createdAt / updatedAt</td><td>DateTime</td><td>Auto-managed</td></tr>
+</tbody>
+</table>
+</div>
+<div class="alert alert-info">
+  <strong>Key format:</strong> <code>htk_</code> followed by 64 hex characters (32 random bytes). Total length 68 characters. Never stored plain — only the SHA-256 hash is persisted.
+</div>
 
 <h2 id="model-post">Data Models — Posts</h2>
 
@@ -683,6 +710,15 @@ SMTP_FROM="noreply@example.com"</code></pre>
 <div class="endpoint"><span class="badge badge-put">PUT</span><span class="endpoint-path">/roles/:id</span><div class="endpoint-meta"><span class="badge badge-perm">ROLE_EDIT</span></div><div class="endpoint-desc">Update role. Cannot modify system roles (super-admin, admin, editor, author, subscriber).</div></div>
 <div class="endpoint"><span class="badge badge-delete">DELETE</span><span class="endpoint-path">/roles/:id</span><div class="endpoint-meta"><span class="badge badge-perm">ROLE_DELETE</span></div><div class="endpoint-desc">Delete custom role. Cannot delete system roles.</div></div>
 
+<h2 id="api-polls">API — Polls</h2>
+<p>Base path: <code>/polls</code> · All endpoints require authentication.</p>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/polls</span><div class="endpoint-meta"><span class="badge badge-perm">polls_read</span></div><div class="endpoint-desc">List polls with pagination. Query: <code>page, limit, search, status</code>.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/polls/:id</span><div class="endpoint-meta"><span class="badge badge-perm">polls_read</span></div><div class="endpoint-desc">Get single poll with options and vote counts.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/polls</span><div class="endpoint-meta"><span class="badge badge-perm">polls_create</span></div><div class="endpoint-desc">Create a poll. Body: <code>{ question, slug, type, options[], allowVoteChange?, showResultsBeforeVote?, opensAt?, closesAt? }</code>.</div></div>
+<div class="endpoint"><span class="badge badge-put">PUT</span><span class="endpoint-path">/polls/:id</span><div class="endpoint-meta"><span class="badge badge-perm">polls_update</span></div><div class="endpoint-desc">Update poll settings or options.</div></div>
+<div class="endpoint"><span class="badge badge-delete">DELETE</span><span class="endpoint-path">/polls/:id</span><div class="endpoint-meta"><span class="badge badge-perm">polls_delete</span></div><div class="endpoint-desc">Delete a poll and all associated votes.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/polls/:id/export</span><div class="endpoint-meta"><span class="badge badge-perm">polls_read</span></div><div class="endpoint-desc">Download all votes for this poll as a CSV file.</div></div>
+
 <h2 id="api-celebrations">API — Celebrations</h2>
 <p>Base path: <code>/celebrations</code> · All endpoints require authentication.</p>
 <div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/celebrations</span><div class="endpoint-meta"><span class="badge badge-perm">CELEBRATION_READ</span></div><div class="endpoint-desc">List celebrations with pagination. Query: <code>page, limit, search, type</code>.</div></div>
@@ -695,6 +731,85 @@ SMTP_FROM="noreply@example.com"</code></pre>
 <p>Base path: <code>/settings</code> · Requires authentication.</p>
 <div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/settings</span><div class="endpoint-meta"><span class="badge badge-perm">SETTING_READ</span></div><div class="endpoint-desc">Returns all settings as a flat array of <code>{ key, value, type }</code> objects.</div></div>
 <div class="endpoint"><span class="badge badge-put">PUT</span><span class="endpoint-path">/settings</span><div class="endpoint-meta"><span class="badge badge-perm">SETTING_EDIT</span></div><div class="endpoint-desc">Bulk upsert settings. Body: <code>{ updates: { key: string, value: string }[] }</code>.</div></div>
+
+<h2 id="api-api-keys">API — API Keys</h2>
+<p>Base path: <code>/api-keys</code> · All endpoints require JWT authentication (admin session). Keys are scoped to the authenticated user — you can only manage your own keys.</p>
+
+<div class="alert alert-info">
+  <strong>Two authentication methods.</strong> JWT Bearer tokens (for the admin UI and browser sessions) and API keys (<code>X-API-Key</code> header) for scripts and external integrations. A key authenticates the owning user and enforces its declared scopes on every request.
+</div>
+
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/api-keys</span><div class="endpoint-meta"><span class="badge badge-auth">Auth</span></div><div class="endpoint-desc">List your API keys. Returns prefix, name, scopes, lastUsedAt, expiresAt, and createdAt. Raw key is never returned here.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/api-keys/scopes</span><div class="endpoint-meta"><span class="badge badge-auth">Auth</span></div><div class="endpoint-desc">List all 20 valid scope strings.</div></div>
+<div class="endpoint"><span class="badge badge-post">POST</span><span class="endpoint-path">/api-keys</span><div class="endpoint-meta"><span class="badge badge-auth">Auth</span></div><div class="endpoint-desc">Create a key. Body: <code>{ name, scopes[], expiresAt? }</code>. Returns the full key in <code>rawKey</code> — shown once only.</div></div>
+<div class="endpoint"><span class="badge badge-patch">PATCH</span><span class="endpoint-path">/api-keys/:id</span><div class="endpoint-meta"><span class="badge badge-auth">Auth</span></div><div class="endpoint-desc">Update name, scopes, or expiry on an existing key. Ownership-checked.</div></div>
+<div class="endpoint"><span class="badge badge-delete">DELETE</span><span class="endpoint-path">/api-keys/:id</span><div class="endpoint-meta"><span class="badge badge-auth">Auth</span></div><div class="endpoint-desc">Permanently revoke (delete) a key. Ownership-checked.</div></div>
+
+<h4>Available Scopes</h4>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Scope</th><th>HTTP method(s) allowed</th><th>Affected resource(s)</th></tr></thead>
+<tbody>
+<tr><td><code>posts:read</code></td><td>GET</td><td><code>/posts</code>, <code>/posts/:id</code></td></tr>
+<tr><td><code>posts:write</code></td><td>POST, PUT, PATCH</td><td><code>/posts</code>, <code>/posts/:id</code></td></tr>
+<tr><td><code>posts:delete</code></td><td>DELETE</td><td><code>/posts/:id</code></td></tr>
+<tr><td><code>pages:read</code></td><td>GET</td><td>Posts filtered by <code>type=page</code></td></tr>
+<tr><td><code>pages:write</code></td><td>POST, PUT, PATCH</td><td>Page creation/update</td></tr>
+<tr><td><code>pages:delete</code></td><td>DELETE</td><td>Page deletion</td></tr>
+<tr><td><code>media:read</code></td><td>GET</td><td><code>/media</code>, <code>/media/:id</code></td></tr>
+<tr><td><code>media:write</code></td><td>POST, PUT</td><td>Upload, rename, move</td></tr>
+<tr><td><code>media:delete</code></td><td>DELETE</td><td><code>/media/:id</code></td></tr>
+<tr><td><code>polls:read</code></td><td>GET</td><td><code>/polls</code>, <code>/polls/:id</code></td></tr>
+<tr><td><code>polls:write</code></td><td>POST, PUT</td><td>Poll creation/update</td></tr>
+<tr><td><code>polls:delete</code></td><td>DELETE</td><td><code>/polls/:id</code></td></tr>
+<tr><td><code>categories:read</code></td><td>GET</td><td><code>/categories</code></td></tr>
+<tr><td><code>categories:write</code></td><td>POST, PUT</td><td>Category creation/update</td></tr>
+<tr><td><code>tags:read</code></td><td>GET</td><td><code>/tags</code></td></tr>
+<tr><td><code>tags:write</code></td><td>POST, PUT</td><td>Tag creation/update</td></tr>
+<tr><td><code>comments:read</code></td><td>GET</td><td><code>/comments</code></td></tr>
+<tr><td><code>comments:write</code></td><td>PUT, PATCH</td><td>Comment moderation</td></tr>
+<tr><td><code>comments:delete</code></td><td>DELETE</td><td><code>/comments/:id</code></td></tr>
+<tr><td><code>settings:read</code></td><td>GET</td><td><code>/settings</code></td></tr>
+<tr><td><code>users:read</code></td><td>GET</td><td><code>/users</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Scope enforcement is inferred from HTTP method + URL path: <code>GET</code> → <code>:read</code>, <code>DELETE</code> → <code>:delete</code>, everything else → <code>:write</code>. Public endpoints under <code>/public/*</code> never require a scope.</p>
+
+<h4>Usage example</h4>
+<pre><code class="bash"># List published posts
+curl https://your-site.com/api/posts \
+  -H "X-API-Key: htk_your_key_here"
+
+# Create a draft post (requires posts:write scope)
+curl -X POST https://your-site.com/api/posts \
+  -H "X-API-Key: htk_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Hello","content":"&lt;p&gt;World&lt;/p&gt;","status":"draft"}'</code></pre>
+
+<h4>Create key — request / response</h4>
+<pre><code class="json">// POST /api/api-keys
+{
+  "name": "My CI pipeline",
+  "scopes": ["posts:read", "media:write"],
+  "expiresAt": "2027-01-01"
+}
+
+// 201 response — rawKey shown once
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "My CI pipeline",
+    "prefix": "htk_a1b2c3d4",
+    "scopes": ["posts:read", "media:write"],
+    "expiresAt": "2027-01-01T00:00:00.000Z",
+    "lastUsedAt": null,
+    "createdAt": "2026-06-18T12:00:00.000Z",
+    "rawKey": "htk_a1b2c3d4e5f6..."
+  }
+}</code></pre>
 
 <h2 id="api-seo">API — SEO &amp; Sitemap</h2>
 <div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/sitemap/xml</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Generate and serve <code>sitemap.xml</code>. Includes all published posts, pages, categories, tags, and manual entries.</div></div>
@@ -722,7 +837,7 @@ SMTP_FROM="noreply@example.com"</code></pre>
 <h2 id="api-public">API — Public Endpoints</h2>
 <p>Base path: <code>/public</code> · No authentication required.</p>
 
-<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/site-settings</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Returns a safe subset of settings for the frontend: site title, tagline, logo, logo_dark, timezone, date_format, time_format, week_starts_on, front_page_display, front_page_id, posts_page_id, contact_page_id, about_page_id, permalink_structure, show_tagline, default_comment_status, require_name_email_for_comments, show_avatars.</div></div>
+<div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/site-settings</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Returns a safe subset of settings for the frontend: site title, tagline, logo, logo_dark, <strong>site_logo_height</strong>, <strong>admin_logo_height</strong>, timezone, date_format, time_format, week_starts_on, front_page_display, front_page_id, posts_page_id, contact_page_id, about_page_id, permalink_structure, show_tagline, default_comment_status, require_name_email_for_comments, show_avatars.</div></div>
 <div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/posts</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">List published posts. Query: <code>page, limit, search, categorySlug, tagSlug, featured, dateFrom, dateTo, authorId, sortBy, sortOrder</code>.</div></div>
 <div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/posts/:slug</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Get full published post by slug. Returns post with author, coAuthors, categories, tags, SEO fields.</div></div>
 <div class="endpoint"><span class="badge badge-get">GET</span><span class="endpoint-path">/public/pages/:slug</span><div class="endpoint-meta"><span class="badge badge-public">Public</span></div><div class="endpoint-desc">Get published page by slug.</div></div>
@@ -769,6 +884,7 @@ SMTP_FROM="noreply@example.com"</code></pre>
 <tr><td>Widgets</td><td>/admin/widgets</td><td>WIDGET_READ</td><td>Create widgets, assign to zones, reorder</td></tr>
 <tr><td>Sitemap</td><td>/admin/sitemap</td><td>SEO_READ</td><td>Manual sitemap entries; preview of auto-generated items</td></tr>
 <tr><td>Settings</td><td>/admin/settings</td><td>SETTING_READ</td><td>General, reading, discussion, media, permalink settings in tabbed form</td></tr>
+<tr><td>API Keys</td><td>/admin/api-keys</td><td>—</td><td>Create, view, and revoke personal API keys. Shows prefix (<code>htk_xxxxxxxx…</code>), scopes, last-used timestamp, and expiry. Raw key is revealed exactly once at creation time.</td></tr>
 <tr><td>Contact</td><td>/admin/contact</td><td>SETTING_READ</td><td>Contact form submissions; mark read, delete</td></tr>
 <tr><td>Users</td><td>/admin/users</td><td>USER_READ</td><td>User list; create, edit, assign roles, deactivate</td></tr>
 <tr><td>Roles</td><td>/admin/roles</td><td>ROLE_READ</td><td>Custom role management; permission checkbox matrix</td></tr>
@@ -793,6 +909,7 @@ SMTP_FROM="noreply@example.com"</code></pre>
 <tr><td>Display Options</td><td>Featured toggle, sidebar toggle, comment status override</td></tr>
 <tr><td>SEO</td><td>Meta title, description, keywords, canonical URL</td></tr>
 <tr><td>Open Graph</td><td>OG title, description, image picker</td></tr>
+<tr><td>Shortcodes</td><td>Reference list of all available shortcodes with Insert buttons. Lazy-loads on first open. Includes a dynamic Polls section — fetches all polls and shows per-poll Insert buttons that inject <code>[poll slug="your-slug"]</code> at the cursor position.</td></tr>
 <tr><td>Revisions</td><td>Chronological list of saves; shows changed fields, user avatar, timestamp; archive button per entry (gated by REVISION_ARCHIVE)</td></tr>
 </tbody>
 </table>
@@ -895,6 +1012,16 @@ SMTP_FROM="noreply@example.com"</code></pre>
   <li><code>generateXml(baseUrl)</code> — Combines published posts (using permalink structure), pages (<code>/pages/slug</code>), categories, tags, and manual entries into a valid sitemap.xml string</li>
 </ul>
 
+<h3>apiKey.service.ts</h3>
+<ul>
+  <li><code>AVAILABLE_SCOPES</code> — Readonly const array of all 21 valid scope strings</li>
+  <li><code>createApiKey(userId, name, scopes, expiresAt?)</code> — Generates <code>htk_</code> + 64 hex random bytes, stores SHA-256 hash + prefix, returns the record with <code>rawKey</code> attached (never stored)</li>
+  <li><code>listApiKeys(userId)</code> — Returns all active keys for the user with scopes parsed from JSON</li>
+  <li><code>updateApiKey(id, userId, data)</code> — Ownership-checked partial update of name, scopes, or expiry</li>
+  <li><code>revokeApiKey(id, userId)</code> — Ownership-checked permanent deletion</li>
+  <li><code>validateApiKey(raw)</code> — Hashes the raw key, looks up by hash, checks expiry, fires <code>lastUsedAt</code> update (fire-and-forget), and returns <code>{ record, userId, permissions, scopes }</code> where <code>permissions</code> is the owning user's full RBAC permission list</li>
+</ul>
+
 <h3>mail.service.ts</h3>
 <ul>
   <li><code>isMailConfigured()</code> — Checks if SMTP_HOST env var is set</li>
@@ -905,7 +1032,11 @@ SMTP_FROM="noreply@example.com"</code></pre>
 <h2 id="middleware">Middleware</h2>
 
 <h3>authenticate</h3>
-<p>Extracts Bearer token from <code>Authorization</code> header, verifies with <code>JWT_SECRET</code>, attaches decoded payload to <code>req.user</code>. Returns 401 if missing or invalid.</p>
+<p>Supports two authentication methods, checked in order:</p>
+<ol>
+  <li><strong>API key</strong> — if <code>X-API-Key</code> header is present, looks up the SHA-256 hash in the <code>ApiKey</code> table, checks expiry, then infers the required scope from HTTP method + <code>req.baseUrl</code> (e.g. <code>GET /api/posts</code> → <code>posts:read</code>). Returns 401 for invalid/expired keys; 403 if the key lacks the required scope. Synthesises a <code>JWTPayload</code>-compatible object from the owning user's RBAC permissions so downstream <code>requirePermission</code> checks continue to work.</li>
+  <li><strong>JWT Bearer token</strong> — extracts the <code>Authorization: Bearer …</code> header, verifies with <code>JWT_SECRET</code>, attaches decoded payload to <code>req.user</code>. Returns 401 if missing or invalid.</li>
+</ol>
 
 <h3>requirePermission(permission)</h3>
 <p>Factory middleware. After <code>authenticate</code>, checks <code>req.user.permissions[]</code> includes the given string. Returns 403 if not. Super-admins always pass (all permissions granted).</p>
@@ -945,6 +1076,8 @@ ConflictError   → 409 Conflict</code></pre>
 <tr><td>show_tagline</td><td>string (yes/no)</td><td>"yes"</td><td>Toggle tagline display</td></tr>
 <tr><td>site_logo</td><td>string</td><td>""</td><td>Logo image URL</td></tr>
 <tr><td>site_logo_dark</td><td>string</td><td>""</td><td>Dark mode logo URL</td></tr>
+<tr><td>site_logo_height</td><td>number (px)</td><td>""</td><td>Height of the logo on the public site header in px. Leave blank for CSS default (~32 px). Width auto-scales. Accepted range: 16–200.</td></tr>
+<tr><td>admin_logo_height</td><td>number (px)</td><td>""</td><td>Max-height of the logo in the admin sidebar in px. Leave blank for CSS default (~32 px). Accepted range: 16–200.</td></tr>
 <tr><td>site_description</td><td>string</td><td>—</td><td>Meta description for homepage</td></tr>
 <tr><td>admin_email</td><td>string</td><td>"admin@example.com"</td><td>Notification destination</td></tr>
 <tr><td>timezone</td><td>string</td><td>"UTC"</td><td>IANA tz (e.g., "Asia/Kolkata"). Used for scheduling and celebrations.</td></tr>
@@ -1025,6 +1158,7 @@ ConflictError   → 409 Conflict</code></pre>
   <div class="shortcode-item"><div class="shortcode-key">[post_author]</div><div class="shortcode-desc">Primary author's display name</div></div>
   <div class="shortcode-item"><div class="shortcode-key">[post_date]</div><div class="shortcode-desc">Post publication date (formatted)</div></div>
   <div class="shortcode-item"><div class="shortcode-key">[post_excerpt]</div><div class="shortcode-desc">Post excerpt or auto-generated snippet</div></div>
+  <div class="shortcode-item"><div class="shortcode-key">[poll slug="…"]</div><div class="shortcode-desc">Embeds a live interactive poll widget inline in the article body. Rendered by <code>RichContent</code> on the public site. Handles Quill-encoded quotes and spaces automatically.</div></div>
 </div>
 
 <!-- WIDGETS -->
@@ -1045,6 +1179,7 @@ ConflictError   → 409 Conflict</code></pre>
 <tr><td>tags</td><td>Tag Cloud</td><td>limit</td><td>Tag cloud (all or top N tags)</td></tr>
 <tr><td>calendar</td><td>Calendar</td><td>—</td><td>Monthly calendar with linked post counts per day</td></tr>
 <tr><td>search</td><td>Search</td><td>placeholder</td><td>Search input that navigates to <code>/?search=</code></td></tr>
+<tr><td>poll</td><td>Poll</td><td>count, slug</td><td><code>count=1</code> (default) shows a single poll — auto-picks the latest open poll unless a specific <code>slug</code> is set. <code>count=2–10</code> renders a carousel with ‹ › navigation arrows and dot indicators. Compact sidebar styles are applied automatically via a CSS context selector when the widget appears in the sidebar zone.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1276,7 +1411,7 @@ ConflictError   → 409 Conflict</code></pre>
 </table>
 </div>
 
-<s<!-- ============================================================ DOCKER -->
+<!-- ============================================================ DOCKER -->
 <h2 id="docker-overview">Docker Deployment</h2>
 <p>The entire application — API, admin panel, public website, and MySQL database — runs as five Docker containers orchestrated by a single <code>docker-compose.yml</code>. Only one host port is ever opened; everything else communicates over an internal Docker network.</p>
 
@@ -1993,7 +2128,7 @@ sudo journalctl -u headtilts-api -f</code></pre>
   <li>Review and tighten firewall rules — the API port should only be accessible via a reverse proxy, not directly from the internet.</li>
 </ul>
 
-cript>
+<script>
 // Highlight active nav link on scroll
 const sections = document.querySelectorAll('section[id], h2[id], h3[id]');
 const links = document.querySelectorAll('nav a');

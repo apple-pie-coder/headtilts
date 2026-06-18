@@ -14,8 +14,6 @@
 
 .card {
   background: var(--surface-overlay);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow), var(--glass-shine);
   border-radius: 20px;

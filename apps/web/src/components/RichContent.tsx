@@ -2,8 +2,33 @@ import { useMemo } from 'react';
 import { sanitizeHtml } from '../utils/sanitize';
 import { PollWidget } from './PollWidget';
 
-// Matches [poll slug="..."] optionally wrapped in a <p> tag by the editor
-const POLL_RE = /(?:<p[^>]*>)?\[poll\s+slug="([^"]+)"\s*\](?:<\/p>)?/gi;
+// Inject id attributes on h2/h3 so TableOfContents anchor links work.
+function injectHeadingIds(html: string): string {
+  const seen = new Map<string, number>();
+  return html.replace(/<(h[23])([^>]*)>/gi, (_match, tag: string, attrs: string) => {
+    // Extract text from the next closing tag — use a simple text extraction
+    const base = attrs; // placeholder; we patch after
+    return `<${tag}${attrs} data-toc-pending>`;
+  }).replace(/<(h[23])[^>]*data-toc-pending[^>]*>([\s\S]*?)<\/\1>/gi,
+    (_match, tag: string, inner: string) => {
+      const text = inner.replace(/<[^>]+>/g, '').trim();
+      const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const count = seen.get(slug) ?? 0;
+      const id = count === 0 ? slug : `${slug}-${count}`;
+      seen.set(slug, count + 1);
+      return `<${tag} id="${id}">${inner}</${tag}>`;
+    }
+  );
+}
+
+// Quill encodes " → &quot; and spaces → &nbsp; inside text content.
+// This regex handles both raw and entity-encoded forms.
+const SP = '(?:\\s|&nbsp;)+';
+const QO = '(?:"|&quot;)';
+const POLL_RE = new RegExp(
+  `(?:<p[^>]*>)?\\[poll${SP}slug=${QO}([\\w-]+)${QO}(?:\\s|&nbsp;)*\\](?:</p>)?`,
+  'gi',
+);
 
 type Segment = { type: 'html'; html: string } | { type: 'poll'; slug: string };
 
@@ -31,7 +56,7 @@ interface Props {
 }
 
 export function RichContent({ html, className }: Props) {
-  const segments = useMemo(() => splitSegments(html).map((seg) =>
+  const segments = useMemo(() => splitSegments(injectHeadingIds(html)).map((seg) =>
     seg.type === 'html' ? { ...seg, html: sanitizeHtml(seg.html) } : seg
   ), [html]);
 

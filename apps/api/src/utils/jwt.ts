@@ -44,3 +44,24 @@ export function decodeToken(token: string): JWTPayload | null {
     return null;
   }
 }
+
+const MFA_TOKEN_SECRET = (process.env.JWT_SECRET || 'dev-secret') + '_mfa';
+
+export interface MfaTokenPayload {
+  sub: string;
+  type: 'mfa_pending';
+}
+
+export function signMfaToken(userId: string): string {
+  return jwt.sign({ sub: userId, type: 'mfa_pending' }, MFA_TOKEN_SECRET, { expiresIn: '10m' });
+}
+
+export function verifyMfaToken(token: string): MfaTokenPayload | null {
+  try {
+    const payload = jwt.verify(token, MFA_TOKEN_SECRET) as unknown as MfaTokenPayload;
+    if (payload.type !== 'mfa_pending') return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}

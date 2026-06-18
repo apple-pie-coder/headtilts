@@ -12,6 +12,7 @@ function toRoleDTO(role: {
   name: string;
   description: string | null;
   isSystem: boolean;
+  mfaRequired: boolean;
   permissions: { permission: { id: number; module: string; action: string; description: string | null } }[];
 }) {
   return {
@@ -19,6 +20,7 @@ function toRoleDTO(role: {
     name: role.name,
     description: role.description,
     isSystem: role.isSystem,
+    mfaRequired: role.mfaRequired,
     permissions: role.permissions.map((rp) => ({
       id: rp.permission.id,
       module: rp.permission.module,
@@ -42,7 +44,7 @@ export async function getRoleById(id: number) {
   return toRoleDTO(role);
 }
 
-export async function createRole(input: { name: string; description?: string; permissionIds?: number[] }) {
+export async function createRole(input: { name: string; description?: string; permissionIds?: number[]; mfaRequired?: boolean }) {
   if (!input.name?.trim()) throw new ValidationError('Role name is required');
 
   const existing = await prisma.role.findUnique({ where: { name: input.name.trim() } });
@@ -52,6 +54,7 @@ export async function createRole(input: { name: string; description?: string; pe
     data: {
       name: input.name.trim(),
       description: input.description?.trim() || null,
+      mfaRequired: input.mfaRequired ?? false,
       permissions: input.permissionIds?.length
         ? { create: input.permissionIds.map((permissionId) => ({ permissionId })) }
         : undefined,
@@ -62,7 +65,7 @@ export async function createRole(input: { name: string; description?: string; pe
   return toRoleDTO(role);
 }
 
-export async function updateRole(id: number, input: { name?: string; description?: string; permissionIds?: number[] }) {
+export async function updateRole(id: number, input: { name?: string; description?: string; permissionIds?: number[]; mfaRequired?: boolean }) {
   const existing = await prisma.role.findUnique({ where: { id } });
   if (!existing) throw new NotFoundError('Role not found');
 
@@ -77,6 +80,7 @@ export async function updateRole(id: number, input: { name?: string; description
       data: {
         name: input.name?.trim() ?? existing.name,
         description: input.description !== undefined ? (input.description?.trim() || null) : existing.description,
+        mfaRequired: input.mfaRequired !== undefined ? input.mfaRequired : existing.mfaRequired,
       },
     });
 

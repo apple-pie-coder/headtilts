@@ -25,11 +25,13 @@ import PagesPage from './pages/Pages';
 import PostEditorPage from './pages/PostEditor';
 import MediaPage from './pages/Media';
 import SettingsPage from './pages/Settings';
+import ApiKeysPage from './pages/ApiKeys';
 import MenusPage from './pages/Menus';
 import MenuEditorPage from './pages/MenuEditor';
 import RolesPage from './pages/Roles';
 import ProfilePage from './pages/Profile';
 import SitemapPage from './pages/Sitemap';
+import RedirectsPage from './pages/Redirects';
 import WidgetsPage from './pages/Widgets';
 
 function App() {
@@ -215,6 +217,14 @@ function App() {
             }
           />
           <Route
+            path="/admin/redirects"
+            element={
+              <ProtectedRoute requiredPermission={PERMISSIONS.SETTING_READ}>
+                <RedirectsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/admin/settings"
             element={
               <ProtectedRoute requiredPermission={PERMISSIONS.SETTING_READ}>
@@ -222,6 +232,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/admin/api-keys" element={<ApiKeysPage />} />
           <Route
             path="/admin/contact"
             element={

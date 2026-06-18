@@ -850,6 +850,24 @@
 
 .revChange em { color: var(--accent); font-style: normal; }
 
+.revRestoreBtn {
+  background: none;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-sm);
+  font-size: 0.6875rem;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0.125rem 0.5rem;
+  flex-shrink: 0;
+  transition: color var(--ease), background var(--ease);
+  font-weight: 600;
+}
+
+.revRestoreBtn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
 .revArchiveBtn {
   background: none;
   border: 1px solid var(--border);

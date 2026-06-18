@@ -10,6 +10,8 @@ const DEFAULTS: SiteSettings = {
   show_tagline: 'yes',
   site_logo: '',
   site_logo_dark: '',
+  site_logo_height: '',
+  admin_logo_height: '',
   site_description: '',
   timezone: 'UTC',
   date_format: 'F j, Y',

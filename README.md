@@ -211,6 +211,19 @@ The server also exposes `GET /health` for monitoring. Logs go to `LOG_FILE` (def
 
 ## Content features
 
+### Logo sizing
+
+Logo dimensions are controlled per-context under **Admin → Settings → General**, below the logo pickers.
+
+| Field | Where it applies | Default |
+| --- | --- | --- |
+| **Public Logo Height** | Public site header (`<img>` height, px) | 32 px |
+| **Admin Logo Height** | Admin sidebar logo (`<img>` max-height, px) | 32 px |
+
+Leave either field blank to use the built-in CSS default (32 px). Width adjusts automatically (`width: auto`) to preserve the aspect ratio. Accepts any integer from 16 to 200.
+
+---
+
 ### Polls
 
 Create and manage polls from **Admin → Polls**. Each poll supports single-choice or multi-choice voting, configurable result visibility, optional vote-change, and scheduled open/close dates.
@@ -292,6 +305,128 @@ Shortcodes can be used inside post and page content in the Quill editor. They ar
 | `[post_date]` | Publish date (respects `date_format`; override with `format="…"`) |
 | `[post_excerpt]` | Post excerpt |
 | `[poll slug="…"]` | Embeds a live interactive poll widget |
+
+---
+
+## REST API & API keys
+
+Headtilts exposes its full data API at `/api/*`. All write endpoints and most read endpoints require authentication. There are two authentication methods:
+
+| Method | Use case |
+| --- | --- |
+| **JWT** (Bearer token) | Admin UI and browser-based apps that log in interactively |
+| **API key** (`X-API-Key` header) | Scripts, CI pipelines, external integrations, headless clients |
+
+### Creating an API key
+
+1. Go to **Admin → Settings → API Keys**.
+2. Click **New Key**, give it a name, choose an expiry (optional), and tick the scopes it needs.
+3. Click **Create Key** — the full key is shown **once** in a reveal banner. Copy it immediately.
+4. The key list shows only the prefix (`htk_xxxxxxxx…`) from that point on.
+
+Keys are owned by the user who created them. A key can never grant more access than its owner's RBAC permissions.
+
+### Using a key
+
+Pass the key in the `X-API-Key` request header. No `Authorization: Bearer` header is needed when using a key.
+
+```bash
+# List published posts
+curl https://your-site.com/api/posts \
+  -H "X-API-Key: htk_your_key_here"
+
+# Create a post (requires posts:write scope)
+curl -X POST https://your-site.com/api/posts \
+  -H "X-API-Key: htk_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Hello world", "content": "<p>…</p>", "status": "draft"}'
+
+# Upload media (requires media:write scope)
+curl -X POST https://your-site.com/api/media \
+  -H "X-API-Key: htk_your_key_here" \
+  -F "file=@photo.jpg"
+```
+
+If the key lacks a required scope the API returns:
+
+```json
+{ "success": false, "error": { "code": "FORBIDDEN", "message": "API key missing required scope: posts:write" } }
+```
+
+### Available scopes
+
+| Scope | Grants |
+| --- | --- |
+| `posts:read` | `GET /api/posts`, `GET /api/posts/:id` |
+| `posts:write` | `POST /api/posts`, `PUT /api/posts/:id`, `PATCH /api/posts/:id` |
+| `posts:delete` | `DELETE /api/posts/:id` |
+| `pages:read` | Read pages (same endpoints as posts, filtered by type) |
+| `pages:write` | Create / update pages |
+| `pages:delete` | Delete pages |
+| `media:read` | `GET /api/media` |
+| `media:write` | Upload, rename, move media |
+| `media:delete` | Delete media |
+| `polls:read` | `GET /api/polls`, `GET /api/polls/:id` |
+| `polls:write` | Create / update polls |
+| `polls:delete` | Delete polls |
+| `categories:read` | `GET /api/categories` |
+| `categories:write` | Create / update categories |
+| `tags:read` | `GET /api/tags` |
+| `tags:write` | Create / update tags |
+| `comments:read` | `GET /api/comments` |
+| `comments:write` | Moderate / update comments |
+| `comments:delete` | Delete comments |
+| `settings:read` | `GET /api/settings` |
+| `users:read` | `GET /api/users` |
+
+Scope enforcement is inferred from the HTTP method and URL path:
+- `GET` → `:read`
+- `POST` / `PUT` / `PATCH` → `:write`
+- `DELETE` → `:delete`
+
+Public endpoints under `/api/public/*` do not require any authentication or scope.
+
+### Key management endpoints
+
+All endpoints below require a valid JWT (admin session) or an API key belonging to the same user.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/api-keys` | List your keys (prefix + metadata, never the raw key) |
+| `GET` | `/api/api-keys/scopes` | List all valid scope strings |
+| `POST` | `/api/api-keys` | Create a new key — returns the raw key once |
+| `PATCH` | `/api/api-keys/:id` | Update name, scopes, or expiry |
+| `DELETE` | `/api/api-keys/:id` | Revoke (permanently delete) a key |
+
+**Create request body:**
+
+```json
+{
+  "name": "My integration",
+  "scopes": ["posts:read", "media:read"],
+  "expiresAt": "2027-01-01"
+}
+```
+
+`expiresAt` is optional. Keys with no expiry remain valid until explicitly revoked.
+
+**Create response (key shown once):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "My integration",
+    "prefix": "htk_a1b2c3d4",
+    "scopes": ["posts:read", "media:read"],
+    "expiresAt": "2027-01-01T00:00:00.000Z",
+    "lastUsedAt": null,
+    "createdAt": "2026-06-18T12:00:00.000Z",
+    "rawKey": "htk_a1b2c3d4e5f6…"
+  }
+}
+```
 
 ---
 

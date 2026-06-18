@@ -39,6 +39,7 @@ function postInputFromBody(req: Request) {
     isFeatured,
     showSidebar,
     commentStatus,
+    showToc,
     categoryIds,
     tagNames,
     authorId,
@@ -69,6 +70,11 @@ function postInputFromBody(req: Request) {
     commentStatus:
       commentStatus !== undefined
         ? (commentStatus === 'open' || commentStatus === 'closed' ? commentStatus : null)
+        : undefined,
+    // 'yes' / 'no' override; null = inherit site toc_enabled setting
+    showToc:
+      showToc !== undefined
+        ? (showToc === 'yes' || showToc === 'no' ? showToc : null)
         : undefined,
     categoryIds,
     tagNames,
@@ -150,6 +156,7 @@ export async function create(req: Request, res: Response): Promise<void> {
           ? [{ field: 'scheduledFor', label: 'Scheduled for', note: new Date(post.scheduledFor).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) }]
           : []),
       ],
+      snapshot: revisionsService.buildSnapshot(post),
     }).catch(() => {});
     sendSuccess(res, post, 201, 'Post created successfully');
   } catch (error) {
@@ -166,7 +173,7 @@ export async function update(req: Request, res: Response): Promise<void> {
     const post = await postsService.updatePost(id, input);
     const changes = revisionsService.computeDiff(old, post, input);
     const action = revisionsService.deriveAction(old.status, post.status);
-    revisionsService.recordRevision({ postId: id, userId: req.user!.sub, action, changes }).catch(() => {});
+    revisionsService.recordRevision({ postId: id, userId: req.user!.sub, action, changes, snapshot: revisionsService.buildSnapshot(post) }).catch(() => {});
     sendSuccess(res, post, 200, 'Post updated successfully');
   } catch (error) {
     handleError(res, error);
@@ -192,6 +199,45 @@ export async function authorList(_req: Request, res: Response): Promise<void> {
       orderBy: [{ firstName: 'asc' }, { username: 'asc' }],
     });
     sendSuccess(res, users);
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function duplicate(req: Request, res: Response): Promise<void> {
+  try {
+    const id = parseIntParam(req.params.id);
+    const post = await postsService.duplicatePost(id, req.user!.sub);
+    revisionsService.recordRevision({
+      postId: post.id,
+      userId: req.user!.sub,
+      action: 'created',
+      changes: [{ field: 'title', label: 'Title', note: `Duplicated from post #${id}` }],
+    }).catch(() => {});
+    sendSuccess(res, post, 201, 'Post duplicated');
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function bulk(req: Request, res: Response): Promise<void> {
+  try {
+    const { ids, action } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      sendError(res, 'VALIDATION_ERROR', 'ids must be a non-empty array', 422);
+      return;
+    }
+    const validActions = ['publish', 'draft', 'trash', 'delete'];
+    if (!validActions.includes(action)) {
+      sendError(res, 'VALIDATION_ERROR', `action must be one of: ${validActions.join(', ')}`, 422);
+      return;
+    }
+    if (action === 'publish') assertCanSetStatus(req, 'published');
+    if (action === 'delete' && !req.user!.permissions.includes(PERMISSIONS.POST_DELETE)) {
+      throw new ForbiddenError('You do not have permission to delete posts');
+    }
+    const count = await postsService.bulkUpdatePosts(ids.map(Number), action);
+    sendSuccess(res, { count });
   } catch (error) {
     handleError(res, error);
   }

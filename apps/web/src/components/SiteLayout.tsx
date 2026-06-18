@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faDesktop, faSun, faMoon } from '@fortawesome/free-solid-svg-icons';
+import { faDesktop, faSun, faMoon, faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
 import { fetchMenu } from '../services/taxonomy';
 import { resolveMediaUrl } from '../services/api';
 import { MenuItem } from '../types';
@@ -49,7 +49,7 @@ function buildTree(items: MenuItem[]): (MenuItem & { children: MenuItem[] })[] {
 
 export function SiteLayout({ children }: { children: ReactNode }) {
   const {
-    site_title, site_tagline, show_tagline, site_logo, site_logo_dark,
+    site_title, site_tagline, show_tagline, site_logo, site_logo_dark, site_logo_height,
     search_engine_visibility,
   } = useSiteSettings();
   const { theme } = useTheme();
@@ -93,8 +93,9 @@ export function SiteLayout({ children }: { children: ReactNode }) {
             <Link to="/" className="site-brand">
               {(() => {
                 const logo = (theme === 'dark' && site_logo_dark) ? site_logo_dark : site_logo;
+                const logoStyle = site_logo_height ? { height: `${site_logo_height}px`, maxWidth: 'none' } : undefined;
                 return logo
-                  ? <img className="site-logo" src={resolveMediaUrl(logo)} alt={site_title} />
+                  ? <img className="site-logo" src={resolveMediaUrl(logo)} alt={site_title} style={logoStyle} />
                   : site_title;
               })()}
             </Link>
@@ -112,6 +113,9 @@ export function SiteLayout({ children }: { children: ReactNode }) {
                 </NavLink>
               ))}
             </nav>
+            <Link to="/search" className="nav-search-link" aria-label="Search" title="Search">
+              <FontAwesomeIcon icon={faMagnifyingGlass} />
+            </Link>
             <ThemeSwitch />
             <button
               type="button"

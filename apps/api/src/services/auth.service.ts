@@ -1,10 +1,11 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../config/database';
-import { signAccessToken, signRefreshToken, JWTPayload } from '../utils/jwt';
+import { signAccessToken, signRefreshToken, signMfaToken, JWTPayload } from '../utils/jwt';
 import { ValidationError, UnauthorizedError, ConflictError, ForbiddenError, ApiError } from '../utils/errors';
 import { validateEmail, validatePassword, validateUsername } from '@headtilts/shared';
 import { sendMail } from './mail.service';
+import * as mfaService from './mfa.service';
 
 async function createUser(
   email: string,
@@ -124,86 +125,141 @@ export async function setupFirstAdmin(
   return login(email, password);
 }
 
-export async function login(identifier: string, password: string) {
-  // Find user by email or username (case-sensitive exact match on either)
-  const user = await prisma.user.findFirst({
-    where: {
-      OR: [{ email: identifier }, { username: identifier }],
-    },
+const USER_WITH_ROLES_INCLUDE = {
+  userRoles: {
     include: {
-      userRoles: {
-        include: {
-          role: {
-            include: {
-              permissions: {
-                include: { permission: true },
-              },
-            },
-          },
-        },
+      role: {
+        include: { permissions: { include: { permission: true } } },
       },
     },
-  });
+  },
+} as const;
 
-  if (!user || !user.isActive) {
-    throw new UnauthorizedError('Invalid credentials');
-  }
-
-  // Verify password
-  const isPasswordValid = await bcrypt.compare(password, user.password);
-  if (!isPasswordValid) {
-    throw new UnauthorizedError('Invalid credentials');
-  }
-
-  // Get roles and permissions
-  const roles = user.userRoles.map((ur) => ur.role.name);
-  const permissions = user.userRoles
+function buildTokensForUser(user: Awaited<ReturnType<typeof prisma.user.findFirst>> & {
+  userRoles: { role: { name: string; id: number; permissions: { permission: { id: number; module: string; action: string } }[] } }[];
+}) {
+  const roles = user!.userRoles.map((ur) => ur.role.name);
+  const permissions = user!.userRoles
     .flatMap((ur) => ur.role.permissions)
     .map((rp) => `${rp.permission.module}_${rp.permission.action}`);
 
-  // Generate tokens
-  const payload: JWTPayload = {
-    sub: user.id,
-    email: user.email,
-    username: user.username,
-    roles,
-    permissions,
-  };
+  const payload: JWTPayload = { sub: user!.id, email: user!.email, username: user!.username, roles, permissions };
+  return { payload, accessToken: signAccessToken(payload), refreshToken: signRefreshToken(payload) };
+}
 
-  const accessToken = signAccessToken(payload);
-  const refreshToken = signRefreshToken(payload);
-
-  // Store the refresh token hash so it can be revoked on logout.
+async function storeRefreshToken(userId: string, refreshToken: string) {
   await prisma.session.create({
     data: {
-      userId: user.id,
+      userId,
       token: crypto.createHash('sha256').update(refreshToken).digest('hex'),
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     },
   });
+}
 
+function formatUserResponse(user: {
+  id: string; email: string; username: string; firstName: string | null; lastName: string | null;
+  avatar: string | null; isActive: boolean;
+  userRoles: { role: { id: number; name: string; permissions: { permission: { id: number; module: string; action: string } }[] } }[];
+}) {
   return {
-    accessToken,
-    refreshToken,
-    user: {
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      avatar: user.avatar,
-      isActive: user.isActive,
-      roles: user.userRoles.map((ur) => ({
-        id: ur.role.id,
-        name: ur.role.name,
-        permissions: ur.role.permissions.map((rp) => ({
-          id: rp.permission.id,
-          module: rp.permission.module,
-          action: rp.permission.action,
-        })),
+    id: user.id,
+    email: user.email,
+    username: user.username,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    avatar: user.avatar,
+    isActive: user.isActive,
+    roles: user.userRoles.map((ur) => ({
+      id: ur.role.id,
+      name: ur.role.name,
+      permissions: ur.role.permissions.map((rp) => ({
+        id: rp.permission.id,
+        module: rp.permission.module,
+        action: rp.permission.action,
       })),
-    },
+    })),
   };
+}
+
+export async function login(identifier: string, password: string) {
+  const user = await prisma.user.findFirst({
+    where: { OR: [{ email: identifier }, { username: identifier }] },
+    include: USER_WITH_ROLES_INCLUDE,
+  });
+
+  if (!user || !user.isActive) throw new UnauthorizedError('Invalid credentials');
+
+  const isPasswordValid = await bcrypt.compare(password, user.password);
+  if (!isPasswordValid) throw new UnauthorizedError('Invalid credentials');
+
+  const mfaEnforced = await mfaService.isMfaRequiredForUser(user.id);
+
+  if (user.mfaEnabled || mfaEnforced) {
+    const mfaToken = signMfaToken(user.id);
+    return { mfaRequired: true, mfaToken };
+  }
+
+  const { accessToken, refreshToken } = buildTokensForUser(user as Parameters<typeof buildTokensForUser>[0]);
+  await storeRefreshToken(user.id, refreshToken);
+
+  return { accessToken, refreshToken, user: formatUserResponse(user) };
+}
+
+export async function completeMfaLogin(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, include: USER_WITH_ROLES_INCLUDE });
+  if (!user || !user.isActive) throw new UnauthorizedError('User not found');
+
+  const { accessToken, refreshToken } = buildTokensForUser(user as Parameters<typeof buildTokensForUser>[0]);
+  await storeRefreshToken(user.id, refreshToken);
+
+  return { accessToken, refreshToken, user: formatUserResponse(user) };
+}
+
+export async function setupMfa(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, mfaEnabled: true } });
+  if (!user) throw new ApiError('NOT_FOUND', 'User not found', 404);
+  if (user.mfaEnabled) throw new ApiError('MFA_ALREADY_ENABLED', 'MFA is already enabled', 409);
+
+  const secret = mfaService.generateSecret();
+  const otpauthUrl = mfaService.getOtpAuthUrl(secret, user.email);
+  const qrCodeDataUrl = await mfaService.getQrCodeDataUrl(otpauthUrl);
+
+  await prisma.user.update({ where: { id: userId }, data: { mfaSecret: secret } });
+
+  return { secret, otpauthUrl, qrCodeDataUrl };
+}
+
+export async function enableMfa(userId: string, totpCode: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { mfaSecret: true, mfaEnabled: true } });
+  if (!user) throw new ApiError('NOT_FOUND', 'User not found', 404);
+  if (user.mfaEnabled) throw new ApiError('MFA_ALREADY_ENABLED', 'MFA is already enabled', 409);
+  if (!user.mfaSecret) throw new ApiError('MFA_NOT_SETUP', 'Call /auth/mfa/setup first', 400);
+
+  const valid = mfaService.verifyTotp(user.mfaSecret, totpCode);
+  if (!valid) throw new UnauthorizedError('Invalid authentication code');
+
+  const { plain, hashed } = mfaService.generateBackupCodes();
+  await prisma.user.update({
+    where: { id: userId },
+    data: { mfaEnabled: true, mfaBackupCodes: JSON.stringify(hashed) },
+  });
+
+  return { backupCodes: plain };
+}
+
+export async function disableMfa(userId: string, password: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { password: true, mfaEnabled: true } });
+  if (!user) throw new ApiError('NOT_FOUND', 'User not found', 404);
+  if (!user.mfaEnabled) throw new ApiError('MFA_NOT_ENABLED', 'MFA is not enabled', 400);
+
+  const isPasswordValid = await bcrypt.compare(password, user.password);
+  if (!isPasswordValid) throw new UnauthorizedError('Invalid password');
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { mfaEnabled: false, mfaSecret: null, mfaBackupCodes: null },
+  });
 }
 
 export async function getCurrentUser(userId: string) {

@@ -41,6 +41,7 @@ export default function RolesPage() {
   const [modal, setModal] = useState<ModalState | null>(null);
   const [formName, setFormName] = useState('');
   const [formDesc, setFormDesc] = useState('');
+  const [formMfaRequired, setFormMfaRequired] = useState(false);
   const [formPermIds, setFormPermIds] = useState<Set<number>>(new Set());
   const [formSaving, setFormSaving] = useState(false);
 
@@ -66,6 +67,7 @@ export default function RolesPage() {
       const full = await fetchRole(role.id);
       setFormName(full.name);
       setFormDesc(full.description || '');
+      setFormMfaRequired(full.mfaRequired ?? false);
       setFormPermIds(new Set(full.permissions?.map((p) => p.id) ?? []));
       setModal({ mode: 'edit', role: full });
     } catch (err) {
@@ -76,6 +78,7 @@ export default function RolesPage() {
   function openCreate() {
     setFormName('');
     setFormDesc('');
+    setFormMfaRequired(false);
     setFormPermIds(new Set());
     setModal({ mode: 'create' });
   }
@@ -107,7 +110,7 @@ export default function RolesPage() {
     e.preventDefault();
     setFormSaving(true);
     try {
-      const payload = { name: formName.trim(), description: formDesc.trim(), permissionIds: [...formPermIds] };
+      const payload = { name: formName.trim(), description: formDesc.trim(), permissionIds: [...formPermIds], mfaRequired: formMfaRequired };
       if (modal?.mode === 'edit' && modal.role) {
         await updateRole(modal.role.id, payload);
       } else {
@@ -156,6 +159,7 @@ export default function RolesPage() {
               <th>Name</th>
               <th>Description</th>
               <th>Permissions</th>
+              <th>MFA</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -169,6 +173,12 @@ export default function RolesPage() {
                 <td className={styles.desc}>{role.description || <span className={styles.muted}>—</span>}</td>
                 <td>
                   <span className={styles.permCount}>{role.permissions?.length ?? '…'} permissions</span>
+                </td>
+                <td>
+                  {role.mfaRequired
+                    ? <span className={styles.mfaBadge}>Required</span>
+                    : <span className={styles.muted}>—</span>
+                  }
                 </td>
                 <td className={styles.actions}>
                   {canEdit && (
@@ -218,6 +228,19 @@ export default function RolesPage() {
                   placeholder="Optional description"
                   disabled={formSaving}
                 />
+              </div>
+
+              <div className={styles.field}>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={formMfaRequired}
+                    onChange={(e) => setFormMfaRequired(e.target.checked)}
+                    disabled={formSaving}
+                  />
+                  <span>Require MFA for this role</span>
+                </label>
+                <span className={styles.fieldHint}>Users with this role must enable two-factor authentication to sign in.</span>
               </div>
 
               <div className={styles.permsSection}>

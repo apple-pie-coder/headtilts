@@ -2,7 +2,7 @@ import { prisma } from '../config/database';
 import { ValidationError } from '../utils/errors';
 
 const ALLOWED_SETTING_KEYS = new Set([
-  'site_title', 'site_tagline', 'show_tagline', 'site_logo', 'site_logo_dark', 'site_description',
+  'site_title', 'site_tagline', 'show_tagline', 'site_logo', 'site_logo_dark', 'site_logo_height', 'admin_logo_height', 'site_description',
   'admin_email', 'timezone', 'date_format', 'time_format', 'week_starts_on',
   'front_page_display', 'front_page_id', 'posts_page_id', 'contact_page_id', 'about_page_id',
   'posts_per_page', 'posts_per_rss', 'rss_content', 'search_engine_visibility', 'permalink_structure',

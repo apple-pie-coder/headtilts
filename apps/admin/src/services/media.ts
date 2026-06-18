@@ -132,3 +132,8 @@ export async function createFolder(name: string): Promise<MediaFolder> {
 export async function deleteFolder(id: number): Promise<void> {
   await apiClient.delete(`/media/folders/${id}`);
 }
+
+export async function fetchMediaUsage(id: number): Promise<{ count: number; posts: { id: number; title: string; slug: string; status: string; type: string }[] }> {
+  const response = await apiClient.get(`/media/${id}/usage`);
+  return response.data.data;
+}

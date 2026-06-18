@@ -47,6 +47,7 @@ export interface PostSummary {
 
 export interface PostFull extends PostSummary {
   content: string;
+  showToc?: string | null;
   metaTitle: string | null;
   metaDescription: string | null;
   metaKeywords: string | null;
@@ -89,6 +90,8 @@ export interface SiteSettings {
   show_tagline: string;
   site_logo: string;
   site_logo_dark: string;
+  site_logo_height?: string;
+  admin_logo_height?: string;
   site_description: string;
   timezone: string;
   date_format: string;
@@ -97,6 +100,7 @@ export interface SiteSettings {
   front_page_display: string;
   search_engine_visibility?: string;
   permalink_structure?: string;
+  toc_enabled?: string;
   front_page_id: string;
   posts_page_id: string;
   contact_page_id: string;
