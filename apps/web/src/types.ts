@@ -105,11 +105,15 @@ export interface SiteSettings {
   posts_page_id: string;
   contact_page_id: string;
   about_page_id: string;
+  privacy_policy_page_id: string;
+  terms_page_id: string;
   // Resolved page slugs (populated by API alongside the IDs)
   front_page_slug?: string;
   posts_page_slug?: string;
   contact_page_slug?: string;
   about_page_slug?: string;
+  privacy_policy_page_slug?: string;
+  terms_page_slug?: string;
 }
 
 export interface CommentReactionSummary {

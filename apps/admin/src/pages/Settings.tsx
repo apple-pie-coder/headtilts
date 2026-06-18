@@ -235,6 +235,8 @@ export default function SettingsPage() {
   const [postsPageId,      setPostsPageId]      = useState('');
   const [contactPageId,    setContactPageId]    = useState('');
   const [aboutPageId,      setAboutPageId]      = useState('');
+  const [privacyPageId,    setPrivacyPageId]    = useState('');
+  const [termsPageId,      setTermsPageId]      = useState('');
   const [postsPerPage,     setPostsPerPage]      = useState('10');
   const [postsPerRss,      setPostsPerRss]       = useState('10');
   const [rssContent,       setRssContent]        = useState('excerpt');
@@ -326,6 +328,8 @@ export default function SettingsPage() {
       const ppid  = g(all, 'posts_page_id', '');
       const cpid  = g(all, 'contact_page_id', '');
       const apid  = g(all, 'about_page_id', '');
+      const ppid2 = g(all, 'privacy_policy_page_id', '');
+      const tpid  = g(all, 'terms_page_id', '');
       const ppp   = g(all, 'posts_per_page', '10');
       const prss  = g(all, 'posts_per_rss', '10');
       const rc    = g(all, 'rss_content', 'excerpt');
@@ -333,9 +337,11 @@ export default function SettingsPage() {
       const toc   = g(all, 'toc_enabled', 'yes');
       setFrontPageDisplay(fpd); setFrontPageId(fpid); setPostsPageId(ppid);
       setContactPageId(cpid); setAboutPageId(apid);
+      setPrivacyPageId(ppid2); setTermsPageId(tpid);
       setPostsPerPage(ppp); setPostsPerRss(prss); setRssContent(rc); setSearchVisibility(sv); setTocEnabled(toc);
       setSavedReading({ front_page_display: fpd, front_page_id: fpid, posts_page_id: ppid,
         contact_page_id: cpid, about_page_id: apid,
+        privacy_policy_page_id: ppid2, terms_page_id: tpid,
         posts_per_page: ppp, posts_per_rss: prss, rss_content: rc, search_engine_visibility: sv, toc_enabled: toc });
 
       // Discussion
@@ -428,6 +434,7 @@ export default function SettingsPage() {
   const curReading: Record<string, string> = { front_page_display: frontPageDisplay,
     front_page_id: frontPageId, posts_page_id: postsPageId,
     contact_page_id: contactPageId, about_page_id: aboutPageId,
+    privacy_policy_page_id: privacyPageId, terms_page_id: termsPageId,
     posts_per_page: postsPerPage, posts_per_rss: postsPerRss,
     rss_content: rssContent, search_engine_visibility: searchVisibility, toc_enabled: tocEnabled };
   const curDiscussion: Record<string, string> = { default_comment_status: commentStatus,
@@ -768,8 +775,10 @@ export default function SettingsPage() {
             <div className={styles.formTable}>
               {(
                 [
-                  { label: 'Contact Page',  value: contactPageId, set: setContactPageId },
-                  { label: 'About Page',    value: aboutPageId,   set: setAboutPageId   },
+                  { label: 'Contact Page',        value: contactPageId,  set: setContactPageId  },
+                  { label: 'About Page',          value: aboutPageId,    set: setAboutPageId    },
+                  { label: 'Privacy Policy Page', value: privacyPageId,  set: setPrivacyPageId  },
+                  { label: 'Terms Page',          value: termsPageId,    set: setTermsPageId    },
                 ] as { label: string; value: string; set: (v: string) => void }[]
               ).map(({ label, value, set }) => (
                 <React.Fragment key={label}>
