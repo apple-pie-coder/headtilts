@@ -297,10 +297,12 @@ export async function toggleReaction(commentId: number, emoji: string, visitorId
 export async function listComments(
   page: number,
   limit: number,
-  filters: { status?: string; search?: string } = {},
+  filters: { status?: string; search?: string; authorId?: string; postId?: number; sortBy?: 'createdAt' | 'updatedAt'; sortOrder?: 'asc' | 'desc' } = {},
 ) {
   const where = {
     ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.authorId ? { authorEmail: filters.authorId } : {}),
+    ...(filters.postId ? { postId: filters.postId } : {}),
     ...(filters.search
       ? {
           OR: [
@@ -312,10 +314,13 @@ export async function listComments(
       : {}),
   };
 
+  const sortBy = filters.sortBy || 'createdAt';
+  const sortOrder = filters.sortOrder || 'desc';
+
   const [items, total, grouped] = await Promise.all([
     prisma.comment.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { [sortBy]: sortOrder },
       skip: (page - 1) * limit,
       take: limit,
       include: {

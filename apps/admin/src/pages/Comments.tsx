@@ -7,8 +7,9 @@ import { useToast } from '../components/ToastContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faReply } from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from '../hooks/useAuth';
-import { AdminComment } from '../types';
+import { AdminComment, Post } from '../types';
 import { deleteComment, fetchComments, setCommentStatus } from '../services/comments';
+import { fetchPosts } from '../services/posts';
 import postsStyles from './Posts.module.css';
 import styles from './Comments.module.css';
 
@@ -46,21 +47,39 @@ export default function CommentsPage() {
   const canModerate = hasPermission(PERMISSIONS.COMMENT_MODERATE);
 
   const [items, setItems] = useState<AdminComment[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
+  const [authorId, setAuthorId] = useState('');
+  const [postId, setPostId] = useState('');
+  const [sortBy, setSortBy] = useState<'createdAt' | 'updatedAt'>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    fetchPosts(1, 100, { type: 'post' })
+      .then((r) => setPosts(r.items))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     load();
-  }, [page, status, search]);
+  }, [page, status, search, authorId, postId, sortBy, sortOrder]);
 
   async function load() {
     setLoading(true);
     try {
-      const result = await fetchComments(page, PAGE_SIZE, { status, search });
+      const result = await fetchComments(page, PAGE_SIZE, {
+        status,
+        search,
+        authorId: authorId || undefined,
+        postId: postId ? Number(postId) : undefined,
+        sortBy,
+        sortOrder,
+      });
       setItems(result.items);
       setStatusCounts(result.statusCounts);
       setTotal(result.pagination.total);
@@ -127,6 +146,42 @@ export default function CommentsPage() {
               value={search}
               onChange={(e) => { setPage(1); setSearch(e.target.value); }}
             />
+          </div>
+          <div className={postsStyles.filter}>
+            <label>Author Email</label>
+            <input
+              type="text"
+              placeholder="Filter by email..."
+              value={authorId}
+              onChange={(e) => { setPage(1); setAuthorId(e.target.value); }}
+            />
+          </div>
+          <div className={postsStyles.filter}>
+            <label>Post</label>
+            <select
+              value={postId}
+              onChange={(e) => { setPage(1); setPostId(e.target.value); }}
+            >
+              <option value="">All posts</option>
+              {posts.map((p) => (
+                <option key={p.id} value={p.id}>{p.title}</option>
+              ))}
+            </select>
+          </div>
+          <div className={postsStyles.filter}>
+            <label>Sort</label>
+            <select
+              value={`${sortBy}:${sortOrder}`}
+              onChange={(e) => {
+                const [field, order] = e.target.value.split(':') as [typeof sortBy, typeof sortOrder];
+                setPage(1); setSortBy(field); setSortOrder(order);
+              }}
+            >
+              <option value="createdAt:desc">Created (newest)</option>
+              <option value="createdAt:asc">Created (oldest)</option>
+              <option value="updatedAt:desc">Updated (newest)</option>
+              <option value="updatedAt:asc">Updated (oldest)</option>
+            </select>
           </div>
         </div>
       </div>

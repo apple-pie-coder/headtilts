@@ -10,10 +10,19 @@ export interface CommentListResult {
 export async function fetchComments(
   page: number,
   limit: number,
-  filters: { status?: string; search?: string } = {},
+  filters: { status?: string; search?: string; authorId?: string; postId?: number; sortBy?: 'createdAt' | 'updatedAt'; sortOrder?: 'asc' | 'desc' } = {},
 ): Promise<CommentListResult> {
   const response = await apiClient.get('/comments', {
-    params: { page, limit, status: filters.status || undefined, search: filters.search || undefined },
+    params: {
+      page,
+      limit,
+      status: filters.status || undefined,
+      search: filters.search || undefined,
+      authorId: filters.authorId || undefined,
+      postId: filters.postId || undefined,
+      sortBy: filters.sortBy || undefined,
+      sortOrder: filters.sortOrder || undefined,
+    },
   });
   return response.data.data;
 }
