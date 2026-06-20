@@ -288,6 +288,69 @@ async function getPublicPollWithResults(slug: string, voterIdentifier: string) {
   return getPublicPoll(slug, voterIdentifier);
 }
 
+export async function getPollAnalytics() {
+  const [allPolls, totalVotes, rawVotesOverTime] = await Promise.all([
+    prisma.poll.findMany({
+      select: {
+        id: true, title: true, status: true, slug: true, createdAt: true,
+        _count: { select: { votes: true } },
+        options: {
+          select: { id: true, text: true, order: true, _count: { select: { votes: true } } },
+          orderBy: { order: 'asc' as const },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.pollVote.count(),
+    prisma.$queryRaw<{ date: string; votes: bigint }[]>`
+      SELECT DATE(createdAt) as date, COUNT(*) as votes
+      FROM PollVote
+      WHERE createdAt >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+      GROUP BY DATE(createdAt)
+      ORDER BY date ASC
+    `,
+  ]);
+
+  const statusCounts = allPolls.reduce<Record<string, number>>((acc, p) => {
+    acc[p.status] = (acc[p.status] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const pollBreakdown = allPolls.map((p) => ({
+    id: p.id,
+    title: p.title,
+    status: p.status,
+    slug: p.slug,
+    totalVotes: p._count.votes,
+    options: p.options.map((o) => ({
+      id: o.id,
+      text: o.text,
+      votes: o._count.votes,
+      percentage: p._count.votes > 0 ? Math.round((o._count.votes / p._count.votes) * 100) : 0,
+    })),
+  }));
+
+  const mostVoted = [...pollBreakdown].sort((a, b) => b.totalVotes - a.totalVotes)[0] ?? null;
+
+  return {
+    overview: {
+      total: allPolls.length,
+      open: statusCounts['open'] ?? 0,
+      closed: statusCounts['closed'] ?? 0,
+      draft: statusCounts['draft'] ?? 0,
+      scheduled: statusCounts['scheduled'] ?? 0,
+      totalVotes,
+      mostVotedTitle: mostVoted?.title ?? null,
+      mostVotedCount: mostVoted?.totalVotes ?? 0,
+    },
+    pollBreakdown,
+    votesOverTime: rawVotesOverTime.map((r) => ({
+      date: String(r.date).slice(0, 10),
+      votes: Number(r.votes),
+    })),
+  };
+}
+
 export async function exportVotesCsv(id: number): Promise<string> {
   const poll = await prisma.poll.findUnique({
     where: { id },

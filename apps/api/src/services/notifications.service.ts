@@ -2,8 +2,108 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { PERMISSIONS } from '@headtilts/shared';
 import { pushNotification } from '../realtime/notifications.gateway';
+import { sendMail } from './mail.service';
 
-export type NotificationType = 'comment' | 'contact' | 'post_published' | 'user_registered';
+export type NotificationType =
+  | 'comment'
+  | 'contact'
+  | 'post_published'
+  | 'post_scheduled'
+  | 'user_registered'
+  | 'failed_login'
+  | 'security_alert'
+  | 'api_key_created'
+  | 'user_deactivated'
+  | 'media_storage_high';
+
+export type NotificationChannel = 'email' | 'inapp' | 'both' | 'none';
+
+export interface NotificationTypeDef {
+  type: NotificationType;
+  label: string;
+  description: string;
+  defaultChannel: NotificationChannel;
+  hasThreshold: boolean;
+  thresholdLabel?: string;
+  thresholdDefault?: number;
+}
+
+export const NOTIFICATION_TYPES: NotificationTypeDef[] = [
+  {
+    type: 'user_registered',
+    label: 'New User Registration',
+    description: 'When a new user creates an account.',
+    defaultChannel: 'inapp',
+    hasThreshold: false,
+  },
+  {
+    type: 'comment',
+    label: 'New Comments',
+    description: 'When a new comment is submitted or needs moderation.',
+    defaultChannel: 'inapp',
+    hasThreshold: false,
+  },
+  {
+    type: 'contact',
+    label: 'Contact Form Submissions',
+    description: 'When someone submits the contact form on the public site.',
+    defaultChannel: 'inapp',
+    hasThreshold: false,
+  },
+  {
+    type: 'post_published',
+    label: 'Post Published',
+    description: 'When a scheduled post is automatically published.',
+    defaultChannel: 'inapp',
+    hasThreshold: false,
+  },
+  {
+    type: 'post_scheduled',
+    label: 'Post Scheduled',
+    description: 'When a post is scheduled for future publishing.',
+    defaultChannel: 'inapp',
+    hasThreshold: false,
+  },
+  {
+    type: 'failed_login',
+    label: 'Failed Login Attempts',
+    description: 'When there are repeated failed login attempts on an account.',
+    defaultChannel: 'both',
+    hasThreshold: true,
+    thresholdLabel: 'Alert after N failed attempts',
+    thresholdDefault: 5,
+  },
+  {
+    type: 'security_alert',
+    label: 'Security Alerts',
+    description: 'Critical security events such as suspicious IP access or account compromise.',
+    defaultChannel: 'both',
+    hasThreshold: false,
+  },
+  {
+    type: 'api_key_created',
+    label: 'New API Key Created',
+    description: 'When a new API key is created for any user.',
+    defaultChannel: 'inapp',
+    hasThreshold: false,
+  },
+  {
+    type: 'user_deactivated',
+    label: 'User Account Deactivated',
+    description: 'When a user account is deactivated by an administrator.',
+    defaultChannel: 'inapp',
+    hasThreshold: false,
+  },
+  {
+    type: 'media_storage_high',
+    label: 'High Media Storage Usage',
+    description: 'When media storage usage exceeds a configured percentage of the disk limit.',
+    defaultChannel: 'inapp',
+    hasThreshold: true,
+    thresholdLabel: 'Alert at % disk usage',
+    thresholdDefault: 80,
+  },
+];
 
 interface NotifyInput {
   type: NotificationType;
@@ -16,9 +116,6 @@ interface NotifyInput {
 
 /**
  * Resolve active users holding a given permission string ("module_action").
- * Mirrors how the JWT permission strings are built in auth.service
- * (`${permission.module}_${permission.action}`), so it splits on the first
- * underscore to keep multi-word actions like "manage_roles" intact.
  */
 export async function getUserIdsWithPermission(permission: string): Promise<string[]> {
   const idx = permission.indexOf('_');
@@ -37,37 +134,71 @@ export async function getUserIdsWithPermission(permission: string): Promise<stri
 }
 
 /**
- * Persist one notification per recipient and push it live to any connected
- * sockets. Recipient counts are small (admins), so individual creates are fine
- * and give us the real row (id/createdAt) to push.
+ * Get a user's notification preference for a given type.
+ * Falls back to the type's default channel if no preference is set.
+ */
+async function getPreference(userId: string, type: NotificationType): Promise<{ channel: NotificationChannel; enabled: boolean }> {
+  const pref = await prisma.userNotificationPreference.findUnique({
+    where: { userId_type: { userId, type } },
+  });
+  if (pref) {
+    return { channel: pref.channel as NotificationChannel, enabled: pref.enabled };
+  }
+  const def = NOTIFICATION_TYPES.find((t) => t.type === type);
+  return { channel: def?.defaultChannel ?? 'inapp', enabled: true };
+}
+
+/**
+ * Persist one notification per recipient, filtering by their preferences,
+ * and push it live to connected sockets. Optionally send email.
  */
 export async function notify(input: NotifyInput): Promise<void> {
   const recipients = Array.from(new Set(input.recipientIds)).filter(Boolean);
   if (recipients.length === 0) return;
 
-  const rows = await Promise.all(
-    recipients.map((userId) =>
-      prisma.notification.create({
-        data: {
-          userId,
-          type: input.type,
-          title: input.title,
-          body: input.body ?? null,
-          link: input.link ?? null,
-          ...(input.data ? { data: input.data as Prisma.InputJsonValue } : {}),
-        },
-      }),
-    ),
-  );
+  await Promise.all(
+    recipients.map(async (userId) => {
+      const { channel, enabled } = await getPreference(userId, input.type);
+      if (!enabled || channel === 'none') return;
 
-  for (const row of rows) {
-    pushNotification(row.userId, row);
-  }
+      const sendInApp = channel === 'inapp' || channel === 'both';
+      const sendEmail = channel === 'email' || channel === 'both';
+
+      let row: { id: number; userId: string; type: string; title: string; body: string | null; link: string | null; data: unknown; readAt: Date | null; createdAt: Date } | null = null;
+
+      if (sendInApp) {
+        row = await prisma.notification.create({
+          data: {
+            userId,
+            type: input.type,
+            title: input.title,
+            body: input.body ?? null,
+            link: input.link ?? null,
+            ...(input.data ? { data: input.data as Prisma.InputJsonValue } : {}),
+          },
+        });
+        pushNotification(userId, row);
+      }
+
+      if (sendEmail) {
+        const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+        if (user?.email) {
+          sendMail({
+            to: user.email,
+            subject: input.title,
+            text: [input.title, input.body].filter(Boolean).join('\n\n'),
+            html: `<p><strong>${input.title}</strong></p>${input.body ? `<p>${input.body}</p>` : ''}${input.link ? `<p><a href="${input.link}">View in admin</a></p>` : ''}`,
+          }).catch(() => {
+            /* non-fatal — email failure should not break the in-app flow */
+          });
+        }
+      }
+    }),
+  );
 }
 
 // ---------------------------------------------------------------------------
-// Per-event helpers — resolve recipients by permission, then notify.
-// Call these fire-and-forget at the trigger sites (never block the request).
+// Per-event helpers
 // ---------------------------------------------------------------------------
 
 export async function notifyNewComment(input: {
@@ -135,6 +266,70 @@ export async function notifyNewUser(input: {
     data: { id: input.id },
     recipientIds,
   });
+}
+
+export async function notifyApiKeyCreated(input: {
+  userId: string;
+  name: string;
+}): Promise<void> {
+  const recipientIds = await getUserIdsWithPermission(PERMISSIONS.USER_MANAGE_ROLES);
+  await notify({
+    type: 'api_key_created',
+    title: `New API key created: "${input.name}"`,
+    body: `A new API key was created by user ${input.userId}.`,
+    link: '/admin/api-keys',
+    recipientIds,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Notification preferences CRUD
+// ---------------------------------------------------------------------------
+
+export interface NotificationPreferenceRow {
+  type: string;
+  channel: string;
+  enabled: boolean;
+  threshold: number | null;
+}
+
+export async function getPreferences(userId: string): Promise<NotificationPreferenceRow[]> {
+  const rows = await prisma.userNotificationPreference.findMany({ where: { userId } });
+  // Merge with defaults so all types are always represented
+  return NOTIFICATION_TYPES.map((def) => {
+    const saved = rows.find((r) => r.type === def.type);
+    return {
+      type: def.type,
+      channel: saved?.channel ?? def.defaultChannel,
+      enabled: saved?.enabled ?? true,
+      threshold: saved?.threshold ?? def.thresholdDefault ?? null,
+    };
+  });
+}
+
+export async function updatePreferences(
+  userId: string,
+  prefs: Array<{ type: string; channel: NotificationChannel; enabled: boolean; threshold?: number | null }>,
+): Promise<void> {
+  await Promise.all(
+    prefs.map((p) =>
+      prisma.userNotificationPreference.upsert({
+        where: { userId_type: { userId, type: p.type } },
+        create: {
+          userId,
+          type: p.type,
+          channel: p.channel,
+          enabled: p.enabled,
+          threshold: p.threshold ?? null,
+        },
+        update: {
+          channel: p.channel,
+          enabled: p.enabled,
+          threshold: p.threshold ?? null,
+        },
+      }),
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------

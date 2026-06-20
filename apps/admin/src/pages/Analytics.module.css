@@ -1,0 +1,783 @@
+/* ── Page ────────────────────────────────────────────────────────────────────── */
+.page {
+  padding: 1.75rem 2rem 3rem;
+  max-width: 1400px;
+}
+
+/* ── Page header ─────────────────────────────────────────────────────────────── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.pageTitle {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--t1);
+  letter-spacing: -0.4px;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.pageTitleIcon { color: var(--accent); }
+
+.pageSubtitle {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--t3);
+}
+
+.pageActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* ── Granularity switch ──────────────────────────────────────────────────────── */
+.granSwitch {
+  display: flex;
+  background: var(--surface2);
+  border-radius: var(--r-sm);
+  padding: 0.2rem;
+  gap: 0.1rem;
+}
+
+.granBtn {
+  padding: 0.3rem 0.8rem;
+  border: none;
+  background: transparent;
+  border-radius: calc(var(--r-sm) - 2px);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--t3);
+  cursor: pointer;
+  transition: background var(--ease), color var(--ease);
+}
+.granBtn:hover { color: var(--t1); background: var(--surface3); }
+.granBtnActive { background: var(--accent) !important; color: #fff !important; }
+
+/* ── Icon button ─────────────────────────────────────────────────────────────── */
+.iconBtn {
+  width: 2.25rem;
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface1);
+  color: var(--t2);
+  cursor: pointer;
+  transition: background var(--ease), color var(--ease), border-color var(--ease);
+}
+.iconBtn:hover:not(:disabled) { background: var(--surface2); color: var(--t1); }
+.iconBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+.iconBtnOn {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface1)) !important;
+  color: var(--accent) !important;
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent) !important;
+}
+
+/* ── Export button ───────────────────────────────────────────────────────────── */
+.exportBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0 1rem;
+  height: 2.25rem;
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background var(--ease), box-shadow var(--ease);
+}
+.exportBtn:hover {
+  background: var(--accent-h, var(--accent));
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* ── Spin animation ──────────────────────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.75s linear infinite; display: inline-block; }
+
+/* ── Loading state ───────────────────────────────────────────────────────────── */
+.loadingState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 6rem 2rem;
+  color: var(--t3);
+  font-size: 1rem;
+}
+
+/* ── Tab bar ─────────────────────────────────────────────────────────────────── */
+.tabBar {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 1.75rem;
+}
+
+.tabBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.25rem;
+  border: none;
+  background: transparent;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--t3);
+  cursor: pointer;
+  position: relative;
+  transition: color var(--ease);
+  margin-bottom: -2px;
+  border-bottom: 2px solid transparent;
+}
+.tabBtn:hover { color: var(--t1); }
+.tabBtnActive {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ── Tab content wrapper ─────────────────────────────────────────────────────── */
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ── Card ────────────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 1.25rem 1.5rem;
+}
+
+.cardTitle {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--t2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Stat card ───────────────────────────────────────────────────────────────── */
+.statCard {
+  background: var(--surface1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 1rem 1.1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+.statCardLink { cursor: pointer; }
+.statCardLink:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.statCardAccent {
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface1));
+  border-color: color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.statCardIcon {
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+.statCardAccent .statCardIcon {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.statCardBody { flex: 1; min-width: 0; }
+
+.statCardValue {
+  font-size: 1.625rem;
+  font-weight: 700;
+  color: var(--t1);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.statCardLabel {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--t3);
+  margin-top: 0.15rem;
+}
+
+.statCardMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.statCardSub {
+  font-size: 0.75rem;
+  color: var(--t3);
+}
+
+/* ── Trend badge ─────────────────────────────────────────────────────────────── */
+.trendBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+}
+.trendUp   { background: color-mix(in srgb, #22c55e 12%, transparent); color: #22c55e; }
+.trendDown { background: color-mix(in srgb, #ef4444 12%, transparent); color: #ef4444; }
+
+/* ── Overview layout ─────────────────────────────────────────────────────────── */
+.heroRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+@media (max-width: 900px)  { .heroRow { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px)  { .heroRow { grid-template-columns: 1fr; } }
+
+.overviewBody {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 1.25rem;
+  align-items: start;
+}
+@media (max-width: 1050px) { .overviewBody { grid-template-columns: 1fr; } }
+
+.overviewLeft  { display: flex; flex-direction: column; gap: 1.25rem; }
+.overviewRight { display: flex; flex-direction: column; gap: 1.25rem; }
+
+/* Mini stat grid (inside a card) */
+.miniGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+@media (max-width: 700px) { .miniGrid { grid-template-columns: repeat(2, 1fr); } }
+
+/* ── Content tab layout ──────────────────────────────────────────────────────── */
+.contentBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.fullGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.contentLower {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+@media (max-width: 780px) { .contentLower { grid-template-columns: 1fr; } }
+
+/* ── API tab layout ──────────────────────────────────────────────────────────── */
+.apiRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+@media (max-width: 900px)  { .apiRow { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px)  { .apiRow { grid-template-columns: 1fr; } }
+
+.apiBottom {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+@media (max-width: 780px) { .apiBottom { grid-template-columns: 1fr; } }
+
+/* ── Permission wall ─────────────────────────────────────────────────────────── */
+.permWall {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 5rem 2rem;
+  color: var(--t3);
+  text-align: center;
+  font-size: 0.9rem;
+}
+.permIcon { font-size: 2.5rem; opacity: 0.3; }
+
+/* ── Donut chart ─────────────────────────────────────────────────────────────── */
+.donutWrap {
+  display: flex;
+  align-items: center;
+  gap: 1.75rem;
+  flex-wrap: wrap;
+}
+
+/* Outer container — positions the SVG ring and HTML center overlay together */
+.donutOuter {
+  position: relative;
+  width: 128px;
+  height: 128px;
+  flex-shrink: 0;
+}
+
+.donutSvg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+/* HTML center overlay — better typography than SVG <text> */
+.donutCenter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.donutCenterNum {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--t1);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+  transition: color 0.15s;
+}
+
+.donutCenterLabel {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--t3);
+  margin-top: 0.3rem;
+  transition: color 0.15s;
+}
+
+/* ── Legend ──────────────────────────────────────────────────────────────────── */
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+}
+
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.4rem;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background var(--ease);
+  font-size: 0.8125rem;
+}
+.legendRow:hover,
+.legendRowActive { background: var(--surface2); }
+
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;   /* rounded square matches the rounded-cap ring segments */
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+}
+
+.legendLabel { flex: 1; color: var(--t2); }
+.legendCount { font-weight: 700; color: var(--t1); font-variant-numeric: tabular-nums; }
+.legendPct   { color: var(--t3); font-size: 0.75rem; min-width: 3ch; text-align: right; }
+
+/* ── Bar list ────────────────────────────────────────────────────────────────── */
+.barList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.barRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.barMeta { min-width: 0; overflow: hidden; }
+
+.barLabel {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--t1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.barSub {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--t3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 0.05rem;
+}
+
+.barTrack {
+  width: 100px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface3);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.barVal {
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--t2);
+  text-align: right;
+  min-width: 3.5ch;
+}
+
+/* ── Timeline chart ──────────────────────────────────────────────────────────── */
+.chartWrap { position: relative; }
+
+.chartSvg {
+  display: block;
+  width: 100%;
+  height: 130px;
+  overflow: visible;
+  cursor: crosshair;
+}
+
+.tooltip {
+  position: absolute;
+  top: 4px;
+  transform: translateX(-50%);
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 0.4rem 0.65rem;
+  font-size: 0.78rem;
+  color: var(--t1);
+  pointer-events: none;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+  z-index: 10;
+}
+.tooltipErr { color: var(--error, #ef4444); }
+
+.xAxis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--t4, var(--t3));
+  margin-top: 0.25rem;
+}
+
+.chartLegend {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--t3);
+  flex-wrap: wrap;
+}
+
+.ldot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 0.3rem;
+  vertical-align: middle;
+}
+
+.legendRange { margin-left: auto; font-style: italic; font-size: 0.75rem; }
+
+/* ── Recent list ─────────────────────────────────────────────────────────────── */
+.recentList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.recentRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.recentRow:last-child { border-bottom: none; }
+
+/* Status pip (for posts) */
+.statusPip {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.pipPublished { background: #22c55e; }
+.pipScheduled { background: #f59e0b; }
+.pipDraft     { background: var(--t4, #94a3b8); }
+
+/* Avatar (for users/comments) */
+.recentAvatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface2));
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.recentAvatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.recentInfo { flex: 1; min-width: 0; }
+
+.recentTitle {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--t1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: none;
+}
+a.recentTitle:hover { color: var(--accent); }
+
+.recentMeta {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--t3);
+  margin-top: 0.1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────────── */
+.empty {
+  padding: 1.5rem 0;
+  text-align: center;
+  color: var(--t3);
+  font-size: 0.875rem;
+}
+
+/* ── Polls tab layout ────────────────────────────────────────────────────────── */
+.pollsHeroRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+@media (max-width: 900px)  { .pollsHeroRow { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px)  { .pollsHeroRow { grid-template-columns: 1fr; } }
+
+.pollsBody {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+@media (max-width: 1050px) { .pollsBody { grid-template-columns: 1fr; } }
+
+.pollsLeft  { display: flex; flex-direction: column; gap: 1.25rem; }
+.pollsRight { display: flex; flex-direction: column; gap: 1.25rem; }
+
+/* ── Poll results list ───────────────────────────────────────────────────────── */
+.pollResultsList {
+  display: flex;
+  flex-direction: column;
+}
+
+.pollResultItem {
+  border-bottom: 1px solid var(--border);
+}
+.pollResultItem:last-child { border-bottom: none; }
+
+.pollResultHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.25rem;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+  transition: background var(--ease);
+}
+.pollResultHeader:hover { background: var(--surface2); }
+
+.pollStatusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.pollDot_open      { background: #22c55e; }
+.pollDot_closed    { background: #94a3b8; }
+.pollDot_draft     { background: var(--accent); }
+.pollDot_scheduled { background: #f59e0b; }
+
+.pollResultTitle {
+  font-size: 0.8375rem;
+  font-weight: 500;
+  color: var(--t1);
+  text-decoration: none;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pollResultTitle:hover { color: var(--accent); }
+
+.pollChip {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.pollChip_open      { background: color-mix(in srgb, #22c55e 15%, transparent); color: #22c55e; }
+.pollChip_closed    { background: color-mix(in srgb, #94a3b8 15%, transparent); color: #94a3b8; }
+.pollChip_draft     { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+.pollChip_scheduled { background: color-mix(in srgb, #f59e0b 15%, transparent); color: #f59e0b; }
+
+.pollResultVotes {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--t2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.pollWinner {
+  font-size: 0.72rem;
+  color: var(--t3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+  flex-shrink: 1;
+}
+
+.pollExpandBtn {
+  background: none;
+  border: none;
+  color: var(--t3);
+  font-size: 0.65rem;
+  cursor: pointer;
+  padding: 0.2rem;
+  flex-shrink: 0;
+  transition: color var(--ease);
+}
+.pollExpandBtn:hover { color: var(--t1); }
+
+.pollOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.5rem 0.5rem 0.75rem 1.1rem;
+}
+
+.pollOption {
+  display: grid;
+  grid-template-columns: 1fr 80px auto auto;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.pollOptionText {
+  font-size: 0.78rem;
+  color: var(--t2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pollOptionPct {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--t1);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  min-width: 3ch;
+}
+
+.pollOptionVotes {
+  font-size: 0.72rem;
+  color: var(--t3);
+  min-width: 2ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.pollNoVotes {
+  font-size: 0.8rem;
+  color: var(--t3);
+  padding: 0.25rem 0;
+}

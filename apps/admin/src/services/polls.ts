@@ -71,6 +71,42 @@ export async function deletePoll(id: number) {
   await apiClient.delete(`/polls/${id}`);
 }
 
+export interface PollOptionBreakdown {
+  id: number;
+  text: string;
+  votes: number;
+  percentage: number;
+}
+
+export interface PollBreakdownItem {
+  id: number;
+  title: string;
+  status: string;
+  slug: string;
+  totalVotes: number;
+  options: PollOptionBreakdown[];
+}
+
+export interface PollAnalyticsData {
+  overview: {
+    total: number;
+    open: number;
+    closed: number;
+    draft: number;
+    scheduled: number;
+    totalVotes: number;
+    mostVotedTitle: string | null;
+    mostVotedCount: number;
+  };
+  pollBreakdown: PollBreakdownItem[];
+  votesOverTime: { date: string; votes: number }[];
+}
+
+export async function fetchPollAnalytics() {
+  const res = await apiClient.get('/polls/analytics');
+  return res.data.data as PollAnalyticsData;
+}
+
 export async function resetPollVotes(id: number) {
   const res = await apiClient.post(`/polls/${id}/reset`, {});
   return res.data.data as Poll;

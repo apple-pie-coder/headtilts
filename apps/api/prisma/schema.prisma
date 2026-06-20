@@ -30,10 +30,11 @@ model User {
   media         Media[]
   userRoles     UserRole[]
   sessions      Session[]
-  notifications Notification[]
-  revisions     PostRevision[]
-  pollVotes     PollVote[]
-  apiKeys       ApiKey[]
+  notifications               Notification[]
+  notificationPreferences     UserNotificationPreference[]
+  revisions                   PostRevision[]
+  pollVotes                   PollVote[]
+  apiKeys                     ApiKey[]
 
   @@index([email])
   @@index([username])
@@ -43,7 +44,7 @@ model Notification {
   id        Int       @id @default(autoincrement())
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      String    // 'comment' | 'contact' | 'post_published' | 'user_registered'
+  type      String    // see NotificationType enum in notifications.service.ts
   title     String
   body      String?   @db.Text
   link      String?   // admin route to open, e.g. '/admin/comments'
@@ -53,6 +54,20 @@ model Notification {
 
   @@index([userId, readAt])
   @@index([userId, createdAt])
+}
+
+model UserNotificationPreference {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // notification type key
+  channel   String   @default("inapp")  // 'email' | 'inapp' | 'both' | 'none'
+  enabled   Boolean  @default(true)
+  threshold Int?     // for threshold-based notifications (e.g. failed login count)
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, type])
+  @@index([userId])
 }
 
 model Session {
@@ -626,19 +641,36 @@ model Redirect {
 // ===================== API Keys =====================
 
 model ApiKey {
-  id          Int       @id @default(autoincrement())
+  id          Int              @id @default(autoincrement())
   name        String
-  prefix      String    @unique
-  keyHash     String    @unique
+  prefix      String           @unique
+  keyHash     String           @unique
   userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  scopes      String    @db.Text
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scopes      String           @db.Text
   expiresAt   DateTime?
   lastUsedAt  DateTime?
-  active      Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  active      Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  usageLogs   ApiKeyUsageLog[]
 
   @@index([userId])
   @@index([keyHash])
+}
+
+model ApiKeyUsageLog {
+  id         Int      @id @default(autoincrement())
+  apiKeyId   Int
+  apiKey     ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  method     String   // GET, POST, PUT, DELETE, etc.
+  endpoint   String   // normalised path, e.g. /posts/:id
+  statusCode Int
+  durationMs Int      // response time in milliseconds
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([apiKeyId, createdAt])
+  @@index([createdAt])
+  @@index([endpoint, createdAt])
 }

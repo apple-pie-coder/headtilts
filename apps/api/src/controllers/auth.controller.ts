@@ -88,6 +88,20 @@ export async function me(req: Request, res: Response): Promise<void> {
   }
 }
 
+export async function refresh(req: Request, res: Response): Promise<void> {
+  try {
+    const { refreshToken } = req.body;
+    const result = await authService.refreshAccessToken(refreshToken);
+    sendSuccess(res, result);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      sendError(res, error.code, error.message, error.statusCode);
+    } else {
+      sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+    }
+  }
+}
+
 export async function logout(req: Request, res: Response): Promise<void> {
   try {
     const { refreshToken } = req.body;

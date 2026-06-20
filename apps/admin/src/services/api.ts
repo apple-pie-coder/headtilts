@@ -18,31 +18,62 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
+let isRefreshing = false;
+let refreshQueue: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = [];
+
+function processQueue(err: unknown, token: string | null) {
+  refreshQueue.forEach(({ resolve, reject }) => (err ? reject(err) : resolve(token!)));
+  refreshQueue = [];
+}
+
 // Response interceptor for token refresh
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    // If 401 and haven't retried, try to refresh token
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (!refreshToken) {
+        localStorage.removeItem('accessToken');
+        window.location.href = '/admin/login';
+        return Promise.reject(error);
+      }
+
+      if (isRefreshing) {
+        // Queue requests that come in while a refresh is in flight
+        return new Promise((resolve, reject) => {
+          refreshQueue.push({ resolve, reject });
+        }).then((token) => {
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return apiClient(originalRequest);
+        });
+      }
+
+      isRefreshing = true;
       try {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (refreshToken) {
-          // For now, we'll just redirect to login on token expiry
-          // In a full implementation, you'd call a refresh endpoint
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          window.location.href = '/admin/login';
-          return Promise.reject(error);
-        }
-      } catch {
+        const { data } = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
+        const { accessToken: newAccess, refreshToken: newRefresh, user } = data.data;
+
+        localStorage.setItem('accessToken', newAccess);
+        localStorage.setItem('refreshToken', newRefresh);
+
+        // Notify AuthContext to update user state with fresh permissions
+        window.dispatchEvent(new CustomEvent('auth:userRefreshed', { detail: { user } }));
+
+        processQueue(null, newAccess);
+        originalRequest.headers.Authorization = `Bearer ${newAccess}`;
+        return apiClient(originalRequest);
+      } catch (refreshErr) {
+        processQueue(refreshErr, null);
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         window.location.href = '/admin/login';
-        return Promise.reject(error);
+        return Promise.reject(refreshErr);
+      } finally {
+        isRefreshing = false;
       }
     }
 

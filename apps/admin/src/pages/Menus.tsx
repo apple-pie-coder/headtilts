@@ -8,6 +8,9 @@ import { useToast } from '../components/ToastContext';
 import { useAuth } from '../hooks/useAuth';
 import { MenuSummary } from '../types';
 import { createMenu, deleteMenu, fetchMenus } from '../services/menus';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
+import { useDensity } from '../hooks/useDensity';
 import styles from './Menus.module.css';
 
 function errorMsg(err: unknown, fallback: string) {
@@ -24,6 +27,7 @@ export default function MenusPage() {
 
   const [menus, setMenus] = useState<MenuSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [density, setDensity] = useDensity('menusDensity');
 
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
@@ -76,11 +80,18 @@ export default function MenusPage() {
     <AdminLayout>
       <div className={styles.header}>
         <h2 className={styles.title}>Menus</h2>
-        {canCreate && (
-          <button className={styles.addButton} onClick={() => setShowCreate(true)}>
-            Create Menu
-          </button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className={styles.densitySwitch} role="group" aria-label="List density">
+            <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
+            <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
+            <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
+          </div>
+          {canCreate && (
+            <button className={styles.addButton} onClick={() => setShowCreate(true)}>
+              Create Menu
+            </button>
+          )}
+        </div>
       </div>
 
       {showCreate && (
@@ -130,7 +141,7 @@ export default function MenusPage() {
       )}
 
       <div className={styles.tableWrapper}>
-        <table>
+        <table className={styles[`density_${density}`]}>
           <thead>
             <tr>
               <th>Name</th>

@@ -11,6 +11,7 @@ import { buildPostPath, getPermalinkStructure, matchPostPath } from '../utils/pe
 import { getCalendarMonth } from '../services/calendar.service';
 import { getTodaysCelebrations } from '../services/celebrations.service';
 import { listPolls, getPublicPoll, submitVote } from '../services/polls.service';
+import { searchAll, searchType } from '../services/search.service';
 import rateLimit from 'express-rate-limit';
 import { publicReadLimiter } from '../middleware/rateLimit';
 import { ApiError } from '../utils/errors';
@@ -741,52 +742,25 @@ router.get('/posts/:slug/og-image', asyncHandler(async (req: Request, res: Respo
   res.end(png);
 }));
 
-// GET /public/search — full-text post search for the public site
+// GET /public/search?q=...&type=all|posts|pages|tags|categories|polls&page=1
 router.get('/search', publicReadLimiter, asyncHandler(async (req: Request, res: Response) => {
   const q = String(req.query.q || '').trim();
+  const type = ['posts', 'pages', 'tags', 'categories', 'polls'].includes(String(req.query.type))
+    ? String(req.query.type) : 'all';
   const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-  const limit = 10;
 
   if (!q) {
-    sendSuccess(res, { items: [], pagination: { total: 0, page, limit, pages: 0 }, query: q });
+    sendSuccess(res, { query: q, type, grouped: null, items: [], total: 0 });
     return;
   }
 
-  const where = {
-    status: 'published' as const,
-    type: 'post' as const,
-    OR: [
-      { title: { contains: q } },
-      { excerpt: { contains: q } },
-      { content: { contains: q } },
-    ],
-  };
-
-  const [total, items] = await Promise.all([
-    prisma.post.count({ where }),
-    prisma.post.findMany({
-      where,
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        excerpt: true,
-        publishedAt: true,
-        featuredImage: true,
-        author: { select: { username: true, firstName: true, lastName: true } },
-        categories: { select: { category: { select: { name: true, slug: true } } } },
-      },
-      orderBy: { publishedAt: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-  ]);
-
-  sendSuccess(res, {
-    items,
-    pagination: { total, page, limit, pages: Math.ceil(total / limit) },
-    query: q,
-  });
+  if (type === 'all') {
+    const result = await searchAll(q, 4);
+    sendSuccess(res, result);
+  } else {
+    const result = await searchType(q, type, page, 10);
+    sendSuccess(res, result);
+  }
 }));
 
 // GET /public/redirects/resolve?from=<path> — look up a redirect by source path

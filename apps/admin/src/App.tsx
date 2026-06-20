@@ -26,6 +26,8 @@ import PostEditorPage from './pages/PostEditor';
 import MediaPage from './pages/Media';
 import SettingsPage from './pages/Settings';
 import ApiKeysPage from './pages/ApiKeys';
+import ApiAnalyticsPage from './pages/ApiAnalytics';
+import AnalyticsPage from './pages/Analytics';
 import MenusPage from './pages/Menus';
 import MenuEditorPage from './pages/MenuEditor';
 import RolesPage from './pages/Roles';
@@ -233,6 +235,22 @@ function App() {
             }
           />
           <Route path="/admin/api-keys" element={<ApiKeysPage />} />
+          <Route
+            path="/admin/analytics"
+            element={
+              <ProtectedRoute requiredPermission={PERMISSIONS.POST_READ}>
+                <AnalyticsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/api-analytics"
+            element={
+              <ProtectedRoute requiredPermission={PERMISSIONS.API_ANALYTICS_VIEW}>
+                <ApiAnalyticsPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/admin/contact"
             element={

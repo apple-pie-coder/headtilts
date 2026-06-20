@@ -6,6 +6,9 @@ import { useToast } from '../components/ToastContext';
 import { UserFormModal } from '../components/UserFormModal';
 import { Role, User } from '../types';
 import { deleteUser, fetchRoles, fetchUsers } from '../services/users';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
+import { useDensity } from '../hooks/useDensity';
 import styles from './Users.module.css';
 
 const PAGE_SIZE = 10;
@@ -20,6 +23,7 @@ export default function UsersPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [modalUser, setModalUser] = useState<User | null | undefined>(undefined);
+  const [density, setDensity] = useDensity('usersDensity');
 
   useEffect(() => {
     fetchRoles()
@@ -85,6 +89,11 @@ export default function UsersPage() {
             }}
           />
         </div>
+        <div className={styles.densitySwitch} role="group" aria-label="List density">
+          <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
+          <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
+          <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
+        </div>
         <button className={styles.addButton} onClick={() => setModalUser(null)}>
           Add User
         </button>
@@ -92,7 +101,7 @@ export default function UsersPage() {
 
 
       <div className={styles.tableWrapper}>
-        <table>
+        <table className={styles[`density_${density}`]}>
           <thead>
             <tr>
               <th>Email</th>

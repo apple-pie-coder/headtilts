@@ -81,7 +81,8 @@ export default function PollEditorPage() {
     setOptions(next.map((o, idx) => ({ ...o, order: idx })));
   }
 
-  async function handleSave() {
+  async function handleSave(asDraft = false) {
+    const targetStatus = asDraft ? 'draft' : status;
     if (!title.trim()) { toast.error('Title is required'); return; }
     if (!question.trim()) { toast.error('Question is required'); return; }
     const validOpts = options.filter((o) => o.text.trim());
@@ -92,7 +93,7 @@ export default function PollEditorPage() {
       question: question.trim(),
       slug: slug.trim() || undefined,
       description: description.trim() || undefined,
-      status,
+      status: targetStatus,
       voteMode,
       resultVisibility,
       voterRestriction,
@@ -123,121 +124,146 @@ export default function PollEditorPage() {
 
   return (
     <AdminLayout>
-      <div className={styles.page}>
-        <div className={styles.header}>
-          <button className={styles.back} onClick={() => navigate('/admin/polls')}>
-            <FontAwesomeIcon icon={faArrowLeft} /> Polls
-          </button>
-          <h1 className={styles.title}>{isEdit ? 'Edit Poll' : 'New Poll'}</h1>
-          <button className={styles.saveBtn} onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : (isEdit ? 'Save changes' : 'Create poll')}
-          </button>
-        </div>
+      <div className={styles.header}>
+        <h2 className={styles.title}>{isEdit ? 'Edit Poll' : 'Add New Poll'}</h2>
+        <button className={styles.backButton} onClick={() => navigate('/admin/polls')}>
+          <FontAwesomeIcon icon={faArrowLeft} /> Back to Polls
+        </button>
+      </div>
 
-        <div className={styles.layout}>
-          <div className={styles.main}>
-            <div className={styles.card}>
-              <div className={styles.formGroup}>
-                <label>Title</label>
-                <input value={title} onChange={(e) => handleTitleChange(e.target.value)} placeholder="Poll title" />
-              </div>
-              <div className={styles.formGroup}>
-                <label>Question</label>
-                <textarea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="What do you want to ask?" rows={3} />
-              </div>
-              <div className={styles.formGroup}>
-                <label>Slug</label>
-                <input value={slug} onChange={(e) => { setSlug(e.target.value); setSlugManual(true); }} placeholder="poll-slug" />
-              </div>
-              <div className={styles.formGroup}>
-                <label>Description <span className={styles.optional}>(optional)</span></label>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional context shown below the question" rows={2} />
-              </div>
-            </div>
+      <div className={styles.layout}>
+        <div className={styles.contentColumn}>
+          <input
+            type="text"
+            className={styles.titleInput}
+            placeholder="Poll title"
+            value={title}
+            onChange={(e) => handleTitleChange(e.target.value)}
+          />
 
-            <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Answer options</h2>
-              <div className={styles.optionList}>
-                {options.map((opt, i) => (
-                  <div key={i} className={styles.optionRow}>
-                    <div className={styles.optionHandle}>
-                      <button onClick={() => moveOption(i, -1)} disabled={i === 0} className={styles.moveBtn}>▲</button>
-                      <button onClick={() => moveOption(i, 1)} disabled={i === options.length - 1} className={styles.moveBtn}>▼</button>
-                    </div>
-                    <input
-                      className={styles.optionInput}
-                      value={opt.text}
-                      onChange={(e) => updateOption(i, e.target.value)}
-                      placeholder={`Option ${i + 1}`}
-                    />
-                    <button className={styles.removeOptBtn} onClick={() => removeOption(i)} disabled={options.length <= 2}>
-                      <FontAwesomeIcon icon={faTrash} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <button className={styles.addOptBtn} onClick={addOption}>
-                <FontAwesomeIcon icon={faPlus} /> Add option
-              </button>
-            </div>
+          <div className={styles.permalinkRow}>
+            <span className={styles.permalinkLabel}>Permalink:</span>
+            <span className={styles.permalinkBase}>/polls/</span>
+            <input
+              type="text"
+              className={styles.permalinkInput}
+              value={slug}
+              onChange={(e) => { setSlug(e.target.value); setSlugManual(true); }}
+              placeholder={slugify(title) || 'poll-slug'}
+            />
+          </div>
 
-            <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Featured image</h2>
-              <MediaPickerInput value={featuredImage} onChange={setFeaturedImage} />
+          <div className={styles.panel}>
+            <h3>Question</h3>
+            <textarea
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder="What do you want to ask?"
+              rows={3}
+            />
+            <div className={styles.formGroup} style={{ marginTop: '0.875rem' }}>
+              <label>Description <span className={styles.optional}>(optional)</span></label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Optional context shown below the question"
+                rows={2}
+              />
             </div>
           </div>
 
-          <div className={styles.sidebar}>
-            <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Status</h2>
-              <select value={status} onChange={(e) => setStatus(e.target.value)} className={styles.select}>
+          <div className={styles.panel}>
+            <h3>Answer options</h3>
+            <div className={styles.optionList}>
+              {options.map((opt, i) => (
+                <div key={i} className={styles.optionRow}>
+                  <div className={styles.optionHandle}>
+                    <button onClick={() => moveOption(i, -1)} disabled={i === 0} className={styles.moveBtn}>▲</button>
+                    <button onClick={() => moveOption(i, 1)} disabled={i === options.length - 1} className={styles.moveBtn}>▼</button>
+                  </div>
+                  <input
+                    className={styles.optionInput}
+                    value={opt.text}
+                    onChange={(e) => updateOption(i, e.target.value)}
+                    placeholder={`Option ${i + 1}`}
+                  />
+                  <button className={styles.removeOptBtn} onClick={() => removeOption(i)} disabled={options.length <= 2}>
+                    <FontAwesomeIcon icon={faTrash} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button className={styles.addOptBtn} onClick={addOption}>
+              <FontAwesomeIcon icon={faPlus} /> Add option
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.sidebar}>
+          <div className={styles.panel}>
+            <h3>Publish</h3>
+            <div className={styles.formGroup}>
+              <label>Status</label>
+              <select value={status} onChange={(e) => setStatus(e.target.value)}>
                 <option value="draft">Draft</option>
                 <option value="open">Open (accepting votes)</option>
                 <option value="closed">Closed</option>
                 <option value="scheduled">Scheduled</option>
               </select>
-              <div className={styles.formGroup} style={{ marginTop: '1rem' }}>
-                <label>Opens at <span className={styles.optional}>(optional)</span></label>
-                <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
-              </div>
-              <div className={styles.formGroup}>
-                <label>Closes at <span className={styles.optional}>(optional)</span></label>
-                <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
-              </div>
             </div>
-
-            <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Voting rules</h2>
-              <div className={styles.formGroup}>
-                <label>Vote mode</label>
-                <select value={voteMode} onChange={(e) => setVoteMode(e.target.value)} className={styles.select}>
-                  <option value="single">Single choice</option>
-                  <option value="multiple">Multiple choice</option>
-                </select>
-              </div>
-              <div className={styles.formGroup}>
-                <label>Voter restriction</label>
-                <select value={voterRestriction} onChange={(e) => setVoterRestriction(e.target.value)} className={styles.select}>
-                  <option value="anonymous">Anonymous (cookie)</option>
-                  <option value="ip_limited">IP-limited</option>
-                  <option value="authenticated">Authenticated users only</option>
-                </select>
-              </div>
-              <label className={styles.toggle}>
-                <input type="checkbox" checked={allowVoteChange} onChange={(e) => setAllowVoteChange(e.target.checked)} />
-                <span>Allow voters to change their vote</span>
-              </label>
+            <div className={styles.formGroup}>
+              <label>Opens at <span className={styles.optional}>(optional)</span></label>
+              <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
             </div>
+            <div className={styles.formGroup}>
+              <label>Closes at <span className={styles.optional}>(optional)</span></label>
+              <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+            </div>
+            <div className={styles.publishActions}>
+              <button className={styles.draftButton} onClick={() => handleSave(true)} disabled={saving}>
+                Save Draft
+              </button>
+              <button className={styles.primaryButton} onClick={() => handleSave(false)} disabled={saving}>
+                {saving ? 'Saving…' : isEdit ? 'Update' : 'Publish'}
+              </button>
+            </div>
+          </div>
 
-            <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Results visibility</h2>
-              <select value={resultVisibility} onChange={(e) => setResultVisibility(e.target.value)} className={styles.select}>
+          <div className={styles.panel}>
+            <h3>Voting rules</h3>
+            <div className={styles.formGroup}>
+              <label>Vote mode</label>
+              <select value={voteMode} onChange={(e) => setVoteMode(e.target.value)}>
+                <option value="single">Single choice</option>
+                <option value="multiple">Multiple choice</option>
+              </select>
+            </div>
+            <div className={styles.formGroup}>
+              <label>Voter restriction</label>
+              <select value={voterRestriction} onChange={(e) => setVoterRestriction(e.target.value)}>
+                <option value="anonymous">Anonymous (cookie)</option>
+                <option value="ip_limited">IP-limited</option>
+                <option value="authenticated">Authenticated users only</option>
+              </select>
+            </div>
+            <div className={styles.formGroup}>
+              <label>Results visibility</label>
+              <select value={resultVisibility} onChange={(e) => setResultVisibility(e.target.value)}>
                 <option value="after_vote">After voting</option>
                 <option value="before_vote">Before voting</option>
                 <option value="after_close">After poll closes</option>
                 <option value="always">Always</option>
               </select>
             </div>
+            <label className={styles.toggle}>
+              <input type="checkbox" checked={allowVoteChange} onChange={(e) => setAllowVoteChange(e.target.checked)} />
+              <span>Allow voters to change their vote</span>
+            </label>
+          </div>
+
+          <div className={styles.panel}>
+            <h3>Featured image</h3>
+            <MediaPickerInput value={featuredImage} onChange={setFeaturedImage} />
           </div>
         </div>
       </div>

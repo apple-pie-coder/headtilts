@@ -10,7 +10,9 @@ async function seed() {
     // Create permissions
     const permissionMap: Record<string, { id: number }> = {};
     for (const [, permName] of Object.entries(PERMISSIONS)) {
-      const [module, action] = permName.split('_');
+      const idx = permName.indexOf('_');
+      const module = permName.slice(0, idx);
+      const action = permName.slice(idx + 1);
       const permission = await prisma.permission.upsert({
         where: { module_action: { module, action } },
         update: {},

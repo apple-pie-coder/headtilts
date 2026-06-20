@@ -5,7 +5,8 @@ import { AdminLayout } from '../components/AdminLayout';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/ToastContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faXmark, faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
+import { useDensity } from '../hooks/useDensity';
 import { useAuth } from '../hooks/useAuth';
 import { Role } from '../types';
 import {
@@ -37,6 +38,7 @@ export default function RolesPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [permsByModule, setPermsByModule] = useState<Record<string, PermissionEntry[]>>({});
   const [loading, setLoading] = useState(true);
+  const [density, setDensity] = useDensity('rolesDensity');
 
   const [modal, setModal] = useState<ModalState | null>(null);
   const [formName, setFormName] = useState('');
@@ -144,16 +146,23 @@ export default function RolesPage() {
     <AdminLayout>
       <div className={styles.header}>
         <h2 className={styles.title}>Roles & Permissions</h2>
-        {canCreate && (
-          <button className={styles.addButton} onClick={openCreate}>
-            Create Role
-          </button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className={styles.densitySwitch} role="group" aria-label="List density">
+            <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
+            <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
+            <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
+          </div>
+          {canCreate && (
+            <button className={styles.addButton} onClick={openCreate}>
+              Create Role
+            </button>
+          )}
+        </div>
       </div>
 
 
       <div className={styles.tableWrapper}>
-        <table>
+        <table className={styles[`density_${density}`]}>
           <thead>
             <tr>
               <th>Name</th>

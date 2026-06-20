@@ -425,6 +425,7 @@ tr:last-child td { border-bottom: none; }
 .densitySwitch {
   display: inline-flex;
   align-items: center;
+  align-self: flex-start;
   gap: 0.25rem;
   padding: 0.125rem;
   border-radius: var(--r-sm);

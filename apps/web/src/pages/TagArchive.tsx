@@ -55,6 +55,9 @@ export function TagArchivePage() {
         <p className="archive-label">Tag</p>
         <h1 className="page-title">#{tag?.name || slug}</h1>
         {tag?.description && <p className="archive-description">{tag.description}</p>}
+        {!loading && pagination && (
+          <p className="archive-count">{pagination.total} post{pagination.total !== 1 ? 's' : ''}</p>
+        )}
       </div>
 
       {error && <div className="alert-error">{error}</div>}

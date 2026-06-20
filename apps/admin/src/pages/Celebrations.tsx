@@ -7,6 +7,9 @@ import { CelebrationForm } from '../components/CelebrationForm';
 import { Celebration } from '../types';
 import { deleteCelebration, fetchCelebrations } from '../services/celebrations';
 import { resolveMediaUrl } from '../services/media';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
+import { useDensity } from '../hooks/useDensity';
 import styles from './Celebrations.module.css';
 
 const PAGE_SIZE = 10;
@@ -23,6 +26,7 @@ export default function CelebrationsPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Celebration | null>(null);
   const [formKey, setFormKey] = useState(0);
+  const [density, setDensity] = useDensity('celebrationsDensity');
 
   useEffect(() => {
     load();
@@ -105,10 +109,15 @@ export default function CelebrationsPage() {
                 onChange={(e) => { setPage(1); setSearch(e.target.value); }}
               />
             </div>
+            <div className={styles.densitySwitch} role="group" aria-label="List density">
+              <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
+              <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
+              <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
+            </div>
           </div>
 
           <div className={styles.tableWrapper}>
-            <table>
+            <table className={styles[`density_${density}`]}>
               <thead>
                 <tr>
                   <th></th>

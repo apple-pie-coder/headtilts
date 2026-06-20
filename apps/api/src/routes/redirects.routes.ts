@@ -8,9 +8,9 @@ const router: IRouter = Router();
 
 router.use(authenticate);
 
-router.get('/', requirePermission(PERMISSIONS.SETTING_READ), asyncHandler(redirectsController.list));
-router.post('/', requirePermission(PERMISSIONS.SETTING_EDIT), asyncHandler(redirectsController.create));
-router.put('/:id', requirePermission(PERMISSIONS.SETTING_EDIT), asyncHandler(redirectsController.update));
-router.delete('/:id', requirePermission(PERMISSIONS.SETTING_EDIT), asyncHandler(redirectsController.remove));
+router.get('/', requirePermission(PERMISSIONS.REDIRECT_READ), asyncHandler(redirectsController.list));
+router.post('/', requirePermission(PERMISSIONS.REDIRECT_MANAGE), asyncHandler(redirectsController.create));
+router.put('/:id', requirePermission(PERMISSIONS.REDIRECT_MANAGE), asyncHandler(redirectsController.update));
+router.delete('/:id', requirePermission(PERMISSIONS.REDIRECT_MANAGE), asyncHandler(redirectsController.remove));
 
 export default router;

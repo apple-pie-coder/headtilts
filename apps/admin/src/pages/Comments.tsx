@@ -5,7 +5,8 @@ import { AdminLayout } from '../components/AdminLayout';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/ToastContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faReply } from '@fortawesome/free-solid-svg-icons';
+import { faReply, faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
+import { useDensity } from '../hooks/useDensity';
 import { useAuth } from '../hooks/useAuth';
 import { AdminComment, Post } from '../types';
 import { deleteComment, fetchComments, setCommentStatus } from '../services/comments';
@@ -58,6 +59,7 @@ export default function CommentsPage() {
   const [sortBy, setSortBy] = useState<'createdAt' | 'updatedAt'>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [loading, setLoading] = useState(true);
+  const [density, setDensity] = useDensity('commentsDensity');
 
   useEffect(() => {
     fetchPosts(1, 100, { type: 'post' })
@@ -183,11 +185,19 @@ export default function CommentsPage() {
               <option value="updatedAt:asc">Updated (oldest)</option>
             </select>
           </div>
+          <div className={postsStyles.filter}>
+            <label>Density</label>
+            <div className={postsStyles.densitySwitch} role="group" aria-label="List density">
+              <button type="button" className={`${postsStyles.densityOption} ${density === 'compact' ? postsStyles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
+              <button type="button" className={`${postsStyles.densityOption} ${density === 'condensed' ? postsStyles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
+              <button type="button" className={`${postsStyles.densityOption} ${density === 'relaxed' ? postsStyles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
+            </div>
+          </div>
         </div>
       </div>
 
       <div className={postsStyles.tableWrapper}>
-        <table>
+        <table className={postsStyles[`density_${density}`]}>
           <thead>
             <tr>
               <th>Author</th>

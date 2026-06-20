@@ -609,3 +609,280 @@
   margin: 0 0 1.25rem;
   line-height: 1.5;
 }
+
+.errorBanner {
+  background: color-mix(in srgb, var(--error, #ef4444) 8%, var(--surface1));
+  border: 1px solid color-mix(in srgb, var(--error, #ef4444) 30%, transparent);
+  border-radius: var(--r-sm);
+  padding: 0.875rem 1rem;
+  font-size: 0.875rem;
+  color: var(--t1);
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+/* ── Email tab ── */
+
+.panelMuted {
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+}
+
+.emailToggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.emailToggleInfo { flex: 1; min-width: 200px; }
+
+.emailToggleTitle {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.emailToggleDesc {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--t3);
+  line-height: 1.5;
+}
+
+.emailToggleSwitch {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.emailToggleSwitch input { display: none; }
+
+.emailToggleTrack {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--ghost);
+  border: 1px solid var(--border);
+  transition: background var(--ease), border-color var(--ease);
+  flex-shrink: 0;
+}
+
+.emailToggleTrack::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform var(--ease);
+}
+
+.emailToggleSwitch input:checked + .emailToggleTrack {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.emailToggleSwitch input:checked + .emailToggleTrack::before {
+  transform: translate(20px, -50%);
+}
+
+.emailToggleLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--t1);
+  min-width: 56px;
+}
+
+.formDivider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.25rem 0;
+}
+
+.emailGroupLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--t3);
+  margin: 0 0 0.75rem;
+}
+
+.inlineRow {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.emailActions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.testEmailButton {
+  padding: 0.4375rem 1rem;
+  background: var(--ghost);
+  color: var(--t1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  transition: background var(--ease), border-color var(--ease);
+}
+
+.testEmailButton:hover:not(:disabled) {
+  background: var(--ghost-h);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.testEmailButton:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ── Notification settings ── */
+
+.notifList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+
+.notifRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--sep);
+  transition: background var(--ease);
+}
+
+.notifRow:last-child { border-bottom: none; }
+.notifRow:hover { background: var(--ghost); }
+
+.notifRowDisabled { opacity: 0.55; }
+
+.notifInfo { flex: 1; min-width: 0; }
+
+.notifToggleWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin-bottom: 0.25rem;
+}
+
+.notifLabel {
+  font-weight: 600;
+  color: var(--t1);
+  font-size: 0.9375rem;
+}
+
+.notifDesc {
+  margin: 0 0 0;
+  font-size: 0.8125rem;
+  color: var(--t3);
+  line-height: 1.4;
+}
+
+.notifThreshold {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.notifThresholdLabel {
+  font-size: 0.8125rem;
+  color: var(--t2);
+  white-space: nowrap;
+}
+
+.notifControls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.notifControls .selectInput {
+  width: auto;
+  min-width: 140px;
+}
+
+/* Compact toggle for notification rows */
+.notifToggle {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.notifToggle input { display: none; }
+
+.notifToggleTrack {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--ghost);
+  border: 1px solid var(--border);
+  transition: background var(--ease), border-color var(--ease);
+}
+
+.notifToggleTrack::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform var(--ease);
+}
+
+.notifToggle input:checked + .notifToggleTrack {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.notifToggle input:checked + .notifToggleTrack::before {
+  transform: translate(14px, -50%);
+}
+
+.testNotifButton {
+  padding: 0.3125rem 0.75rem;
+  background: var(--ghost);
+  color: var(--t2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background var(--ease), color var(--ease), border-color var(--ease);
+}
+
+.testNotifButton:hover:not(:disabled) {
+  background: var(--ghost-h);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.testNotifButton:disabled { opacity: 0.45; cursor: not-allowed; }

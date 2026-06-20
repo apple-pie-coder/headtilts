@@ -305,6 +305,32 @@ export async function getCurrentUser(userId: string) {
   };
 }
 
+export async function refreshAccessToken(refreshToken: string) {
+  if (!refreshToken) throw new UnauthorizedError('Refresh token required');
+
+  const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+  const session = await prisma.session.findFirst({
+    where: { token: tokenHash, expiresAt: { gt: new Date() } },
+    select: { userId: true },
+  });
+
+  if (!session) throw new UnauthorizedError('Invalid or expired refresh token');
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId, isActive: true },
+    include: USER_WITH_ROLES_INCLUDE,
+  });
+
+  if (!user) throw new UnauthorizedError('User not found or inactive');
+
+  // Rotate: delete old session, issue new tokens
+  await prisma.session.deleteMany({ where: { token: tokenHash } });
+  const { accessToken, refreshToken: newRefreshToken } = buildTokensForUser(user as Parameters<typeof buildTokensForUser>[0]);
+  await storeRefreshToken(user.id, newRefreshToken);
+
+  return { accessToken, refreshToken: newRefreshToken, user: formatUserResponse(user) };
+}
+
 export async function logout(refreshToken: string): Promise<void> {
   if (!refreshToken) return;
   const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');

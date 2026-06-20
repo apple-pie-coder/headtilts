@@ -6,6 +6,9 @@ import { useToast } from '../components/ToastContext';
 import { TagForm } from '../components/TagForm';
 import { Tag } from '../types';
 import { deleteTag, fetchTags } from '../services/tags';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
+import { useDensity } from '../hooks/useDensity';
 import styles from './Tags.module.css';
 
 const PAGE_SIZE = 10;
@@ -20,6 +23,7 @@ export default function TagsPage() {
   const [loading, setLoading] = useState(true);
   const [editingTag, setEditingTag] = useState<Tag | null>(null);
   const [formKey, setFormKey] = useState(0);
+  const [density, setDensity] = useDensity('tagsDensity');
 
   useEffect(() => {
     loadTags();
@@ -95,16 +99,22 @@ export default function TagsPage() {
                 }}
               />
             </div>
+            <div className={styles.densitySwitch} role="group" aria-label="List density">
+              <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
+              <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
+              <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
+            </div>
           </div>
 
 
           <div className={styles.tableWrapper}>
-            <table>
+            <table className={styles[`density_${density}`]}>
               <thead>
                 <tr>
                   <th>Name</th>
                   <th>Slug</th>
                   <th>Description</th>
+                  <th className={styles.countCell}>Posts</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -116,6 +126,7 @@ export default function TagsPage() {
                       <code className={styles.slug}>{tag.slug}</code>
                     </td>
                     <td className={styles.description}>{tag.description || '—'}</td>
+                    <td className={styles.countCell}>{tag._count?.posts ?? '—'}</td>
                     <td className={styles.actions}>
                       <button onClick={() => setEditingTag(tag)}>Edit</button>
                       <button className={styles.deleteButton} onClick={() => handleDelete(tag)}>

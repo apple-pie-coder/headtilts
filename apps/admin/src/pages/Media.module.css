@@ -197,7 +197,8 @@
   font-size: 0.8125rem;
 }
 
-.formGroup input[type='text'] {
+.formGroup input[type='text'],
+.formGroup textarea {
   width: 100%;
   padding: 0.5rem 0.75rem;
   background: var(--input-bg);
@@ -206,12 +207,26 @@
   font-size: 0.9375rem;
   color: var(--t1);
   transition: border-color var(--ease), box-shadow var(--ease);
+  font-family: inherit;
 }
 
-.formGroup input[type='text']:focus {
+.formGroup textarea {
+  resize: vertical;
+  min-height: 72px;
+  line-height: 1.5;
+}
+
+.formGroup input[type='text']:focus,
+.formGroup textarea:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: var(--input-ring);
+}
+
+.formGroup input[type='text']:disabled,
+.formGroup textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Standard app dropdown styling (matches Settings .selectInput), full-width for the panel */

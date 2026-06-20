@@ -16,3 +16,9 @@ export async function fetchPublicSettings(): Promise<Record<string, string>> {
   const response = await apiClient.get('/public/site-settings');
   return response.data.data;
 }
+
+/** Send a test email to the currently logged-in user to verify SMTP config. */
+export async function sendTestEmail(): Promise<{ sent: boolean; to: string }> {
+  const response = await apiClient.post('/settings/test-email');
+  return response.data.data;
+}

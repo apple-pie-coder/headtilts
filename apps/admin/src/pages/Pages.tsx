@@ -10,6 +10,9 @@ import { Post, User } from '../types';
 import { deletePost, fetchPosts, updatePost } from '../services/posts';
 import { fetchUsers } from '../services/users';
 import { fetchSettings } from '../services/settings';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
+import { useDensity } from '../hooks/useDensity';
 import styles from './Posts.module.css';
 
 const ROLE_KEYS: { key: string; label: string; cls: string }[] = [
@@ -89,6 +92,7 @@ export default function PagesPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [loading, setLoading] = useState(true);
   const [roleMap, setRoleMap] = useState<Record<number, { label: string; cls: string }[]>>({});
+  const [density, setDensity] = useDensity('pagesDensity');
 
   useEffect(() => {
     fetchSettings()
@@ -264,11 +268,19 @@ export default function PagesPage() {
               <option value="title:desc">Title (Z → A)</option>
             </select>
           </div>
+          <div className={styles.filter}>
+            <label>Density</label>
+            <div className={styles.densitySwitch} role="group" aria-label="List density">
+              <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
+              <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
+              <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
+            </div>
+          </div>
         </div>
       </div>
 
       <div className={styles.tableWrapper}>
-        <table>
+        <table className={styles[`density_${density}`]}>
           <thead>
             <tr>
               <th>Title</th>

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faEdit, faTrash, faRotateLeft, faDownload } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faEdit, faTrash, faRotateLeft, faDownload, faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
+import { useDensity } from '../hooks/useDensity';
 import { AdminLayout } from '../components/AdminLayout';
 import { useToast } from '../components/ToastContext';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -38,6 +39,7 @@ export default function PollsPage() {
   const [search, setSearch]             = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading]           = useState(true);
+  const [density, setDensity]           = useDensity('pollsDensity');
 
   useEffect(() => { load(); }, [page, search, statusFilter]);
 
@@ -123,10 +125,18 @@ export default function PollsPage() {
             <option value="closed">Closed</option>
           </select>
         </div>
+        <div className={styles.filter}>
+          <label>Density</label>
+          <div className={styles.densitySwitch} role="group" aria-label="List density">
+            <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
+            <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
+            <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
+          </div>
+        </div>
       </div>
 
       <div className={styles.tableWrapper}>
-        <table>
+        <table className={styles[`density_${density}`]}>
           <thead>
             <tr>
               <th>Poll</th>
