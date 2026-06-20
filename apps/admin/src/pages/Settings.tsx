@@ -3,8 +3,12 @@ import { AxiosError } from 'axios';
 import { AdminLayout } from '../components/AdminLayout';
 import { MediaPickerInput } from '../components/MediaPickerInput';
 import { useToast } from '../components/ToastContext';
-import { fetchSettings, updateSettings } from '../services/settings';
+import { fetchSettings, updateSettings, sendTestEmail } from '../services/settings';
 import { fetchPosts } from '../services/posts';
+import {
+  fetchNotificationPreferences, updateNotificationPreferences, sendTestNotification,
+  NotificationPreference, NotificationChannel,
+} from '../services/notifications';
 import { Post, Setting } from '../types';
 import styles from './Settings.module.css';
 
@@ -199,7 +203,7 @@ function CheckField({
 // Main component
 // ---------------------------------------------------------------------------
 
-const TABS = ['General', 'Reading', 'Discussion', 'Media', 'Permalinks', 'Email'] as const;
+const TABS = ['General', 'Reading', 'Discussion', 'Media', 'Permalinks', 'Email', 'Notifications'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function SettingsPage() {
@@ -278,6 +282,7 @@ export default function SettingsPage() {
   const [customStructure, setCustomStructure] = useState('');
 
   // ── Email (SMTP) ──
+  const [smtpEnabled, setSmtpEnabled] = useState('true');
   const [smtpHost,   setSmtpHost]   = useState('');
   const [smtpPort,   setSmtpPort]   = useState('587');
   const [smtpSecure, setSmtpSecure] = useState('false');
@@ -285,6 +290,14 @@ export default function SettingsPage() {
   const [smtpPass,   setSmtpPass]   = useState('');
   const [smtpFrom,   setSmtpFrom]   = useState('');
   const [savedEmail, setSavedEmail] = useState<Record<string, string>>({});
+  const [testingEmail, setTestingEmail] = useState(false);
+
+  // ── Notification preferences ──
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPreference[]>([]);
+  const [notifLoadError, setNotifLoadError] = useState<string | null>(null);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [savingNotif, setSavingNotif] = useState(false);
+  const [testingNotif, setTestingNotif] = useState<string | null>(null);
 
   useEffect(() => {
     load();
@@ -393,14 +406,15 @@ export default function SettingsPage() {
       if (!PERMALINK_PRESETS.some((p) => p.structure === perm)) setCustomStructure(perm);
 
       // Email
+      const sen = g(all, 'smtp_enabled', 'true');
       const sh  = g(all, 'smtp_host');
       const sp  = g(all, 'smtp_port', '587');
       const ss  = g(all, 'smtp_secure', 'false');
       const su  = g(all, 'smtp_user');
       const spw = g(all, 'smtp_pass');
       const sf  = g(all, 'smtp_from');
-      setSmtpHost(sh); setSmtpPort(sp); setSmtpSecure(ss); setSmtpUser(su); setSmtpPass(spw); setSmtpFrom(sf);
-      setSavedEmail({ smtp_host: sh, smtp_port: sp, smtp_secure: ss, smtp_user: su, smtp_pass: spw, smtp_from: sf });
+      setSmtpEnabled(sen); setSmtpHost(sh); setSmtpPort(sp); setSmtpSecure(ss); setSmtpUser(su); setSmtpPass(spw); setSmtpFrom(sf);
+      setSavedEmail({ smtp_enabled: sen, smtp_host: sh, smtp_port: sp, smtp_secure: ss, smtp_user: su, smtp_pass: spw, smtp_from: sf });
     } catch (err) {
       toast.error(errMsg(err, 'Failed to load settings'));
     } finally {
@@ -408,8 +422,39 @@ export default function SettingsPage() {
     }
   }
 
-  function switchTab(t: Tab) {
+  async function switchTab(t: Tab) {
     setTab(t);
+    if (t === 'Notifications' && notifPrefs.length === 0 && !notifLoadError) {
+      setNotifLoading(true);
+      setNotifLoadError(null);
+      try {
+        const prefs = await fetchNotificationPreferences();
+        setNotifPrefs(prefs);
+      } catch {
+        setNotifLoadError('Could not load notification preferences. Make sure the database migrations are applied (run: pnpm --filter @headtilts/api exec prisma migrate deploy).');
+      } finally {
+        setNotifLoading(false);
+      }
+    }
+  }
+
+  function updateNotifPref(type: string, patch: Partial<NotificationPreference>) {
+    setNotifPrefs((prev) => prev.map((p) => (p.type === type ? { ...p, ...patch } : p)));
+  }
+
+  async function saveNotifPrefs() {
+    setSavingNotif(true);
+    try {
+      const updated = await updateNotificationPreferences(
+        notifPrefs.map((p) => ({ type: p.type, channel: p.channel, enabled: p.enabled, threshold: p.threshold })),
+      );
+      setNotifPrefs(updated as unknown as NotificationPreference[]);
+      toast.success('Notification preferences saved.');
+    } catch {
+      toast.error('Failed to save notification preferences');
+    } finally {
+      setSavingNotif(false);
+    }
   }
 
   async function save(updates: Record<string, string>, onSuccess: () => void) {
@@ -458,6 +503,7 @@ export default function SettingsPage() {
   };
 
   const curEmail: Record<string, string> = {
+    smtp_enabled: smtpEnabled,
     smtp_host: smtpHost, smtp_port: smtpPort, smtp_secure: smtpSecure,
     smtp_user: smtpUser, smtp_pass: smtpPass, smtp_from: smtpFrom,
   };
@@ -1193,79 +1239,241 @@ export default function SettingsPage() {
           save(curEmail, () => setSavedEmail({ ...curEmail }));
         }}>
           <div className={styles.panel}>
-            <h3 className={styles.sectionTitle}>SMTP Configuration</h3>
-            <p className={styles.sectionDesc}>
-              Configure an outgoing mail server so the CMS can send comment notifications and
-              password reset emails. Settings saved here override environment variables.
-            </p>
 
-            <div className={styles.formTable}>
-              <label className={styles.formLabel} htmlFor="smtp_host">SMTP Host</label>
-              <div className={styles.formField}>
-                <input id="smtp_host" type="text" className={styles.regularText}
-                  placeholder="smtp.example.com" value={smtpHost}
-                  onChange={(e) => setSmtpHost(e.target.value)} disabled={saving} />
+            {/* Enable / Disable row */}
+            <div className={styles.emailToggleRow}>
+              <div className={styles.emailToggleInfo}>
+                <h3 className={styles.emailToggleTitle}>Email Sending</h3>
+                <p className={styles.emailToggleDesc}>
+                  When disabled, password resets and notifications are suppressed (logged to console instead).
+                </p>
               </div>
+              <label className={styles.emailToggleSwitch}>
+                <input
+                  type="checkbox"
+                  checked={smtpEnabled === 'true'}
+                  onChange={(e) => setSmtpEnabled(e.target.checked ? 'true' : 'false')}
+                  disabled={saving}
+                />
+                <span className={styles.emailToggleTrack} />
+                <span className={styles.emailToggleLabel}>
+                  {smtpEnabled === 'true' ? 'Enabled' : 'Disabled'}
+                </span>
+              </label>
             </div>
 
-            <div className={styles.formTable}>
-              <label className={styles.formLabel} htmlFor="smtp_port">SMTP Port</label>
-              <div className={styles.formField}>
-                <input id="smtp_port" type="number" className={styles.smallText}
-                  placeholder="587" value={smtpPort}
-                  onChange={(e) => setSmtpPort(e.target.value)} disabled={saving} />
-                <p className={styles.description}>Common ports: 587 (STARTTLS), 465 (SSL/TLS), 25 (unencrypted)</p>
+            <hr className={styles.formDivider} />
+
+            {/* All SMTP fields — muted when disabled */}
+            <div className={smtpEnabled !== 'true' ? styles.panelMuted : undefined}>
+
+              <p className={styles.sectionDesc} style={{ marginBottom: '1.25rem' }}>
+                These settings override the <code>SMTP_*</code> environment variables.
+                Leave blank to fall back to the values in <code>.env</code>.
+              </p>
+
+              {/* Server */}
+              <p className={styles.emailGroupLabel}>Server</p>
+
+              <div className={styles.formTable}>
+                <label className={styles.formLabel} htmlFor="smtp_host">Host</label>
+                <div className={styles.formField}>
+                  <input id="smtp_host" type="text" className={styles.regularText}
+                    placeholder="smtp.example.com" value={smtpHost}
+                    onChange={(e) => setSmtpHost(e.target.value)}
+                    disabled={saving || smtpEnabled !== 'true'} />
+                </div>
               </div>
+
+              <div className={styles.formTable}>
+                <label className={styles.formLabel} htmlFor="smtp_port">Port</label>
+                <div className={styles.formField}>
+                  <div className={styles.inlineRow}>
+                    <input id="smtp_port" type="number" className={styles.smallText}
+                      placeholder="587" value={smtpPort}
+                      onChange={(e) => setSmtpPort(e.target.value)}
+                      disabled={saving || smtpEnabled !== 'true'} />
+                    <select className={styles.selectInput}
+                      value={smtpSecure}
+                      onChange={(e) => setSmtpSecure(e.target.value)}
+                      disabled={saving || smtpEnabled !== 'true'}>
+                      <option value="false">STARTTLS</option>
+                      <option value="true">SSL / TLS</option>
+                    </select>
+                  </div>
+                  <p className={styles.description}>587 = STARTTLS · 465 = SSL/TLS</p>
+                </div>
+              </div>
+
+              {/* Credentials */}
+              <p className={styles.emailGroupLabel} style={{ marginTop: '1.25rem' }}>Credentials</p>
+
+              <div className={styles.formTable}>
+                <label className={styles.formLabel} htmlFor="smtp_user">Username</label>
+                <div className={styles.formField}>
+                  <input id="smtp_user" type="text" className={styles.regularText} autoComplete="off"
+                    placeholder="user@example.com" value={smtpUser}
+                    onChange={(e) => setSmtpUser(e.target.value)}
+                    disabled={saving || smtpEnabled !== 'true'} />
+                </div>
+              </div>
+
+              <div className={styles.formTable}>
+                <label className={styles.formLabel} htmlFor="smtp_pass">Password</label>
+                <div className={styles.formField}>
+                  <input id="smtp_pass" type="password" className={styles.regularText} autoComplete="new-password"
+                    placeholder="••••••••" value={smtpPass}
+                    onChange={(e) => setSmtpPass(e.target.value)}
+                    disabled={saving || smtpEnabled !== 'true'} />
+                </div>
+              </div>
+
+              {/* Sender */}
+              <p className={styles.emailGroupLabel} style={{ marginTop: '1.25rem' }}>Sender</p>
+
+              <div className={styles.formTable}>
+                <label className={styles.formLabel} htmlFor="smtp_from">From address</label>
+                <div className={styles.formField}>
+                  <input id="smtp_from" type="text" className={styles.regularText}
+                    placeholder='Site Name <no-reply@example.com>' value={smtpFrom}
+                    onChange={(e) => setSmtpFrom(e.target.value)}
+                    disabled={saving || smtpEnabled !== 'true'} />
+                  <p className={styles.description}>Supports <code>Name &lt;address&gt;</code> format.</p>
+                </div>
+              </div>
+
             </div>
 
-            <div className={styles.formTable}>
-              <label className={styles.formLabel} htmlFor="smtp_secure">Encryption</label>
-              <div className={styles.formField}>
-                <select id="smtp_secure" className={styles.selectInput}
-                  value={smtpSecure}
-                  onChange={(e) => setSmtpSecure(e.target.value)} disabled={saving}>
-                  <option value="false">STARTTLS (port 587)</option>
-                  <option value="true">SSL / TLS (port 465)</option>
-                </select>
-              </div>
-            </div>
+            <hr className={styles.formDivider} />
 
-            <div className={styles.formTable}>
-              <label className={styles.formLabel} htmlFor="smtp_user">Username</label>
-              <div className={styles.formField}>
-                <input id="smtp_user" type="text" className={styles.regularText} autoComplete="off"
-                  placeholder="user@example.com" value={smtpUser}
-                  onChange={(e) => setSmtpUser(e.target.value)} disabled={saving} />
-              </div>
-            </div>
-
-            <div className={styles.formTable}>
-              <label className={styles.formLabel} htmlFor="smtp_pass">Password</label>
-              <div className={styles.formField}>
-                <input id="smtp_pass" type="password" className={styles.regularText} autoComplete="new-password"
-                  placeholder="••••••••" value={smtpPass}
-                  onChange={(e) => setSmtpPass(e.target.value)} disabled={saving} />
-              </div>
-            </div>
-
-            <div className={styles.formTable}>
-              <label className={styles.formLabel} htmlFor="smtp_from">From Address</label>
-              <div className={styles.formField}>
-                <input id="smtp_from" type="email" className={styles.regularText}
-                  placeholder="no-reply@example.com" value={smtpFrom}
-                  onChange={(e) => setSmtpFrom(e.target.value)} disabled={saving} />
-                <p className={styles.description}>The address that appears in the From field of outgoing emails. Defaults to the username if blank.</p>
-              </div>
-            </div>
-
-            <div className={styles.actions}>
+            {/* Actions */}
+            <div className={styles.emailActions}>
               <button type="submit" className={styles.saveButton}
                 disabled={saving || !isDirty(curEmail, savedEmail)}>
                 {saving ? 'Saving…' : 'Save Changes'}
               </button>
+              <button
+                type="button"
+                className={styles.testEmailButton}
+                disabled={testingEmail || saving || smtpEnabled !== 'true' || !smtpHost}
+                onClick={async () => {
+                  setTestingEmail(true);
+                  try {
+                    const result = await sendTestEmail();
+                    toast.success(`Test email sent to ${result.to}`);
+                  } catch {
+                    toast.error('Failed to send test email. Check your SMTP credentials.');
+                  } finally {
+                    setTestingEmail(false);
+                  }
+                }}
+              >
+                {testingEmail ? 'Sending…' : 'Send Test Email'}
+              </button>
+              <p className={styles.description}>
+                Save first, then test. Test email goes to your account address.
+              </p>
             </div>
+
           </div>
         </form>
+      ) : tab === 'Notifications' ? (
+        /* ═══════════════ NOTIFICATIONS ═══════════════ */
+        <div>
+          <div className={styles.panel}>
+            <h3 className={styles.sectionTitle}>Notification Preferences</h3>
+            <p className={styles.sectionDesc}>
+              Choose how you want to be notified for each event type.
+              <strong> In-App</strong> notifications appear in the bell menu.
+              <strong> Email</strong> notifications are sent to your account email address.
+            </p>
+
+            {notifLoadError ? (
+              <div className={styles.errorBanner}>
+                <strong>Setup required:</strong> {notifLoadError}
+              </div>
+            ) : notifLoading || notifPrefs.length === 0 ? (
+              <p className={styles.sectionDesc}>{notifLoading ? 'Loading preferences…' : 'No preferences loaded.'}</p>
+            ) : (
+              <div className={styles.notifList}>
+                {notifPrefs.map((pref) => (
+                  <div key={pref.type} className={`${styles.notifRow} ${!pref.enabled ? styles.notifRowDisabled : ''}`}>
+                    <div className={styles.notifInfo}>
+                      <div className={styles.notifToggleWrap}>
+                        <label className={styles.notifToggle}>
+                          <input
+                            type="checkbox"
+                            checked={pref.enabled}
+                            onChange={(e) => updateNotifPref(pref.type, { enabled: e.target.checked })}
+                          />
+                          <span className={styles.notifToggleTrack} />
+                        </label>
+                        <span className={styles.notifLabel}>{pref.label}</span>
+                      </div>
+                      <p className={styles.notifDesc}>{pref.description}</p>
+                      {pref.hasThreshold && pref.enabled && (
+                        <div className={styles.notifThreshold}>
+                          <label className={styles.notifThresholdLabel}>{pref.thresholdLabel}</label>
+                          <input
+                            type="number"
+                            className={styles.smallText}
+                            value={pref.threshold ?? pref.thresholdDefault ?? ''}
+                            min={1}
+                            onChange={(e) => updateNotifPref(pref.type, { threshold: parseInt(e.target.value) || null })}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className={styles.notifControls}>
+                      <select
+                        className={styles.selectInput}
+                        value={pref.channel}
+                        disabled={!pref.enabled}
+                        onChange={(e) => updateNotifPref(pref.type, { channel: e.target.value as NotificationChannel })}
+                      >
+                        <option value="inapp">In-App only</option>
+                        <option value="email">Email only</option>
+                        <option value="both">In-App + Email</option>
+                        <option value="none">None (silent)</option>
+                      </select>
+
+                      <button
+                        type="button"
+                        className={styles.testNotifButton}
+                        disabled={!pref.enabled || testingNotif === pref.type}
+                        onClick={async () => {
+                          setTestingNotif(pref.type);
+                          try {
+                            await sendTestNotification(pref.type);
+                            toast.success(`Test notification sent for "${pref.label}"`);
+                          } catch {
+                            toast.error('Failed to send test notification');
+                          } finally {
+                            setTestingNotif(null);
+                          }
+                        }}
+                      >
+                        {testingNotif === pref.type ? 'Sending…' : 'Test'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className={styles.actions} style={{ marginTop: '1.5rem' }}>
+              <button
+                type="button"
+                className={styles.saveButton}
+                onClick={saveNotifPrefs}
+                disabled={savingNotif || notifPrefs.length === 0}
+              >
+                {savingNotif ? 'Saving…' : 'Save Preferences'}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </AdminLayout>
   );

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken, JWTPayload } from '../utils/jwt';
 import { sendError } from '../utils/response';
 import { validateApiKey } from '../services/apiKey.service';
+import { prisma } from '../config/database';
 
 /* eslint-disable @typescript-eslint/no-namespace */
 declare global {
@@ -9,6 +10,7 @@ declare global {
     interface Request {
       user?: JWTPayload;
       apiKeyScopes?: string[];
+      apiKeyId?: number;
     }
   }
 }
@@ -64,6 +66,27 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       permissions: result.permissions,
     } as unknown as JWTPayload;
     req.apiKeyScopes = result.scopes;
+    req.apiKeyId = result.id;
+
+    // Log API key usage fire-and-forget after response finishes
+    const startTime = Date.now();
+    res.on('finish', () => {
+      const durationMs = Date.now() - startTime;
+      const endpoint = req.route?.path
+        ? `${req.method} ${req.baseUrl}${req.route.path === '/' ? '' : req.route.path}`
+        : `${req.method} ${req.baseUrl}`;
+      prisma.apiKeyUsageLog.create({
+        data: {
+          apiKeyId: result.id,
+          method: req.method,
+          endpoint,
+          statusCode: res.statusCode,
+          durationMs,
+          ip: (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0].trim() ?? req.socket.remoteAddress ?? null,
+        },
+      }).catch(() => { /* non-fatal */ });
+    });
+
     next();
     return;
   }
@@ -87,17 +110,56 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 }
 
 export function requirePermission(permission: string) {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     if (!req.user) {
       sendError(res, 'UNAUTHORIZED', 'Unauthorized', 401);
       return;
     }
 
-    if (!req.user.permissions?.includes(permission)) {
-      sendError(res, 'FORBIDDEN', 'Insufficient permissions', 403);
+    // API key auth: use scope-based permissions already resolved at authenticate time
+    if (req.apiKeyId !== undefined) {
+      if (!req.user.permissions?.includes(permission)) {
+        sendError(res, 'FORBIDDEN', 'Insufficient permissions', 403);
+        return;
+      }
+      next();
       return;
     }
 
-    next();
+    // JWT auth: always check the DB so permission changes take effect immediately
+    try {
+      // Cache per request — multiple requirePermission calls on the same route share one DB query
+      let perms: string[] | undefined = (req as unknown as Record<string, unknown>)._cachedPermissions as string[] | undefined;
+      if (!perms) {
+        const row = await prisma.user.findUnique({
+          where: { id: req.user.sub },
+          select: {
+            userRoles: {
+              select: {
+                role: {
+                  select: {
+                    permissions: {
+                      select: { permission: { select: { module: true, action: true } } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+        perms = row?.userRoles
+          .flatMap((ur) => ur.role.permissions)
+          .map((rp) => `${rp.permission.module}_${rp.permission.action}`) ?? [];
+        (req as unknown as Record<string, unknown>)._cachedPermissions = perms;
+      }
+
+      if (!perms.includes(permission)) {
+        sendError(res, 'FORBIDDEN', 'Insufficient permissions', 403);
+        return;
+      }
+      next();
+    } catch {
+      sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+    }
   };
 }

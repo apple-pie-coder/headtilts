@@ -51,7 +51,10 @@ export async function listCategories(page: number, limit: number, search?: strin
   const [categories, total] = await Promise.all([
     prisma.category.findMany({
       where,
-      include: { parent: { select: { id: true, name: true } } },
+      include: {
+        parent: { select: { id: true, name: true } },
+        _count: { select: { posts: true } },
+      },
       orderBy: { name: 'asc' },
       skip: (page - 1) * limit,
       take: limit,

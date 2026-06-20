@@ -5,7 +5,8 @@ import { AdminLayout } from '../components/AdminLayout';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/ToastContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faXmark, faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons';
+import { faXmark, faArrowUpRightFromSquare, faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
+import { useDensity } from '../hooks/useDensity';
 import { useAuth } from '../hooks/useAuth';
 import { SitemapEntry } from '../types';
 import {
@@ -36,6 +37,7 @@ export default function SitemapPage() {
   const { hasPermission } = useAuth();
   const [entries, setEntries] = useState<SitemapEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [density, setDensity] = useDensity('sitemapDensity');
 
   const [modal, setModal] = useState<ModalState | null>(null);
   const [formUrl, setFormUrl] = useState('');
@@ -117,6 +119,11 @@ export default function SitemapPage() {
       <div className={styles.header}>
         <h2 className={styles.title}>Sitemap</h2>
         <div className={styles.headerActions}>
+          <div className={styles.densitySwitch} role="group" aria-label="List density">
+            <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
+            <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
+            <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
+          </div>
           <a href={xmlUrl} target="_blank" rel="noreferrer" className={styles.xmlBtn}>
             View XML <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
           </a>
@@ -133,7 +140,7 @@ export default function SitemapPage() {
 
 
       <div className={styles.tableWrapper}>
-        <table>
+        <table className={styles[`density_${density}`]}>
           <thead>
             <tr>
               <th>URL</th>

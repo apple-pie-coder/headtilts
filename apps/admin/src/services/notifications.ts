@@ -1,10 +1,35 @@
 import { apiClient } from './api';
 
-export type NotificationType = 'comment' | 'contact' | 'post_published' | 'user_registered';
+export type NotificationType =
+  | 'comment'
+  | 'contact'
+  | 'post_published'
+  | 'post_scheduled'
+  | 'user_registered'
+  | 'failed_login'
+  | 'security_alert'
+  | 'api_key_created'
+  | 'user_deactivated'
+  | 'media_storage_high';
+
+export type NotificationChannel = 'email' | 'inapp' | 'both' | 'none';
+
+export interface NotificationPreference {
+  type: NotificationType;
+  label: string;
+  description: string;
+  defaultChannel: NotificationChannel;
+  hasThreshold: boolean;
+  thresholdLabel?: string;
+  thresholdDefault?: number;
+  channel: NotificationChannel;
+  enabled: boolean;
+  threshold: number | null;
+}
 
 export interface AppNotification {
   id: number;
-  type: NotificationType;
+  type: string;
   title: string;
   body: string | null;
   link: string | null;
@@ -38,4 +63,20 @@ export async function markNotificationsUnread(ids: number[]): Promise<void> {
 
 export async function markAllNotificationsRead(): Promise<void> {
   await apiClient.post('/notifications/read-all');
+}
+
+export async function fetchNotificationPreferences(): Promise<NotificationPreference[]> {
+  const res = await apiClient.get('/notifications/preferences');
+  return res.data.data;
+}
+
+export async function updateNotificationPreferences(
+  prefs: Array<{ type: string; channel: NotificationChannel; enabled: boolean; threshold?: number | null }>,
+): Promise<NotificationPreference[]> {
+  const res = await apiClient.put('/notifications/preferences', prefs);
+  return res.data.data;
+}
+
+export async function sendTestNotification(type: string): Promise<void> {
+  await apiClient.post('/notifications/test', { type });
 }

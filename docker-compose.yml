@@ -9,7 +9,16 @@
 #   docker compose exec api sh -c "cd apps/api && node_modules/.bin/prisma db seed"
 
 services:
-
+  # ───Mail Hog─────────────────────────────────────────────────────────────────
+  mailhog:
+    image: mailhog/mailhog
+    platform: linux/amd64
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - internal
   # ── MySQL 8 ─────────────────────────────────────────────────────────────────
   mysql:
     image: mysql:8.0

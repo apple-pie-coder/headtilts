@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faTrash, faCopy, faCheck, faKey } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faTrash, faCopy, faCheck, faKey, faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
+import { useDensity } from '../hooks/useDensity';
 import { AdminLayout } from '../components/AdminLayout';
 import { useToast } from '../components/ToastContext';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -104,6 +105,7 @@ export default function ApiKeysPage() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [allScopes, setAllScopes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [density, setDensity] = useDensity('apiKeysDensity');
 
   // Create form state
   const [showForm, setShowForm] = useState(false);
@@ -187,9 +189,16 @@ export default function ApiKeysPage() {
             Create long-lived keys for external scripts and integrations. Each key is shown only once on creation.
           </p>
         </div>
-        <button className={styles.addButton} onClick={() => setShowForm((v) => !v)}>
-          <FontAwesomeIcon icon={faPlus} /> New Key
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className={styles.densitySwitch} role="group" aria-label="List density">
+            <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
+            <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
+            <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
+          </div>
+          <button className={styles.addButton} onClick={() => setShowForm((v) => !v)}>
+            <FontAwesomeIcon icon={faPlus} /> New Key
+          </button>
+        </div>
       </div>
 
       {/* One-time reveal banner */}
@@ -264,7 +273,7 @@ export default function ApiKeysPage() {
 
       {/* Keys table */}
       <div className={styles.tableWrapper}>
-        <table>
+        <table className={styles[`density_${density}`]}>
           <thead>
             <tr>
               <th>Name</th>

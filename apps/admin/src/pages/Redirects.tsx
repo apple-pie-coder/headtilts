@@ -10,6 +10,9 @@ import {
   updateRedirect,
   Redirect,
 } from '../services/redirects';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
+import { useDensity } from '../hooks/useDensity';
 import styles from './Redirects.module.css';
 
 function errMsg(err: unknown): string {
@@ -28,6 +31,7 @@ export default function RedirectsPage() {
   const [editing, setEditing] = useState<Redirect | null>(null);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [density, setDensity] = useDensity('redirectsDensity');
 
   useEffect(() => { load(); }, []);
 
@@ -154,6 +158,11 @@ export default function RedirectsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          <div className={styles.densitySwitch} role="group" aria-label="List density">
+            <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
+            <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
+            <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
+          </div>
         </div>
 
         {loading ? (
@@ -162,7 +171,7 @@ export default function RedirectsPage() {
           <div className={styles.empty}>{search ? 'No redirects match your search.' : 'No redirects yet.'}</div>
         ) : (
           <div className={styles.tableWrapper}>
-            <table>
+            <table className={styles[`density_${density}`]}>
               <thead>
                 <tr>
                   <th>From</th>

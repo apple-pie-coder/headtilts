@@ -35,6 +35,7 @@ export interface Category {
   parent?: { id: number; name: string } | null;
   icon?: string | null;
   showSidebar?: boolean;
+  _count?: { posts: number };
 }
 
 export interface Tag {
@@ -42,6 +43,7 @@ export interface Tag {
   name: string;
   slug: string;
   description?: string | null;
+  _count?: { posts: number };
 }
 
 export type CelebrationType = 'birthday' | 'remembrance';

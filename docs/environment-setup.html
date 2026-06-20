@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Environment Setup — Headtilts CMS</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --accent: #6c8ef7;
+    --accent2: #a78bfa;
+    --green: #34d399;
+    --yellow: #fbbf24;
+    --red: #f87171;
+    --orange: #fb923c;
+    --cyan: #22d3ee;
+    --text: #e2e8f0;
+    --muted: #8892a4;
+    --heading: #f8fafc;
+    --code-bg: #12151f;
+    --nav-w: 260px;
+    --radius: 8px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.65;
+    display: flex;
+  }
+  nav {
+    width: var(--nav-w);
+    min-width: var(--nav-w);
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    overflow-y: auto;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 1.5rem 0 3rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  nav::-webkit-scrollbar { width: 4px; }
+  nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .nav-logo {
+    padding: 0 1.25rem 1.5rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--heading);
+    letter-spacing: -0.02em;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1rem;
+  }
+  .nav-logo span { color: var(--accent); }
+  .nav-back {
+    padding: 0 1.25rem 1rem;
+    font-size: 0.8rem;
+  }
+  .nav-back a { color: var(--muted); text-decoration: none; }
+  .nav-back a:hover { color: var(--accent); }
+  .nav-section {
+    padding: 0.5rem 1.25rem 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 0.75rem;
+  }
+  nav a {
+    display: block;
+    padding: 0.3rem 1.25rem;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.875rem;
+    border-left: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  nav a:hover { color: var(--text); }
+  nav a.active { color: var(--accent); border-left-color: var(--accent); }
+  main {
+    flex: 1;
+    min-width: 0;
+    padding: 3rem 4rem 6rem;
+    max-width: 960px;
+  }
+  @media (max-width: 900px) {
+    body { flex-direction: column; }
+    nav { width: 100%; height: auto; position: static; }
+    main { padding: 2rem 1.5rem; }
+  }
+  h1 { font-size: 2.25rem; font-weight: 800; color: var(--heading); letter-spacing: -0.03em; margin-bottom: 0.5rem; }
+  h2 { font-size: 1.5rem; font-weight: 700; color: var(--heading); letter-spacing: -0.02em; margin: 3rem 0 1rem; padding-top: 3rem; border-top: 1px solid var(--border); }
+  h2:first-of-type { border-top: none; margin-top: 1.5rem; padding-top: 0; }
+  h3 { font-size: 1.1rem; font-weight: 700; color: var(--heading); margin: 2rem 0 0.75rem; }
+  h4 { font-size: 0.9rem; font-weight: 700; color: var(--accent2); text-transform: uppercase; letter-spacing: 0.05em; margin: 1.5rem 0 0.5rem; }
+  p { margin-bottom: 1rem; color: var(--text); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  ul, ol { padding-left: 1.5rem; margin-bottom: 1rem; }
+  li { margin-bottom: 0.3rem; }
+  strong { color: var(--heading); font-weight: 600; }
+  code {
+    font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    font-size: 0.825rem;
+    background: var(--code-bg);
+    color: #93c5fd;
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    overflow-x: auto;
+    margin: 1rem 0 1.5rem;
+    line-height: 1.55;
+  }
+  pre code { background: none; border: none; padding: 0; font-size: 0.85rem; color: var(--text); }
+  .alert {
+    padding: 1rem 1.25rem;
+    border-radius: var(--radius);
+    margin: 1.5rem 0;
+    border-left: 3px solid;
+    font-size: 0.9rem;
+  }
+  .alert-info { background: rgba(108,142,247,0.08); border-color: var(--accent); }
+  .alert-warn { background: rgba(251,191,36,0.08); border-color: var(--yellow); }
+  .alert-danger { background: rgba(248,113,113,0.08); border-color: var(--red); }
+  .alert-success { background: rgba(52,211,153,0.08); border-color: var(--green); }
+  .hero {
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-subtitle { color: var(--muted); font-size: 1.05rem; margin-top: 0.5rem; }
+  .hero-pills { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1.25rem; }
+  .pill {
+    padding: 0.35em 0.85em;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .env-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  @media (max-width: 700px) { .env-grid { grid-template-columns: 1fr; } }
+  .env-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+  }
+  .env-card-title {
+    font-weight: 700;
+    color: var(--heading);
+    margin-bottom: 0.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .env-card-file {
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: var(--accent);
+    margin-bottom: 0.75rem;
+  }
+  .env-card-desc { color: var(--muted); font-size: 0.875rem; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot-dev { background: var(--green); }
+  .dot-staging { background: var(--yellow); }
+  .dot-prod { background: var(--red); }
+  .table-wrap { overflow-x: auto; margin: 1rem 0 2rem; border-radius: var(--radius); border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  thead tr { background: var(--surface2); }
+  th { padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); white-space: nowrap; }
+  td { padding: 0.6rem 1rem; border-top: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .badge {
+    display: inline-block;
+    padding: 0.15em 0.55em;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.6;
+  }
+  .badge-req { background: rgba(248,113,113,0.15); color: var(--red); border: 1px solid rgba(248,113,113,0.3); }
+  .badge-opt { background: rgba(52,211,153,0.15); color: var(--green); border: 1px solid rgba(52,211,153,0.3); }
+  .badge-docker { background: rgba(34,211,238,0.12); color: var(--cyan); border: 1px solid rgba(34,211,238,0.25); }
+  .steps { counter-reset: step; list-style: none; padding: 0; }
+  .steps li {
+    counter-increment: step;
+    padding: 0.75rem 0 0.75rem 3rem;
+    position: relative;
+    border-left: 2px solid var(--border);
+    margin-left: 0.75rem;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: -1.1rem;
+    top: 0.7rem;
+    width: 1.6rem;
+    height: 1.6rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    text-align: center;
+  }
+  section { scroll-margin-top: 2rem; }
+  .checklist { list-style: none; padding: 0; }
+  .checklist li { padding: 0.3rem 0 0.3rem 1.75rem; position: relative; }
+  .checklist li::before { content: "☐"; position: absolute; left: 0; color: var(--muted); }
+  .file-structure { font-family: monospace; font-size: 0.85rem; background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem 1.5rem; line-height: 1.8; }
+  .fs-dir { color: var(--accent2); }
+  .fs-file { color: var(--text); }
+  .fs-note { color: var(--muted); }
+  .fs-active { color: var(--green); }
+  .fs-gitignore { color: var(--yellow); }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Headtilts <span>CMS</span></div>
+  <div class="nav-back"><a href="index.html">← Main Docs</a></div>
+
+  <div class="nav-section">Overview</div>
+  <a href="#overview">Introduction</a>
+  <a href="#file-map">File Map</a>
+  <a href="#environments">Three Environments</a>
+
+  <div class="nav-section">Quick Start</div>
+  <a href="#qs-native">Native Dev Setup</a>
+  <a href="#qs-docker">Docker Dev Setup</a>
+  <a href="#switch-script">Switch-Env Script</a>
+
+  <div class="nav-section">Reference</div>
+  <a href="#var-reference">Variable Reference</a>
+  <a href="#var-database">Database</a>
+  <a href="#var-jwt">JWT</a>
+  <a href="#var-api">API &amp; URLs</a>
+  <a href="#var-uploads">File Uploads</a>
+  <a href="#var-smtp">SMTP / Email</a>
+  <a href="#var-docker">Docker</a>
+
+  <div class="nav-section">Server Setup</div>
+  <a href="#staging-setup">Staging Server</a>
+  <a href="#prod-setup">Production Server</a>
+  <a href="#secrets">Secret Generation</a>
+  <a href="#troubleshoot">Troubleshooting</a>
+</nav>
+
+<main>
+
+<section id="overview" class="hero">
+  <h1>Environment Setup</h1>
+  <p class="hero-subtitle">How Headtilts manages configuration across development, staging, and production.</p>
+  <div class="hero-pills">
+    <span class="pill">.env files</span>
+    <span class="pill">Three environments</span>
+    <span class="pill">Switch script</span>
+    <span class="pill">Docker + native dev</span>
+  </div>
+</section>
+
+<h2 id="file-map">File Map</h2>
+<p>All environment files live at the <strong>monorepo root</strong>. The API reads the root <code>.env</code> via <code>--env-file=../../.env</code>; Docker Compose reads it natively.</p>
+
+<div class="file-structure">
+<span class="fs-dir">Headtilts/</span><br>
+├── <span class="fs-gitignore">.env</span>               <span class="fs-note"># ← active config (gitignored — never commit)</span><br>
+├── <span class="fs-file">.env.dev</span>           <span class="fs-note"># development template (tracked)</span><br>
+├── <span class="fs-file">.env.staging</span>       <span class="fs-note"># staging template (tracked)</span><br>
+├── <span class="fs-file">.env.prod</span>          <span class="fs-note"># production template (tracked)</span><br>
+├── <span class="fs-file">.env.example</span>       <span class="fs-note"># full variable reference (tracked)</span><br>
+├── <span class="fs-file">.env.docker</span>        <span class="fs-note"># legacy Docker template (kept for reference)</span><br>
+├── <span class="fs-dir">scripts/</span><br>
+│   └── <span class="fs-file">switch-env.sh</span>      <span class="fs-note"># copies a template → .env</span><br>
+├── <span class="fs-dir">apps/</span><br>
+│   ├── <span class="fs-dir">api/</span><br>
+│   │   └── <span class="fs-file">.env.example</span>   <span class="fs-note"># API-specific subset (reference only)</span><br>
+│   ├── <span class="fs-dir">admin/</span><br>
+│   │   └── <span class="fs-file">.env.example</span>   <span class="fs-note"># VITE_API_URL only</span><br>
+│   └── <span class="fs-dir">web/</span><br>
+│       └── <span class="fs-file">.env.example</span>   <span class="fs-note"># VITE_API_URL + VITE_SITE_NAME</span><br>
+</div>
+
+<div class="alert alert-warn">
+  <strong>Rule:</strong> The root <code>.env</code> is the single source of truth for all services. Sub-package <code>.env.example</code> files document package-specific variables but are not loaded at runtime.
+</div>
+
+<h2 id="environments">Three Environments</h2>
+
+<div class="env-grid">
+  <div class="env-card">
+    <div class="env-card-title"><span class="dot dot-dev"></span> Development</div>
+    <div class="env-card-file">.env.dev</div>
+    <div class="env-card-desc">Local machine. Weak secrets, localhost URLs, MailHog for email. Suitable for native pnpm dev or Docker on port 8080.</div>
+  </div>
+  <div class="env-card">
+    <div class="env-card-title"><span class="dot dot-staging"></span> Staging</div>
+    <div class="env-card-file">.env.staging</div>
+    <div class="env-card-desc">Server mirror of production. Unique credentials and a real domain. Used to validate builds before production promotion.</div>
+  </div>
+  <div class="env-card">
+    <div class="env-card-title"><span class="dot dot-prod"></span> Production</div>
+    <div class="env-card-file">.env.prod</div>
+    <div class="env-card-desc">Live server. Strong random secrets, real domain, real SMTP. File has permissions 600. Never use dev or staging secrets here.</div>
+  </div>
+</div>
+
+<!-- ── Quick start ─────────────────────────────────────────────────────── -->
+<h2 id="qs-native">Quick Start — Native pnpm Dev</h2>
+<ol class="steps">
+  <li>
+    <strong>Copy the dev template</strong>
+    <pre><code>cp .env.dev .env
+# or use the switch script:
+./scripts/switch-env.sh dev</code></pre>
+  </li>
+  <li>
+    <strong>Verify MySQL is running locally</strong>
+    <pre><code># Create the database if it doesn't exist
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS headtilts;
+  CREATE USER IF NOT EXISTS 'headtilts'@'localhost' IDENTIFIED BY 'headtilts';
+  GRANT ALL ON headtilts.* TO 'headtilts'@'localhost';"</code></pre>
+  </li>
+  <li>
+    <strong>Install dependencies and run migrations</strong>
+    <pre><code>pnpm install
+cd apps/api && pnpm prisma migrate deploy && pnpm prisma db seed</code></pre>
+  </li>
+  <li>
+    <strong>Start all services</strong>
+    <pre><code>pnpm dev</code></pre>
+    <p>Web: <code>http://localhost:5173</code> · Admin: <code>http://localhost:5173/admin</code> · API: <code>http://localhost:3000</code></p>
+  </li>
+</ol>
+
+<h2 id="qs-docker">Quick Start — Docker Compose Dev</h2>
+<ol class="steps">
+  <li>
+    <strong>Copy the dev template and set Docker-specific values</strong>
+    <pre><code>./scripts/switch-env.sh dev
+# Then open .env and uncomment the Docker URL lines:
+#   SITE_URL=http://localhost:8080
+#   WEB_URL=http://localhost:8080
+#   ADMIN_URL=http://localhost:8080/admin
+#   VITE_API_URL=/api</code></pre>
+  </li>
+  <li>
+    <strong>Build and start containers</strong>
+    <pre><code>docker compose up -d --build</code></pre>
+  </li>
+  <li>
+    <strong>Seed the database (first run only)</strong>
+    <pre><code>docker compose exec api sh -c "cd apps/api && node_modules/.bin/prisma db seed"</code></pre>
+  </li>
+  <li>
+    <strong>Open the app</strong>
+    <p>Everything on <code>http://localhost:8080</code> (or whatever <code>HTTP_PORT</code> you set).</p>
+  </li>
+</ol>
+
+<!-- ── Switch script ───────────────────────────────────────────────────── -->
+<h2 id="switch-script">The Switch-Env Script</h2>
+<p><code>scripts/switch-env.sh</code> copies a named template to <code>.env</code>, backs up the existing file, and warns about any unfilled <code>CHANGE_ME</code> placeholders.</p>
+
+<pre><code># Show current environment
+./scripts/switch-env.sh
+
+# Switch to a different environment
+./scripts/switch-env.sh dev
+./scripts/switch-env.sh staging
+./scripts/switch-env.sh prod</code></pre>
+
+<p>The script backs up the existing <code>.env</code> as <code>.env.backup.YYYYMMDD_HHMMSS</code> before overwriting, so you never lose the previous configuration.</p>
+
+<div class="alert alert-info">
+  <strong>Tip:</strong> After switching to <code>staging</code> or <code>prod</code>, the script prints every line that still contains <code>CHANGE_ME</code> so you know exactly what to fill in.
+</div>
+
+<!-- ── Variable reference ──────────────────────────────────────────────── -->
+<h2 id="var-reference">Variable Reference</h2>
+<p>All variables are listed here with their allowed values and which environments require them.</p>
+
+<h3 id="var-database">Database</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Variable</th><th>Required</th><th>Description</th><th>Dev default</th></tr></thead>
+<tbody>
+<tr>
+  <td><code>DATABASE_URL</code></td>
+  <td><span class="badge badge-req">Required</span></td>
+  <td>Prisma MySQL connection string. Host is <code>localhost</code> in native dev; <code>mysql</code> inside Docker Compose.</td>
+  <td><code>mysql://headtilts:headtilts@localhost:3306/headtilts</code></td>
+</tr>
+<tr>
+  <td><code>MYSQL_DATABASE</code></td>
+  <td><span class="badge badge-docker">Docker</span></td>
+  <td>Database name for the MySQL container. Must match the database in <code>DATABASE_URL</code>.</td>
+  <td><code>headtilts</code></td>
+</tr>
+<tr>
+  <td><code>MYSQL_USER</code></td>
+  <td><span class="badge badge-docker">Docker</span></td>
+  <td>MySQL application user created by the container. Must match <code>DATABASE_URL</code>.</td>
+  <td><code>headtilts</code></td>
+</tr>
+<tr>
+  <td><code>MYSQL_ROOT_PASSWORD</code></td>
+  <td><span class="badge badge-docker">Docker</span></td>
+  <td>MySQL root password. Only needed by the container — not exposed to the API.</td>
+  <td><em>Set a unique value</em></td>
+</tr>
+<tr>
+  <td><code>MYSQL_PASSWORD</code></td>
+  <td><span class="badge badge-docker">Docker</span></td>
+  <td>Password for <code>MYSQL_USER</code>. Must match <code>DATABASE_URL</code>.</td>
+  <td><em>Set a unique value</em></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3 id="var-jwt">JWT</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Variable</th><th>Required</th><th>Description</th><th>Dev default</th></tr></thead>
+<tbody>
+<tr>
+  <td><code>JWT_SECRET</code></td>
+  <td><span class="badge badge-req">Required</span></td>
+  <td>Signs access tokens (15 min). Changing it invalidates all active sessions.</td>
+  <td><em>Weak dev value</em></td>
+</tr>
+<tr>
+  <td><code>JWT_REFRESH_SECRET</code></td>
+  <td><span class="badge badge-req">Required</span></td>
+  <td>Signs refresh tokens (7 days). Must differ from <code>JWT_SECRET</code>.</td>
+  <td><em>Weak dev value</em></td>
+</tr>
+<tr>
+  <td><code>JWT_EXPIRES_IN</code></td>
+  <td><span class="badge badge-opt">Optional</span></td>
+  <td>Access token lifetime. Uses <a href="https://github.com/vercel/ms">ms</a> format: <code>15m</code>, <code>1h</code>, etc.</td>
+  <td><code>15m</code></td>
+</tr>
+<tr>
+  <td><code>JWT_REFRESH_EXPIRES_IN</code></td>
+  <td><span class="badge badge-opt">Optional</span></td>
+  <td>Refresh token lifetime.</td>
+  <td><code>7d</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3 id="var-api">API Server &amp; URLs</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Variable</th><th>Required</th><th>Description</th><th>Dev default</th></tr></thead>
+<tbody>
+<tr>
+  <td><code>NODE_ENV</code></td>
+  <td><span class="badge badge-req">Required</span></td>
+  <td>Runtime mode. Controls Express error verbosity and Prisma logging. Values: <code>development</code> | <code>staging</code> | <code>production</code>.</td>
+  <td><code>development</code></td>
+</tr>
+<tr>
+  <td><code>API_PORT</code></td>
+  <td><span class="badge badge-opt">Optional</span></td>
+  <td>Internal Express port. Not exposed to the host in Docker (nginx proxies to it).</td>
+  <td><code>3000</code></td>
+</tr>
+<tr>
+  <td><code>SITE_URL</code></td>
+  <td><span class="badge badge-req">Required</span></td>
+  <td>Canonical site URL. Used in email links, canonical tags, and sitemap. No trailing slash.</td>
+  <td><code>http://localhost:5173</code></td>
+</tr>
+<tr>
+  <td><code>WEB_URL</code></td>
+  <td><span class="badge badge-req">Required</span></td>
+  <td>Public website URL. Used in CORS allow-list and redirects.</td>
+  <td><code>http://localhost:5173</code></td>
+</tr>
+<tr>
+  <td><code>ADMIN_URL</code></td>
+  <td><span class="badge badge-req">Required</span></td>
+  <td>Admin panel URL. Typically <code>SITE_URL/admin</code>.</td>
+  <td><code>http://localhost:5173/admin</code></td>
+</tr>
+<tr>
+  <td><code>VITE_API_URL</code></td>
+  <td><span class="badge badge-req">Required</span></td>
+  <td>Build-time URL injected into the React bundles. Use a relative path (<code>/api</code>) when nginx is in front; absolute (<code>http://localhost:3000/api</code>) for native dev without nginx.</td>
+  <td><code>http://localhost:3000/api</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3 id="var-uploads">File Uploads</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Variable</th><th>Required</th><th>Description</th><th>Dev default</th></tr></thead>
+<tbody>
+<tr>
+  <td><code>UPLOAD_DIR</code></td>
+  <td><span class="badge badge-opt">Optional</span></td>
+  <td>Directory where uploaded files and generated image variants are stored. Relative to the <code>apps/api</code> package root in native dev; absolute inside Docker.</td>
+  <td><code>./uploads</code></td>
+</tr>
+<tr>
+  <td><code>MAX_UPLOAD_SIZE</code></td>
+  <td><span class="badge badge-opt">Optional</span></td>
+  <td>Maximum file size accepted by Multer. Uses bytes or shorthand: <code>10mb</code>, <code>50mb</code>, etc.</td>
+  <td><code>10mb</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3 id="var-smtp">SMTP / Email</h3>
+<p>All SMTP variables are optional. When <code>SMTP_HOST</code> is empty, email is disabled and all outgoing messages are logged to the API console instead.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Variable</th><th>Description</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td><code>SMTP_HOST</code></td><td>SMTP server hostname. Leave empty to disable email.</td><td><code>smtp.mailgun.org</code></td></tr>
+<tr><td><code>SMTP_PORT</code></td><td>SMTP port. Typically 587 (STARTTLS) or 465 (SSL).</td><td><code>587</code></td></tr>
+<tr><td><code>SMTP_SECURE</code></td><td><code>true</code> for port 465 SSL; <code>false</code> for port 587 STARTTLS.</td><td><code>false</code></td></tr>
+<tr><td><code>SMTP_USER</code></td><td>SMTP authentication username.</td><td><code>postmaster@mg.example.com</code></td></tr>
+<tr><td><code>SMTP_PASS</code></td><td>SMTP authentication password.</td><td><em>API key / password</em></td></tr>
+<tr><td><code>SMTP_FROM</code></td><td>"From" address in emails. Quoted format recommended.</td><td><code>Headtilts &lt;no-reply@example.com&gt;</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3 id="var-docker">Docker</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Variable</th><th>Description</th><th>Default</th></tr></thead>
+<tbody>
+<tr><td><code>HTTP_PORT</code></td><td>Host port that nginx binds to. Change to <code>8080</code> for local Docker dev, <code>80</code> for servers behind a reverse proxy.</td><td><code>80</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ── Staging setup ───────────────────────────────────────────────────── -->
+<h2 id="staging-setup">Setting Up a Staging Server</h2>
+
+<ol class="steps">
+  <li>
+    <strong>Pull the repository on the staging server</strong>
+    <pre><code>git clone https://github.com/your-org/headtilts.git /opt/headtilts
+cd /opt/headtilts</code></pre>
+  </li>
+  <li>
+    <strong>Copy the staging template</strong>
+    <pre><code>cp .env.staging .env
+chmod 600 .env
+nano .env   # replace every CHANGE_ME value</code></pre>
+  </li>
+  <li>
+    <strong>Generate secrets</strong>
+    <pre><code># Paste output into JWT_SECRET and JWT_REFRESH_SECRET
+openssl rand -base64 64</code></pre>
+  </li>
+  <li>
+    <strong>Build and start</strong>
+    <pre><code>docker compose up -d --build
+docker compose exec api sh -c "cd apps/api && node_modules/.bin/prisma migrate deploy"
+docker compose exec api sh -c "cd apps/api && node_modules/.bin/prisma db seed"</code></pre>
+  </li>
+</ol>
+
+<!-- ── Production setup ───────────────────────────────────────────────── -->
+<h2 id="prod-setup">Setting Up Production</h2>
+
+<p>Follow the same steps as staging, but:</p>
+<ul>
+  <li>Use <code>cp .env.prod .env</code> as the starting point.</li>
+  <li>Generate <strong>different</strong> secrets from staging — they must never be shared between environments.</li>
+  <li>Set <code>HTTP_PORT=80</code> if nginx on the host or a load balancer handles HTTPS termination.</li>
+  <li>Set <code>SMTP_HOST</code> to a real transactional mail provider (Mailgun, Postmark, SES, etc.).</li>
+</ul>
+
+<div class="alert alert-danger">
+  <strong>Never</strong> copy staging <code>JWT_SECRET</code> or database credentials to production. Generate fresh secrets for each environment.
+</div>
+
+<h4>Pre-go-live checklist</h4>
+<ul class="checklist">
+  <li><code>NODE_ENV=production</code></li>
+  <li><code>JWT_SECRET</code> and <code>JWT_REFRESH_SECRET</code> are unique 64+ character random strings</li>
+  <li>Database password is strong and not shared with staging/dev</li>
+  <li><code>SITE_URL</code>, <code>WEB_URL</code>, <code>ADMIN_URL</code> point to your live domain with correct protocol (<code>https://</code>)</li>
+  <li><code>VITE_API_URL=/api</code> (relative — nginx handles routing)</li>
+  <li><code>SMTP_HOST</code> set to a real SMTP provider</li>
+  <li><code>.env</code> file permissions are <code>600</code>: <code>chmod 600 .env</code></li>
+  <li>No <code>CHANGE_ME</code> placeholders remain: <code>grep CHANGE_ME .env</code></li>
+</ul>
+
+<!-- ── Secrets ────────────────────────────────────────────────────────── -->
+<h2 id="secrets">Generating Strong Secrets</h2>
+<pre><code># 64-byte base64 string (recommended for JWT secrets)
+openssl rand -base64 64
+
+# 32-byte hex string (alternative)
+openssl rand -hex 32
+
+# Example output (do not use these):
+# JWT_SECRET=Hk3mXq9...
+# JWT_REFRESH_SECRET=Zp7rNw2...</code></pre>
+
+<p>Generate a <strong>separate</strong> value for <code>JWT_SECRET</code> and <code>JWT_REFRESH_SECRET</code>. Never reuse a secret across environments.</p>
+
+<!-- ── Troubleshooting ─────────────────────────────────────────────────── -->
+<h2 id="troubleshoot">Troubleshooting</h2>
+
+<h3>API won't connect to MySQL</h3>
+<ul>
+  <li>In Docker: host must be <code>mysql</code> (not <code>localhost</code>) in <code>DATABASE_URL</code>.</li>
+  <li>In native dev: host is <code>localhost</code>. Verify MySQL is running: <code>mysql -u headtilts -p headtilts</code>.</li>
+  <li>Check the MySQL container health: <code>docker compose ps</code> — it takes ~30 s to become healthy.</li>
+</ul>
+
+<h3>Admin shows wrong API URL</h3>
+<p><code>VITE_API_URL</code> is baked into the frontend bundle at build time. After changing it you must rebuild:</p>
+<pre><code>docker compose up -d --build admin</code></pre>
+
+<h3>Email not sending</h3>
+<ul>
+  <li>If <code>SMTP_HOST</code> is empty, email is intentionally disabled — look for log output in the API console.</li>
+  <li>For local testing, start MailHog (<code>docker compose up mailhog</code>) and set <code>SMTP_HOST=localhost SMTP_PORT=1025</code>. MailHog UI: <code>http://localhost:8025</code>.</li>
+</ul>
+
+<h3>Sessions invalidated after restart</h3>
+<p>Changing <code>JWT_SECRET</code> or <code>JWT_REFRESH_SECRET</code> invalidates all existing tokens — users are logged out. This is intentional; rotate secrets only when necessary.</p>
+
+<h3>switch-env.sh: permission denied</h3>
+<pre><code>chmod +x scripts/switch-env.sh</code></pre>
+
+</main>
+</body>
+</html>

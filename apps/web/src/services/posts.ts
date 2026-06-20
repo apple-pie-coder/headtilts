@@ -92,22 +92,3 @@ export interface SeriesInfo {
 export function fetchPostSeries(slug: string): Promise<SeriesInfo | null> {
   return get(`/public/posts/${slug}/series`);
 }
-
-export interface SearchResult {
-  items: {
-    id: number;
-    title: string;
-    slug: string;
-    excerpt: string | null;
-    publishedAt: string | null;
-    featuredImage: string | null;
-    author: { username: string; firstName: string | null; lastName: string | null } | null;
-    categories: { category: { name: string; slug: string } }[];
-  }[];
-  pagination: { total: number; page: number; limit: number; pages: number };
-  query: string;
-}
-
-export function searchPosts(q: string, page?: number): Promise<SearchResult> {
-  return get('/public/search', { q, page });
-}

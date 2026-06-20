@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faDesktop, faSun, faMoon, faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
+import { faDesktop, faSun, faMoon } from '@fortawesome/free-solid-svg-icons';
 import { fetchMenu } from '../services/taxonomy';
 import { resolveMediaUrl } from '../services/api';
 import { MenuItem } from '../types';
@@ -11,6 +11,7 @@ import { useSiteSettings } from '../context/SiteSettingsContext';
 import { useTheme, ThemeMode } from '../context/ThemeContext';
 import { useLayout } from '../context/LayoutContext';
 import { applyRobotsPolicy } from '../utils/seo';
+import { SearchBar } from './SearchBar';
 
 const THEME_OPTIONS: { value: ThemeMode; icon: typeof faSun; label: string }[] = [
   { value: 'system', icon: faDesktop, label: 'System' },
@@ -120,9 +121,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
                   </NavLink>
                 ))}
               </nav>
-              <Link to="/search" className="nav-search-link" aria-label="Search" title="Search">
-                <FontAwesomeIcon icon={faMagnifyingGlass} />
-              </Link>
+              <SearchBar />
               <ThemeSwitch />
               <button
                 type="button"

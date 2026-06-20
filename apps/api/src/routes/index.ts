@@ -17,6 +17,7 @@ import notificationRoutes from './notifications.routes';
 import celebrationRoutes from './celebrations.routes';
 import pollRoutes from './polls.routes';
 import apiKeyRoutes from './apiKey.routes';
+import apiAnalyticsRoutes from './apiAnalytics.routes';
 import redirectRoutes from './redirects.routes';
 import publicRoutes from './public.routes';
 
@@ -40,6 +41,7 @@ router.use('/notifications', notificationRoutes);
 router.use('/celebrations', celebrationRoutes);
 router.use('/polls', pollRoutes);
 router.use('/api-keys', apiKeyRoutes);
+router.use('/api-analytics', apiAnalyticsRoutes);
 router.use('/redirects', redirectRoutes);
 router.use('/public', publicRoutes);
 

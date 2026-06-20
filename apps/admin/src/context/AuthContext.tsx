@@ -15,6 +15,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUser();
   }, []);
 
+  // Listen for token refresh events from the API interceptor
+  useEffect(() => {
+    function handleUserRefreshed(e: Event) {
+      const freshUser = (e as CustomEvent).detail?.user;
+      if (freshUser) setUser(freshUser);
+    }
+    window.addEventListener('auth:userRefreshed', handleUserRefreshed);
+    return () => window.removeEventListener('auth:userRefreshed', handleUserRefreshed);
+  }, []);
+
   async function loadUser() {
     const token = localStorage.getItem('accessToken');
     if (!token) {

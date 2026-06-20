@@ -8,8 +8,8 @@ const router: IRouter = Router();
 
 router.use(authenticate);
 
-router.get('/', requirePermission(PERMISSIONS.SETTING_READ), asyncHandler(contactController.list));
-router.put('/:id/read', requirePermission(PERMISSIONS.SETTING_EDIT), asyncHandler(contactController.markRead));
-router.delete('/:id', requirePermission(PERMISSIONS.SETTING_EDIT), asyncHandler(contactController.remove));
+router.get('/', requirePermission(PERMISSIONS.CONTACT_READ), asyncHandler(contactController.list));
+router.put('/:id/read', requirePermission(PERMISSIONS.CONTACT_MANAGE), asyncHandler(contactController.markRead));
+router.delete('/:id', requirePermission(PERMISSIONS.CONTACT_MANAGE), asyncHandler(contactController.remove));
 
 export default router;

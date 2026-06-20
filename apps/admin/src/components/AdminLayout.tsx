@@ -6,7 +6,7 @@ import {
   faGaugeHigh, faPenToSquare, faFileLines, faImages, faComments, faLayerGroup,
   faTags, faBars, faPuzzlePiece, faUsers, faUserShield, faSitemap, faEnvelope,
   faGear, faSliders, faChevronDown, faFeather, faRightFromBracket, faSun, faMoon, faDesktop,
-  faCakeCandles, faChartBar, faKey, faArrowRight,
+  faCakeCandles, faChartBar, faKey, faArrowRight, faChartLine, faChartPie,
 } from '@fortawesome/free-solid-svg-icons';
 import type { ThemeMode } from '../context/ThemeContext';
 import { useAuth } from '../hooks/useAuth';
@@ -20,6 +20,7 @@ interface NavItem {
   label: string;
   to: string;
   icon: IconDefinition;
+  permission?: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -33,10 +34,11 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Celebrations', to: '/admin/celebrations', icon: faCakeCandles },
   { label: 'Polls', to: '/admin/polls', icon: faChartBar },
   { label: 'Contact', to: '/admin/contact', icon: faEnvelope },
+  { label: 'Analytics', to: '/admin/analytics', icon: faChartPie },
 ];
 
 // Grouped under the collapsible "Settings" section.
-const SETTINGS_ITEMS: NavItem[] = [
+const SETTINGS_ITEMS = [
   { label: 'General', to: '/admin/settings', icon: faSliders },
   { label: 'API Keys', to: '/admin/api-keys', icon: faKey },
   { label: 'Users', to: '/admin/users', icon: faUsers },
@@ -45,6 +47,7 @@ const SETTINGS_ITEMS: NavItem[] = [
   { label: 'Widgets', to: '/admin/widgets', icon: faPuzzlePiece },
   { label: 'Sitemap', to: '/admin/sitemap', icon: faSitemap },
   { label: 'Redirects', to: '/admin/redirects', icon: faArrowRight },
+  { label: 'API Analytics', to: '/admin/api-analytics', icon: faChartLine },
 ];
 
 interface AdminLayoutProps {

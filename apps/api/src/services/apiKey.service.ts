@@ -105,5 +105,5 @@ export async function validateApiKey(raw: string) {
   );
   const scopes = JSON.parse(record.scopes) as string[];
 
-  return { record, userId: record.userId, permissions, scopes };
+  return { id: record.id, record, userId: record.userId, permissions, scopes };
 }

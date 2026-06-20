@@ -61,6 +61,9 @@ export function CategoryArchivePage() {
         <p className="archive-label">Category</p>
         <h1 className="page-title">{category?.name || slug}</h1>
         {category?.description && <p className="archive-description">{category.description}</p>}
+        {!loading && pagination && (
+          <p className="archive-count">{pagination.total} post{pagination.total !== 1 ? 's' : ''}</p>
+        )}
       </div>
 
       {error && <div className="alert-error">{error}</div>}

@@ -1,4 +1,4 @@
-import { DragEvent, FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { DragEvent, FormEvent, ReactNode, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -144,6 +144,7 @@ export default function DashboardPage() {
   const [draftContent, setDraftContent] = useState('');
   const [draftSaving, setDraftSaving] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const canCreatePost = hasPermission(PERMISSIONS.POST_CREATE);
   const canViewUsers = hasPermission(PERMISSIONS.USER_READ);
@@ -173,7 +174,9 @@ export default function DashboardPage() {
   const [hidden, setHidden] = useState<Set<PodId>>(() => reconcileLayout(user?.id, availableIds).hidden);
   const [showCustomize, setShowCustomize] = useState(false);
   const [dragId, setDragId] = useState<PodId | null>(null);
-  const [overId, setOverId] = useState<PodId | null>(null);
+  // insertPoint tracks *where* the dragged card will land:
+  // { id: target pod, position: 'before' | 'after' } or null when not over a valid target
+  const [insertPoint, setInsertPoint] = useState<{ id: PodId; position: 'before' | 'after' } | null>(null);
   const didMountRef = useRef(false);
   const customizeRef = useRef<HTMLDivElement>(null);
 
@@ -226,30 +229,61 @@ export default function DashboardPage() {
     }
   }
 
-  // ── Drag-and-drop reordering (reorder on drop; drag-enter only highlights) ──
-  function handleDragEnterPod(id: PodId) {
-    if (dragId && dragId !== id) setOverId(id);
-  }
+  // ── Drag-and-drop reordering ──
+  // Position-aware: detects whether the cursor is on the top or bottom half of
+  // the target pod to show an insertion line above or below it.
 
-  function handleDropOnPod(target: PodId) {
-    if (dragId && dragId !== target) {
-      const from = order.indexOf(dragId);
-      const to = order.indexOf(target);
-      if (from !== -1 && to !== -1) {
+  const handleDragOverPod = useCallback(
+    (e: DragEvent<HTMLElement>, id: PodId) => {
+      if (!dragId || dragId === id) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const rect = e.currentTarget.getBoundingClientRect();
+      const position: 'before' | 'after' = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+      setInsertPoint((prev) =>
+        prev?.id === id && prev?.position === position ? prev : { id, position },
+      );
+    },
+    [dragId],
+  );
+
+  const handleDropOnPod = useCallback(
+    (e: DragEvent<HTMLElement>, target: PodId) => {
+      e.preventDefault();
+      if (dragId && dragId !== target && insertPoint) {
         const next = order.filter((x) => x !== dragId);
         const targetIdx = next.indexOf(target);
-        // Dropping a pod onto another places it just after that pod when moving
-        // down the list, or just before it when moving up — the natural feel.
-        next.splice(from < to ? targetIdx + 1 : targetIdx, 0, dragId);
-        setOrder(next);
-        writeLayout(user?.id, next, hidden);
+        if (targetIdx !== -1) {
+          const insertIdx = insertPoint.position === 'before' ? targetIdx : targetIdx + 1;
+          next.splice(insertIdx, 0, dragId);
+          setOrder(next);
+          writeLayout(user?.id, next, hidden);
+        }
       }
-    }
-    handleDragEnd();
-  }
+      handleDragEnd();
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dragId, insertPoint, order, hidden, user?.id],
+  );
+
+  // Drop at the very end of the list (after all visible pods)
+  const handleDropAtEnd = useCallback(
+    (e: DragEvent<HTMLElement>) => {
+      e.preventDefault();
+      if (!dragId) return;
+      const next = order.filter((x) => x !== dragId);
+      next.push(dragId);
+      setOrder(next);
+      writeLayout(user?.id, next, hidden);
+      handleDragEnd();
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dragId, order, hidden, user?.id],
+  );
 
   function handleHandleDragStart(e: DragEvent<HTMLButtonElement>, id: PodId) {
     setDragId(id);
+    setIsDragging(true);
     e.dataTransfer.effectAllowed = 'move';
     const card = (e.currentTarget.closest(`.${styles.pod}`) as HTMLElement | null);
     if (card) e.dataTransfer.setDragImage(card, 24, 24);
@@ -257,7 +291,8 @@ export default function DashboardPage() {
 
   function handleDragEnd() {
     setDragId(null);
-    setOverId(null);
+    setInsertPoint(null);
+    setIsDragging(false);
   }
 
   // ── Show/hide ──
@@ -678,7 +713,15 @@ export default function DashboardPage() {
           All pods are hidden. Open <strong>Customize</strong> to bring some back.
         </div>
       ) : (
-        <div className={styles.podGrid}>
+        <div
+          className={styles.podGrid}
+          onDragLeave={(e) => {
+            // Clear insertPoint only when leaving the entire grid (not just a child)
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+              setInsertPoint(null);
+            }
+          }}
+        >
           {visiblePods.map((id) => (
             <section
               key={id}
@@ -686,11 +729,11 @@ export default function DashboardPage() {
                 styles.pod,
                 id === 'stats' ? styles.podWide : '',
                 dragId === id ? styles.podDragging : '',
-                overId === id && dragId && dragId !== id ? styles.podOver : '',
+                insertPoint?.id === id && insertPoint.position === 'before' ? styles.podInsertBefore : '',
+                insertPoint?.id === id && insertPoint.position === 'after' ? styles.podInsertAfter : '',
               ].filter(Boolean).join(' ')}
-              onDragOver={(e) => e.preventDefault()}
-              onDragEnter={() => handleDragEnterPod(id)}
-              onDrop={(e) => { e.preventDefault(); handleDropOnPod(id); }}
+              onDragOver={(e) => handleDragOverPod(e, id)}
+              onDrop={(e) => handleDropOnPod(e, id)}
             >
               <div className={styles.podHeader}>
                 <button
@@ -710,6 +753,16 @@ export default function DashboardPage() {
               <div className={styles.podBody}>{renderPodBody(id)}</div>
             </section>
           ))}
+
+          {/* Drop zone at the end — lets users append a card after all others */}
+          {isDragging && (
+            <div
+              className={styles.dropZoneEnd}
+              onDragOver={(e) => { e.preventDefault(); setInsertPoint(null); }}
+              onDrop={handleDropAtEnd}
+              aria-label="Drop here to move to end"
+            />
+          )}
         </div>
       )}
     </AdminLayout>

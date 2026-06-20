@@ -15,6 +15,7 @@ import { AuthorPage } from './pages/AuthorPage';
 import PollPage from './pages/PollPage';
 import PollsListPage from './pages/PollsListPage';
 import { SearchPage } from './pages/SearchPage';
+import { RedirectGate } from './components/RedirectGate';
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
     <SiteSettingsProvider>
     <LayoutProvider>
     <Router>
+      <RedirectGate>
       <SiteLayout>
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -41,6 +43,7 @@ export default function App() {
           <Route path="*" element={<PermalinkPage />} />
         </Routes>
       </SiteLayout>
+      </RedirectGate>
     </Router>
     </LayoutProvider>
     </SiteSettingsProvider>

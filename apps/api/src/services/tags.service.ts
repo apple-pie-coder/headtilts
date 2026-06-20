@@ -32,6 +32,7 @@ export async function listTags(page: number, limit: number, search?: string) {
   const [tags, total] = await Promise.all([
     prisma.tag.findMany({
       where,
+      include: { _count: { select: { posts: true } } },
       orderBy: { name: 'asc' },
       skip: (page - 1) * limit,
       take: limit,

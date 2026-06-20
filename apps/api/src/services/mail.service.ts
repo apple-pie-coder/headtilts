@@ -20,9 +20,12 @@ interface SmtpConfig {
 async function getSmtpConfig(): Promise<SmtpConfig | null> {
   // DB settings take priority; fall back to environment variables
   try {
-    const keys = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'smtp_from'];
+    const keys = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'smtp_from', 'smtp_enabled'];
     const rows = await prisma.setting.findMany({ where: { key: { in: keys } } });
     const db: Record<string, string> = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+
+    // Honour the global enable/disable toggle (defaults to enabled when not set)
+    if (db.smtp_enabled === 'false') return null;
 
     const host = db.smtp_host || process.env.SMTP_HOST || '';
     if (!host) return null;

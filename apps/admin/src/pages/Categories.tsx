@@ -6,6 +6,9 @@ import { useToast } from '../components/ToastContext';
 import { CategoryForm } from '../components/CategoryForm';
 import { Category } from '../types';
 import { deleteCategory, fetchCategories } from '../services/categories';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
+import { useDensity } from '../hooks/useDensity';
 import styles from './Categories.module.css';
 
 const PAGE_SIZE = 10;
@@ -21,6 +24,7 @@ export default function CategoriesPage() {
   const [loading, setLoading] = useState(true);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [formKey, setFormKey] = useState(0);
+  const [density, setDensity] = useDensity('categoriesDensity');
 
   useEffect(() => {
     loadAllCategories();
@@ -112,17 +116,23 @@ export default function CategoriesPage() {
                 }}
               />
             </div>
+            <div className={styles.densitySwitch} role="group" aria-label="List density">
+              <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
+              <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
+              <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
+            </div>
           </div>
 
 
           <div className={styles.tableWrapper}>
-            <table>
+            <table className={styles[`density_${density}`]}>
               <thead>
                 <tr>
                   <th>Name</th>
                   <th>Slug</th>
                   <th>Parent</th>
                   <th>Description</th>
+                  <th className={styles.countCell}>Posts</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -135,23 +145,18 @@ export default function CategoriesPage() {
                       className={isSubcategory ? styles.subcategoryRow : undefined}
                     >
                       <td>
-                        <span className={isSubcategory ? styles.subcategoryName : styles.categoryName}>
+                        <span className={isSubcategory ? styles.subcategoryName : undefined}>
                           {isSubcategory && <span className={styles.nestingMark} aria-hidden="true" />}
                           {category.icon && <span className={styles.icon}>{category.icon}</span>}
                           {category.name}
                         </span>
-                        {!isSubcategory && (
-                          <span className={styles.parentBadge}>Category</span>
-                        )}
-                        {isSubcategory && (
-                          <span className={styles.subcategoryBadge}>Subcategory</span>
-                        )}
                       </td>
                       <td>
                         <code className={styles.slug}>{category.slug}</code>
                       </td>
                       <td>{category.parent?.name || '—'}</td>
                       <td className={styles.description}>{category.description || '—'}</td>
+                      <td className={styles.countCell}>{category._count?.posts ?? '—'}</td>
                       <td className={styles.actions}>
                         <button onClick={() => setEditingCategory(category)}>Edit</button>
                         <button className={styles.deleteButton} onClick={() => handleDelete(category)}>

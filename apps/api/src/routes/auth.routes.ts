@@ -10,6 +10,7 @@ router.get('/setup-status', asyncHandler(authController.setupStatus));
 router.post('/setup', authLimiter, asyncHandler(authController.setup));
 router.post('/register', authLimiter, asyncHandler(authController.register));
 router.post('/login', authLimiter, asyncHandler(authController.login));
+router.post('/refresh', authLimiter, asyncHandler(authController.refresh));
 router.post('/forgot-password', authLimiter, asyncHandler(authController.forgotPassword));
 router.post('/reset-password', authLimiter, asyncHandler(authController.resetPassword));
 router.post('/logout', authenticate, asyncHandler(authController.logout));

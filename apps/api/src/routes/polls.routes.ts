@@ -19,6 +19,12 @@ router.get('/', requirePermission(PERMISSIONS.POLL_READ), asyncHandler(async (re
   sendPaginatedSuccess(res, items, total, page, limit);
 }));
 
+// Analytics overview — must be before /:id
+router.get('/analytics', requirePermission(PERMISSIONS.POLL_READ), asyncHandler(async (_req: Request, res: Response) => {
+  const data = await pollsService.getPollAnalytics();
+  sendSuccess(res, data);
+}));
+
 // Get one
 router.get('/:id', requirePermission(PERMISSIONS.POLL_READ), asyncHandler(async (req: Request, res: Response) => {
   try {

@@ -10,5 +10,6 @@ router.use(authenticate);
 
 router.get('/', requirePermission(PERMISSIONS.SETTING_READ), asyncHandler(settingsController.list));
 router.put('/', requirePermission(PERMISSIONS.SETTING_EDIT), asyncHandler(settingsController.update));
+router.post('/test-email', requirePermission(PERMISSIONS.SETTING_EDIT), asyncHandler(settingsController.testEmail));
 
 export default router;
