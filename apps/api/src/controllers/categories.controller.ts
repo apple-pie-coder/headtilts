@@ -14,7 +14,7 @@ function handleError(res: Response, error: unknown): void {
 export async function list(req: Request, res: Response): Promise<void> {
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
+    const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 10));
     const search = typeof req.query.search === 'string' ? req.query.search : undefined;
 
     const { items, total } = await categoriesService.listCategories(page, limit, search);

@@ -2,6 +2,8 @@
   position: fixed;
   inset: 0;
   background: var(--overlay);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -120,7 +122,7 @@
   border: none;
   background: transparent;
   border-radius: var(--r-xs);
-  color: var(--t3);
+  color: var(--danger);
   font-size: 0.9375rem;
   display: flex;
   align-items: center;
@@ -130,7 +132,7 @@
   transition: background var(--ease), color var(--ease);
 }
 
-.closeBtn:hover { background: var(--ghost-h); color: var(--t1); }
+.closeBtn:hover { background: var(--danger-bg); color: var(--danger-h); }
 
 /* ── Upload strip ── */
 

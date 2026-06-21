@@ -178,8 +178,8 @@ export default function SitemapPage() {
 
       {/* Modal */}
       {modal && (
-        <div className={styles.overlay} onClick={closeModal}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.overlay}>
+          <div className={styles.modal}>
             <div className={styles.modalHeader}>
               <h3>{modal.mode === 'create' ? 'Add Sitemap Entry' : 'Edit Entry'}</h3>
               <button className={styles.closeBtn} onClick={closeModal}><FontAwesomeIcon icon={faXmark} /></button>

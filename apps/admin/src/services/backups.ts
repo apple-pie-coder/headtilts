@@ -1,0 +1,82 @@
+import { apiClient } from './api';
+
+export interface Backup {
+  id: number;
+  filename: string;
+  label: string | null;
+  sizeBytes: number;
+  status: 'pending' | 'ready' | 'failed';
+  errorMsg: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface BackupSettings {
+  schedule: 'disabled' | 'daily' | 'weekly';
+  scheduleTime: string;
+  scheduleDay: number;
+  retentionDays: number;
+  retentionCount: number;
+  notifyEmail: string;
+  preRestoreBackup: boolean;
+  storage: 'local' | 's3';
+  s3Bucket: string;
+  s3Region: string;
+  s3AccessKey: string;
+  s3SecretKey: string;
+  s3Endpoint: string;
+}
+
+export type RestoreScope = 'all' | 'db' | 'uploads';
+
+export async function listBackups(): Promise<Backup[]> {
+  const res = await apiClient.get('/backups');
+  return res.data.data;
+}
+
+export async function createBackup(label?: string): Promise<{ id: number; status: string }> {
+  const res = await apiClient.post('/backups', { label });
+  return res.data.data;
+}
+
+export async function pollBackup(id: number): Promise<Backup> {
+  const res = await apiClient.get(`/backups/${id}`);
+  return res.data.data;
+}
+
+export async function deleteBackup(id: number): Promise<void> {
+  await apiClient.delete(`/backups/${id}`);
+}
+
+export function downloadUrl(id: number): string {
+  const base = (import.meta.env.VITE_API_URL as string) || '/api';
+  const token = localStorage.getItem('accessToken') ?? '';
+  return `${base}/backups/${id}/download?token=${encodeURIComponent(token)}`;
+}
+
+export async function restoreBackup(id: number, scope: RestoreScope = 'all'): Promise<void> {
+  await apiClient.post(`/backups/${id}/restore`, { scope });
+}
+
+export async function verifyBackup(id: number): Promise<{ valid: boolean; manifest: object | null; error?: string }> {
+  const res = await apiClient.post(`/backups/${id}/verify`);
+  return res.data.data;
+}
+
+export async function uploadBackup(file: File): Promise<Backup> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await apiClient.post('/backups/upload', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data.data;
+}
+
+export async function getBackupSettings(): Promise<BackupSettings> {
+  const res = await apiClient.get('/backups/settings');
+  return res.data.data;
+}
+
+export async function updateBackupSettings(settings: Partial<Record<string, string>>): Promise<void> {
+  await apiClient.put('/backups/settings', settings);
+}

@@ -19,6 +19,9 @@ import pollRoutes from './polls.routes';
 import apiKeyRoutes from './apiKey.routes';
 import apiAnalyticsRoutes from './apiAnalytics.routes';
 import redirectRoutes from './redirects.routes';
+import backupRoutes from './backup.routes';
+import logsRoutes from './logs.routes';
+import healthRoutes from './health.routes';
 import publicRoutes from './public.routes';
 
 const router: IRouter = Router();
@@ -43,6 +46,9 @@ router.use('/polls', pollRoutes);
 router.use('/api-keys', apiKeyRoutes);
 router.use('/api-analytics', apiAnalyticsRoutes);
 router.use('/redirects', redirectRoutes);
+router.use('/backups', backupRoutes);
+router.use('/logs', logsRoutes);
+router.use('/health', healthRoutes);
 router.use('/public', publicRoutes);
 
 export default router;

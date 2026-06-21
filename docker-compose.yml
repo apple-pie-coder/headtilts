@@ -67,6 +67,7 @@ services:
       SMTP_FROM: ${SMTP_FROM:-}
     volumes:
       - uploads_data:/app/apps/api/uploads
+      - backups_data:/app/apps/api/backups
     networks:
       - internal
 
@@ -116,6 +117,7 @@ services:
 volumes:
   mysql_data:
   uploads_data:
+  backups_data:
 
 networks:
   internal:

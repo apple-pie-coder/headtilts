@@ -17,6 +17,7 @@ export interface Poll {
   resultVisibility: string;
   voterRestriction: string;
   allowVoteChange: boolean;
+  showSidebar: boolean;
   startsAt: string | null;
   endsAt: string | null;
   featuredImage: string | null;
@@ -37,6 +38,7 @@ export interface PollInput {
   resultVisibility?: string;
   voterRestriction?: string;
   allowVoteChange?: boolean;
+  showSidebar?: boolean;
   startsAt?: string | null;
   endsAt?: string | null;
   featuredImage?: string | null;
@@ -115,4 +117,34 @@ export async function resetPollVotes(id: number) {
 export function exportPollUrl(id: number) {
   const base = (import.meta.env.VITE_API_URL as string) || '/api';
   return `${base}/polls/${id}/export`;
+}
+
+export interface PollShareClick {
+  id: number;
+  shareId: number;
+  name: string | null;
+  gender: string | null;
+  age: number | null;
+  clickedAt: string;
+}
+
+export interface PollShare {
+  id: number;
+  pollId: number;
+  token: string;
+  sharerIdentifier: string | null;
+  recipientEmail: string | null;
+  recipientName: string | null;
+  note: string | null;
+  channel: string;
+  clicks: number;
+  firstClickAt: string | null;
+  lastClickAt: string | null;
+  createdAt: string;
+  clickDetails: PollShareClick[];
+}
+
+export async function fetchPollShares(pollId: number): Promise<PollShare[]> {
+  const res = await apiClient.get(`/polls/${pollId}/shares`);
+  return res.data.data as PollShare[];
 }

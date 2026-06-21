@@ -118,6 +118,8 @@ tr:last-child td { border-bottom: none; }
   position: fixed;
   inset: 0;
   background: var(--overlay);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -160,12 +162,12 @@ tr:last-child td { border-bottom: none; }
   border: none;
   background: var(--ghost);
   border-radius: var(--r-xs);
-  color: var(--t2);
+  color: var(--danger);
   font-size: 0.875rem;
-  transition: background var(--ease);
+  transition: background var(--ease), color var(--ease);
 }
 
-.closeBtn:hover { background: var(--ghost-h); color: var(--t1); }
+.closeBtn:hover { background: var(--danger-bg); color: var(--danger-h); }
 
 .formError {
   background: var(--danger-bg);

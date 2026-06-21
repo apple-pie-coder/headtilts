@@ -387,6 +387,7 @@ export default function MediaPage() {
                   type="text"
                   placeholder="Search media..."
                   value={search}
+                  autoFocus
                   onChange={(e) => { setPage(1); setSearch(e.target.value); }}
                 />
               </div>

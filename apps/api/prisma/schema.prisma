@@ -18,6 +18,12 @@ model User {
   lastName      String?
   avatar        String?
   bio           String?  @db.Text
+  website       String?
+  location      String?
+  twitterUrl    String?
+  linkedinUrl   String?
+  githubUrl     String?
+  instagramUrl  String?
   isActive      Boolean  @default(true)
   mfaEnabled    Boolean  @default(false)
   mfaSecret     String?
@@ -537,6 +543,7 @@ model Poll {
   resultVisibility  String               @default("after_vote")
   voterRestriction  String               @default("anonymous")
   allowVoteChange   Boolean              @default(false)
+  showSidebar       Boolean              @default(false)
   startsAt          DateTime?
   endsAt            DateTime?
   featuredImage     String?
@@ -544,12 +551,46 @@ model Poll {
   post              Post?                @relation(fields: [postId], references: [id], onDelete: SetNull)
   options           PollOption[]
   votes             PollVote[]
+  shares            PollShare[]
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
 
   @@index([slug])
   @@index([status])
   @@index([postId])
+}
+
+model PollShare {
+  id                Int              @id @default(autoincrement())
+  pollId            Int
+  poll              Poll             @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  token             String           @unique
+  sharerIdentifier  String?
+  recipientEmail    String?
+  recipientName     String?
+  note              String?          @db.Text
+  channel           String           @default("link")
+  clicks            Int              @default(0)
+  firstClickAt      DateTime?
+  lastClickAt       DateTime?
+  createdAt         DateTime         @default(now())
+  clickDetails      PollShareClick[]
+
+  @@index([pollId])
+  @@index([token])
+  @@index([sharerIdentifier])
+}
+
+model PollShareClick {
+  id        Int       @id @default(autoincrement())
+  shareId   Int
+  share     PollShare @relation(fields: [shareId], references: [id], onDelete: Cascade)
+  name      String?
+  gender    String?
+  age       Int?
+  clickedAt DateTime  @default(now())
+
+  @@index([shareId])
 }
 
 model PollOption {
@@ -673,4 +714,50 @@ model ApiKeyUsageLog {
   @@index([apiKeyId, createdAt])
   @@index([createdAt])
   @@index([endpoint, createdAt])
+}
+
+// ===================== Backups =====================
+
+model Backup {
+  id          Int       @id @default(autoincrement())
+  filename    String    @unique
+  label       String?
+  sizeBytes   BigInt    @default(0)
+  status      String    @default("pending") // pending | ready | failed
+  errorMsg    String?   @db.Text
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ===================== Activity Logs =====================
+
+model ActivityLog {
+  id          Int      @id @default(autoincrement())
+  timestamp   DateTime @default(now()) @db.DateTime(6)
+  site        String   @db.VarChar(20)
+  level       String   @db.VarChar(10)
+  category    String   @db.VarChar(40)
+  action      String   @db.VarChar(80)
+  actorId     String?  @db.VarChar(36)
+  actorEmail  String?  @db.VarChar(255)
+  targetType  String?  @db.VarChar(40)
+  targetId    String?  @db.VarChar(40)
+  targetTitle String?  @db.VarChar(255)
+  ip          String?  @db.VarChar(45)
+  userAgent   String?  @db.VarChar(500)
+  path        String?  @db.VarChar(500)
+  method      String?  @db.VarChar(10)
+  statusCode  Int?
+  duration    Int?
+  meta        Json?
+
+  @@index([timestamp])
+  @@index([site, timestamp])
+  @@index([level, timestamp])
+  @@index([category, timestamp])
+  @@index([actorId, timestamp])
+  @@index([action, timestamp])
 }

@@ -234,3 +234,19 @@
   background: var(--surface2, #2c2c2e);
   border-color: var(--border, #3a3a3c);
 }
+
+:global(.dark) .iconBtn,
+:global([data-theme="dark"]) .iconBtn {
+  color: #f5f5f7;
+}
+
+:global(.dark) .iconBtn:hover,
+:global([data-theme="dark"]) .iconBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #2997ff;
+}
+
+:global(.dark) .searchIcon,
+:global([data-theme="dark"]) .searchIcon {
+  color: #a1a1a6;
+}

@@ -54,15 +54,16 @@
   flex-shrink: 0;
   background: none;
   border: none;
-  color: var(--t3);
+  color: var(--danger);
   font-size: 1.1rem;
   line-height: 1;
   cursor: pointer;
   padding: 0 0.15rem;
   margin: -0.1rem -0.2rem 0 0;
+  transition: color var(--ease);
 }
 
-.close:hover { color: var(--t1); }
+.close:hover { color: var(--danger-h); }
 
 /* Variant accents */
 .success .icon { background: #1d9d50; }

@@ -180,6 +180,7 @@
 }
 
 .optional { color: var(--t3); font-weight: 400; font-size: 0.8125rem; }
+.hint { margin: 0.25rem 0 0; font-size: 0.8125rem; color: var(--t3); }
 
 /* ── Publish actions ── */
 
@@ -275,17 +276,17 @@
   width: 32px;
   height: 32px;
   background: transparent;
-  border: 1px solid var(--border);
+  border: 1px solid var(--danger);
   border-radius: var(--r-sm);
-  color: var(--t3);
+  color: var(--danger);
   cursor: pointer;
   flex-shrink: 0;
   transition: color var(--ease), border-color var(--ease), background var(--ease);
 }
 
 .removeOptBtn:hover:not(:disabled) {
-  color: var(--danger);
-  border-color: var(--danger);
+  color: var(--danger-h);
+  border-color: var(--danger-h);
   background: var(--danger-bg);
 }
 

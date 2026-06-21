@@ -18,7 +18,7 @@ import { MediaLibraryModal } from '../components/MediaLibraryModal';
 import { MediaPickerInput } from '../components/MediaPickerInput';
 import { useAuth } from '../hooks/useAuth';
 import { Category, Post } from '../types';
-import { fetchCategories } from '../services/categories';
+import { fetchCategories, createCategory } from '../services/categories';
 import { fetchPolls, Poll } from '../services/polls';
 import { resolveMediaUrl } from '../services/media';
 import { createPost, fetchPost, fetchPosts, fetchPreviewLink, updatePost, fetchAuthorList, PostInput, AuthorListItem } from '../services/posts';
@@ -65,7 +65,6 @@ const QUILL_FORMATS = [
   'align',
   'blockquote', 'code-block',
   'link', 'image', 'video',
-  'style',
 ];
 
 // Extend the built-in image blot to preserve the `style` attribute through
@@ -282,6 +281,10 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   const [tagsInput, setTagsInput] = useState('');
   const [categoryIds, setCategoryIds] = useState<number[]>([]);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatParentId, setNewCatParentId] = useState('');
+  const [newCatSaving, setNewCatSaving] = useState(false);
 
   const [metaTitle, setMetaTitle] = useState('');
   const [metaDescription, setMetaDescription] = useState('');
@@ -426,6 +429,27 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
       setAllCategories(result.items);
     } catch {
       setAllCategories([]);
+    }
+  }
+
+  async function handleAddCategory(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newCatName.trim()) return;
+    setNewCatSaving(true);
+    try {
+      const created = await createCategory({
+        name: newCatName.trim(),
+        parentId: newCatParentId ? Number(newCatParentId) : null,
+      });
+      await loadCategories();
+      setCategoryIds((prev) => [...prev, created.id]);
+      setNewCatName('');
+      setNewCatParentId('');
+      setShowAddCategory(false);
+    } catch {
+      toast.error('Failed to create category');
+    } finally {
+      setNewCatSaving(false);
     }
   }
 
@@ -1217,9 +1241,51 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
 
           {!isPage && (
             <div className={styles.panel}>
-              <h3>Categories</h3>
+              <div className={styles.panelTitleRow}>
+                <h3>Categories</h3>
+                <button
+                  type="button"
+                  className={styles.addCatToggle}
+                  onClick={() => { setShowAddCategory((s) => !s); setNewCatName(''); setNewCatParentId(''); }}
+                  title={showAddCategory ? 'Cancel' : 'Add new category'}
+                >
+                  <FontAwesomeIcon icon={showAddCategory ? faMinus : faPlus} />
+                </button>
+              </div>
+
+              {showAddCategory && (
+                <form onSubmit={handleAddCategory} className={styles.addCatForm}>
+                  <input
+                    className={styles.addCatInput}
+                    type="text"
+                    placeholder="Category name"
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    autoFocus
+                    required
+                    disabled={newCatSaving}
+                  />
+                  {allCategories.length > 0 && (
+                    <select
+                      className={styles.addCatInput}
+                      value={newCatParentId}
+                      onChange={(e) => setNewCatParentId(e.target.value)}
+                      disabled={newCatSaving}
+                    >
+                      <option value="">— No parent —</option>
+                      {allCategories.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  )}
+                  <button type="submit" className={styles.addCatSubmit} disabled={newCatSaving || !newCatName.trim()}>
+                    {newCatSaving ? 'Adding…' : 'Add Category'}
+                  </button>
+                </form>
+              )}
+
               <div className={styles.categoryList}>
-                {categoryTree.length === 0 && <p className={styles.hint}>No categories yet.</p>}
+                {categoryTree.length === 0 && !showAddCategory && <p className={styles.hint}>No categories yet.</p>}
                 {categoryTree.map(({ category, depth }) => (
                   <label key={category.id} className={styles.categoryOption} style={{ paddingLeft: `${depth * 1.25}rem` }}>
                     <input

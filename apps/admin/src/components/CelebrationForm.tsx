@@ -81,6 +81,7 @@ export function CelebrationForm({ celebration, onSaved, onCancel }: CelebrationF
             placeholder="e.g. Freddie Mercury"
             required
             disabled={saving}
+            autoFocus
           />
         </div>
 

@@ -342,12 +342,13 @@
 .folderDelete {
   border: none;
   background: none;
-  color: var(--t3);
+  color: var(--danger);
   cursor: pointer;
   font-size: 1rem;
   padding: 0 0.35rem;
+  transition: color var(--ease);
 }
-.folderDelete:hover { color: var(--danger); }
+.folderDelete:hover { color: var(--danger-h); }
 
 .folderDivider { height: 1px; background: var(--sep); margin: 0.35rem 0; }
 

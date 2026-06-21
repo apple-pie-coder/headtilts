@@ -97,6 +97,13 @@ export const PERMISSIONS = {
   // Contact
   CONTACT_READ: 'contact_read',
   CONTACT_MANAGE: 'contact_manage',
+
+  // Backups
+  SYSTEM_BACKUP: 'system_backup', // create, download, restore, delete backups
+
+  // Activity Logs
+  LOG_READ:   'logs_read',
+  LOG_DELETE: 'logs_delete',
 } as const;
 
 // Default roles with their permissions
@@ -170,6 +177,8 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.REDIRECT_MANAGE,
       PERMISSIONS.CONTACT_READ,
       PERMISSIONS.CONTACT_MANAGE,
+      PERMISSIONS.LOG_READ,
+      PERMISSIONS.LOG_DELETE,
     ],
   },
   EDITOR: {

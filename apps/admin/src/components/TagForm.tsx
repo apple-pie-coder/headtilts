@@ -69,6 +69,7 @@ export function TagForm({ tag, onSaved, onCancel }: TagFormProps) {
             onChange={(e) => handleNameChange(e.target.value)}
             required
             disabled={saving}
+            autoFocus
           />
         </div>
 

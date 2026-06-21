@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AxiosError } from 'axios';
 import { AdminLayout } from '../components/AdminLayout';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -11,48 +11,41 @@ import { faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-sv
 import { useDensity } from '../hooks/useDensity';
 import styles from './Categories.module.css';
 
-const PAGE_SIZE = 10;
+/** Re-order a flat list so each parent is immediately followed by its children. */
+function toTreeOrder(cats: Category[]): Category[] {
+  const byParent = new Map<number | null, Category[]>();
+  for (const c of cats) {
+    const key = c.parentId ?? null;
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key)!.push(c);
+  }
+  function walk(parentId: number | null): Category[] {
+    return (byParent.get(parentId) ?? []).flatMap((c) => [c, ...walk(c.id)]);
+  }
+  return walk(null);
+}
 
 export default function CategoriesPage() {
   const confirm = useConfirm();
   const toast = useToast();
-  const [categories, setCategories] = useState<Category[]>([]);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [formKey, setFormKey] = useState(0);
   const [density, setDensity] = useDensity('categoriesDensity');
 
-  useEffect(() => {
-    loadAllCategories();
-  }, []);
+  useEffect(() => { load(); }, []);
 
-  useEffect(() => {
-    loadCategories();
-  }, [page, search]);
-
-  async function loadAllCategories() {
-    try {
-      const result = await fetchCategories(1, 200);
-      setAllCategories(result.items);
-    } catch {
-      setAllCategories([]);
-    }
-  }
-
-  async function loadCategories() {
+  async function load() {
     setLoading(true);
     try {
-      const result = await fetchCategories(page, PAGE_SIZE, search);
-      setCategories(result.items);
-      setTotal(result.pagination.total);
+      const result = await fetchCategories(1, 500);
+      setAllCategories(result.items);
     } catch (err: unknown) {
       toast.error(
         (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message ||
-          'Failed to load categories'
+          'Failed to load categories',
       );
     } finally {
       setLoading(false);
@@ -60,21 +53,15 @@ export default function CategoriesPage() {
   }
 
   async function handleDelete(category: Category) {
-    if (!(await confirm({ title: 'Delete Category', message: `Delete category "${category.name}"? This cannot be undone.`, confirmLabel: 'Delete', danger: true }))) {
-      return;
-    }
-
+    if (!(await confirm({ title: 'Delete Category', message: `Delete category "${category.name}"? This cannot be undone.`, confirmLabel: 'Delete', danger: true }))) return;
     try {
       await deleteCategory(category.id);
-      if (editingCategory?.id === category.id) {
-        setEditingCategory(null);
-      }
-      await loadCategories();
-      await loadAllCategories();
+      if (editingCategory?.id === category.id) setEditingCategory(null);
+      await load();
     } catch (err: unknown) {
       toast.error(
         (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message ||
-          'Failed to delete category'
+          'Failed to delete category',
       );
     }
   }
@@ -82,11 +69,21 @@ export default function CategoriesPage() {
   function handleSaved() {
     setEditingCategory(null);
     setFormKey((k) => k + 1);
-    loadCategories();
-    loadAllCategories();
+    load();
   }
 
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  // When searching: flat filter across all fields.
+  // When not searching: tree order (parents first, children indented beneath them).
+  const displayCategories = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return toTreeOrder(allCategories);
+    return allCategories.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.slug.toLowerCase().includes(q) ||
+        (c.description ?? '').toLowerCase().includes(q),
+    );
+  }, [allCategories, search]);
 
   return (
     <AdminLayout>
@@ -110,19 +107,15 @@ export default function CategoriesPage() {
                 type="text"
                 placeholder="Search categories..."
                 value={search}
-                onChange={(e) => {
-                  setPage(1);
-                  setSearch(e.target.value);
-                }}
+                onChange={(e) => setSearch(e.target.value)}
               />
             </div>
             <div className={styles.densitySwitch} role="group" aria-label="List density">
-              <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
-              <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
-              <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
+              <button type="button" className={`${styles.densityOption} ${density === 'compact'   ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')}   title="Compact"    aria-pressed={density === 'compact'}  ><FontAwesomeIcon icon={faCompress}    /></button>
+              <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed"  aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
+              <button type="button" className={`${styles.densityOption} ${density === 'relaxed'   ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')}   title="Relaxed"    aria-pressed={density === 'relaxed'}  ><FontAwesomeIcon icon={faExpand}       /></button>
             </div>
           </div>
-
 
           <div className={styles.tableWrapper}>
             <table className={styles[`density_${density}`]}>
@@ -130,38 +123,32 @@ export default function CategoriesPage() {
                 <tr>
                   <th>Name</th>
                   <th>Slug</th>
-                  <th>Parent</th>
                   <th>Description</th>
                   <th className={styles.countCell}>Posts</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {categories.map((category) => {
-                  const isSubcategory = !!category.parentId;
+                {displayCategories.map((category) => {
+                  const isChild = !!category.parentId && !search.trim();
                   return (
-                    <tr
-                      key={category.id}
-                      className={isSubcategory ? styles.subcategoryRow : undefined}
-                    >
+                    <tr key={category.id} className={isChild ? styles.subcategoryRow : undefined}>
                       <td>
-                        <span className={isSubcategory ? styles.subcategoryName : undefined}>
-                          {isSubcategory && <span className={styles.nestingMark} aria-hidden="true" />}
+                        <span className={isChild ? styles.subcategoryName : undefined}>
+                          {isChild && <span className={styles.nestingMark} aria-hidden="true">└</span>}
                           {category.icon && <span className={styles.icon}>{category.icon}</span>}
                           {category.name}
+                          {category.parentId && search.trim() && (
+                            <span className={styles.parentBadge}>{category.parent?.name}</span>
+                          )}
                         </span>
                       </td>
-                      <td>
-                        <code className={styles.slug}>{category.slug}</code>
-                      </td>
-                      <td>{category.parent?.name || '—'}</td>
+                      <td><code className={styles.slug}>{category.slug}</code></td>
                       <td className={styles.description}>{category.description || '—'}</td>
                       <td className={styles.countCell}>{category._count?.posts ?? '—'}</td>
                       <td className={styles.actions}>
                         <button onClick={() => setEditingCategory(category)}>Edit</button>
-                        <button className={styles.deleteButton} onClick={() => handleDelete(category)}>
-                          Delete
-                        </button>
+                        <button className={styles.deleteButton} onClick={() => handleDelete(category)}>Delete</button>
                       </td>
                     </tr>
                   );
@@ -169,19 +156,13 @@ export default function CategoriesPage() {
               </tbody>
             </table>
 
-            {!loading && categories.length === 0 && <div className={styles.empty}>No categories found.</div>}
+            {!loading && displayCategories.length === 0 && (
+              <div className={styles.empty}>No categories found.</div>
+            )}
           </div>
 
           <div className={styles.pagination}>
-            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
-              Previous
-            </button>
-            <span>
-              Page {page} of {pages}
-            </span>
-            <button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages}>
-              Next
-            </button>
+            <span>{displayCategories.length} {displayCategories.length === 1 ? 'category' : 'categories'}</span>
           </div>
         </div>
       </div>

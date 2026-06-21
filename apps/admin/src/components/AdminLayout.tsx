@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
@@ -6,14 +6,18 @@ import {
   faGaugeHigh, faPenToSquare, faFileLines, faImages, faComments, faLayerGroup,
   faTags, faBars, faPuzzlePiece, faUsers, faUserShield, faSitemap, faEnvelope,
   faGear, faSliders, faChevronDown, faFeather, faRightFromBracket, faSun, faMoon, faDesktop,
-  faCakeCandles, faChartBar, faKey, faArrowRight, faChartLine, faChartPie,
+  faCakeCandles, faChartBar, faKey, faArrowRight, faChartLine, faChartPie, faBoxArchive, faClipboardList,
+  faPalette,
 } from '@fortawesome/free-solid-svg-icons';
-import type { ThemeMode } from '../context/ThemeContext';
+import type { ThemeMode, AccentColor, AccentPreset } from '../context/ThemeContext';
+import { ACCENT_PRESETS } from '../context/ThemeContext';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../context/ThemeContext';
+import { Link } from 'react-router-dom';
 import { NotificationBell } from './NotificationBell';
 import { fetchPublicSettings } from '../services/settings';
 import { resolveMediaUrl } from '../services/media';
+import { apiClient } from '../services/api';
 import styles from './AdminLayout.module.css';
 
 interface NavItem {
@@ -48,6 +52,8 @@ const SETTINGS_ITEMS = [
   { label: 'Sitemap', to: '/admin/sitemap', icon: faSitemap },
   { label: 'Redirects', to: '/admin/redirects', icon: faArrowRight },
   { label: 'API Analytics', to: '/admin/api-analytics', icon: faChartLine },
+  { label: 'Backups', to: '/admin/backups', icon: faBoxArchive },
+  { label: 'Logs', to: '/admin/logs', icon: faClipboardList },
 ];
 
 interface AdminLayoutProps {
@@ -56,7 +62,36 @@ interface AdminLayoutProps {
 
 export function AdminLayout({ children }: AdminLayoutProps) {
   const { user, logout } = useAuth();
-  const { mode, setMode, theme } = useTheme();
+  const { mode, setMode, theme, accent, setAccent } = useTheme();
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const appearanceRef = useRef<HTMLDivElement>(null);
+  const [healthStatus, setHealthStatus] = useState<'ok' | 'degraded' | 'down' | 'unknown'>('unknown');
+
+  const checkHealth = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/health');
+      setHealthStatus(res.data.data?.status ?? 'ok');
+    } catch {
+      setHealthStatus('down');
+    }
+  }, []);
+
+  useEffect(() => {
+    checkHealth();
+    const id = setInterval(checkHealth, 60_000);
+    return () => clearInterval(id);
+  }, [checkHealth]);
+
+  useEffect(() => {
+    if (!appearanceOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (appearanceRef.current && !appearanceRef.current.contains(e.target as Node)) {
+        setAppearanceOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [appearanceOpen]);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -194,29 +229,88 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           </button>
           <div className={styles.topHeaderActions}>
             <NotificationBell />
-            <div className={styles.themeSwitch} role="group" aria-label="Color theme">
-              {([
-                { value: 'system', icon: faDesktop, label: 'System' },
-                { value: 'light',  icon: faSun,     label: 'Light'  },
-                { value: 'dark',   icon: faMoon,    label: 'Dark'   },
-              ] as { value: ThemeMode; icon: typeof faSun; label: string }[]).map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  className={`${styles.themeOption} ${mode === opt.value ? styles.themeOptionActive : ''}`}
-                  onClick={() => setMode(opt.value)}
-                  title={`${opt.label} theme`}
-                  aria-label={`${opt.label} theme`}
-                  aria-pressed={mode === opt.value}
-                >
-                  <FontAwesomeIcon icon={opt.icon} />
-                </button>
-              ))}
+            <div className={styles.appearanceWrap} ref={appearanceRef}>
+              <button
+                type="button"
+                className={`${styles.themeOption} ${appearanceOpen ? styles.themeOptionActive : ''}`}
+                onClick={() => setAppearanceOpen((o) => !o)}
+                title="Appearance"
+                aria-label="Appearance settings"
+                aria-expanded={appearanceOpen}
+              >
+                <FontAwesomeIcon icon={faPalette} />
+              </button>
+
+              {appearanceOpen && (
+                <div className={styles.appearancePopover} role="dialog" aria-label="Appearance settings">
+                  <p className={styles.appearanceLabel}>Mode</p>
+                  <div className={styles.themeSwitch} role="group" aria-label="Color mode">
+                    {([
+                      { value: 'light',  icon: faSun,     label: 'Light'  },
+                      { value: 'system', icon: faDesktop,  label: 'System' },
+                      { value: 'dark',   icon: faMoon,    label: 'Dark'   },
+                    ] as { value: ThemeMode; icon: typeof faSun; label: string }[]).map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className={`${styles.themeOption} ${mode === opt.value ? styles.themeOptionActive : ''}`}
+                        onClick={() => setMode(opt.value)}
+                        title={opt.label}
+                        aria-label={`${opt.label} mode`}
+                        aria-pressed={mode === opt.value}
+                      >
+                        <FontAwesomeIcon icon={opt.icon} />
+                      </button>
+                    ))}
+                  </div>
+
+                  <hr className={styles.appearanceSep} />
+
+                  <p className={styles.appearanceLabel}>Accent</p>
+                  <div className={styles.swatchRow}>
+                    {(Object.entries(ACCENT_PRESETS) as [AccentColor, AccentPreset][]).map(([key, preset]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        className={`${styles.swatch} ${accent === key ? styles.swatchActive : ''}`}
+                        style={{ '--swatch': preset.swatch } as React.CSSProperties}
+                        onClick={() => setAccent(key)}
+                        title={preset.label}
+                        aria-label={`${preset.label} accent`}
+                        aria-pressed={accent === key}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>
         <div className={styles.content}>{children}</div>
       </main>
+
+      <footer className={styles.adminFooter}>
+        <span className={styles.footerLeft}>
+          Headtilts v1.0.0 &nbsp;·&nbsp; © {new Date().getFullYear()}
+        </span>
+        <div className={styles.footerRight}>
+          <Link
+            to="/admin/health"
+            className={styles.healthLink}
+            title={`System status: ${healthStatus}`}
+          >
+            <span className={`${styles.healthDot} ${
+              healthStatus === 'ok'       ? styles.healthDotOk       :
+              healthStatus === 'degraded' ? styles.healthDotDegraded :
+              healthStatus === 'down'     ? styles.healthDotDown     :
+                                            styles.healthDotUnknown
+            }`} />
+            {healthStatus === 'ok' ? 'Operational' :
+             healthStatus === 'degraded' ? 'Degraded' :
+             healthStatus === 'down' ? 'Down' : 'Checking…'}
+          </Link>
+        </div>
+      </footer>
     </div>
   );
 }

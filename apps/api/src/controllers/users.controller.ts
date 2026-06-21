@@ -24,8 +24,8 @@ export async function getMe(req: Request, res: Response): Promise<void> {
 export async function updateMe(req: Request, res: Response): Promise<void> {
   try {
     if (!req.user) { sendError(res, 'UNAUTHORIZED', 'Unauthorized', 401); return; }
-    const { firstName, lastName, bio, avatar, password, currentPassword } = req.body;
-    const user = await usersService.updateMe(req.user.sub, { firstName, lastName, bio, avatar, password, currentPassword });
+    const { firstName, lastName, bio, avatar, website, location, twitterUrl, linkedinUrl, githubUrl, instagramUrl, password, currentPassword } = req.body;
+    const user = await usersService.updateMe(req.user.sub, { firstName, lastName, bio, avatar, website, location, twitterUrl, linkedinUrl, githubUrl, instagramUrl, password, currentPassword });
     sendSuccess(res, user, 200, 'Profile updated successfully');
   } catch (error) {
     handleError(res, error);

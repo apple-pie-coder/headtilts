@@ -3,6 +3,7 @@ import * as authService from '../services/auth.service';
 import * as mfaService from '../services/mfa.service';
 import { sendSuccess, sendError } from '../utils/response';
 import { ApiError } from '../utils/errors';
+import { log } from '../services/logger.service';
 import { verifyMfaToken } from '../utils/jwt';
 
 export async function register(req: Request, res: Response): Promise<void> {
@@ -60,9 +61,24 @@ export async function login(req: Request, res: Response): Promise<void> {
     }
 
     const result = await authService.login(loginId, password);
+    log({
+      site: 'admin', level: 'info', category: 'auth', action: 'auth.login',
+      actorEmail: loginId,
+      ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.socket?.remoteAddress,
+      userAgent: req.get('user-agent'),
+      path: req.path, method: req.method, statusCode: 200,
+    });
     sendSuccess(res, result, 200, 'Logged in successfully');
   } catch (error) {
     if (error instanceof ApiError) {
+      log({
+        site: 'admin', level: 'warn', category: 'auth', action: 'auth.login_failed',
+        actorEmail: req.body.identifier ?? req.body.email,
+        ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.socket?.remoteAddress,
+        userAgent: req.get('user-agent'),
+        path: req.path, method: req.method, statusCode: error.statusCode,
+        meta: { reason: error.message },
+      });
       sendError(res, error.code, error.message, error.statusCode, error.details);
     } else {
       sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
@@ -108,6 +124,13 @@ export async function logout(req: Request, res: Response): Promise<void> {
     if (refreshToken) {
       await authService.logout(refreshToken);
     }
+    log({
+      site: 'admin', level: 'info', category: 'auth', action: 'auth.logout',
+      actorId: req.user?.sub, actorEmail: req.user?.email,
+      ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.socket?.remoteAddress,
+      userAgent: req.get('user-agent'),
+      path: req.path, method: req.method, statusCode: 200,
+    });
     sendSuccess(res, { message: 'Logged out successfully' });
   } catch (error) {
     // Logout should always succeed from the client's perspective

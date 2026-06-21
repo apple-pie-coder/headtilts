@@ -161,3 +161,59 @@
 .widget .poll-widget--loading { min-height: 80px; }
 
 .widget .poll-spinner { width: 22px; height: 22px; border-width: 2.5px; }
+
+/* ── Dark mode ── */
+[data-theme='dark'] .poll-widget {
+  background: #1c1c1e;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme='dark'] .poll-widget--error { color: #ff6b6b; }
+
+[data-theme='dark'] .poll-status--open    { background: rgba(52, 199, 89, 0.18);  color: #34c759; }
+[data-theme='dark'] .poll-status--closed  { background: rgba(255, 255, 255, 0.08); color: #8e8e93; }
+[data-theme='dark'] .poll-status--draft   { background: rgba(255, 255, 255, 0.08); color: #8e8e93; }
+[data-theme='dark'] .poll-status--scheduled { background: rgba(41, 151, 255, 0.15); color: #2997ff; }
+
+[data-theme='dark'] .poll-total      { color: #8e8e93; }
+[data-theme='dark'] .poll-question   { color: #f5f5f7; }
+[data-theme='dark'] .poll-description { color: #a1a1a6; }
+
+[data-theme='dark'] .poll-option {
+  background: #2c2c2e;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+[data-theme='dark'] .poll-option--clickable:hover {
+  border-color: #2997ff;
+  background: rgba(41, 151, 255, 0.1);
+}
+[data-theme='dark'] .poll-option--selected {
+  border-color: #2997ff;
+  background: rgba(41, 151, 255, 0.12);
+}
+[data-theme='dark'] .poll-option--my-vote {
+  border-color: rgba(52, 199, 89, 0.5);
+  background: rgba(52, 199, 89, 0.1);
+}
+
+[data-theme='dark'] .poll-option-bar-fill { background: rgba(41, 151, 255, 0.14); }
+
+[data-theme='dark'] .poll-radio,
+[data-theme='dark'] .poll-checkbox {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: #3a3a3c;
+}
+[data-theme='dark'] .poll-radio--checked   { border-color: #2997ff; background: #2997ff; }
+[data-theme='dark'] .poll-checkbox--checked { border-color: #2997ff; background: #2997ff; }
+
+[data-theme='dark'] .poll-option-text { color: #f5f5f7; }
+[data-theme='dark'] .poll-option-pct  { color: #f5f5f7; }
+
+[data-theme='dark'] .poll-error { color: #ff6b6b; }
+
+[data-theme='dark'] .poll-vote-btn { background: #2997ff; }
+[data-theme='dark'] .poll-vote-btn:hover:not(:disabled) { background: #409cff; }
+
+[data-theme='dark'] .poll-voted-msg { color: #34c759; }
+
+[data-theme='dark'] .widget .poll-widget { background: transparent; border-color: transparent; }

@@ -26,6 +26,12 @@ function toUserDTO(user: {
   lastName: string | null;
   avatar: string | null;
   bio: string | null;
+  website: string | null;
+  location: string | null;
+  twitterUrl: string | null;
+  linkedinUrl: string | null;
+  githubUrl: string | null;
+  instagramUrl: string | null;
   isActive: boolean;
   userRoles: {
     role: {
@@ -43,6 +49,12 @@ function toUserDTO(user: {
     lastName: user.lastName,
     avatar: user.avatar,
     bio: user.bio,
+    website: user.website,
+    location: user.location,
+    twitterUrl: user.twitterUrl,
+    linkedinUrl: user.linkedinUrl,
+    githubUrl: user.githubUrl,
+    instagramUrl: user.instagramUrl,
     isActive: user.isActive,
     roles: user.userRoles.map((ur) => ({
       id: ur.role.id,
@@ -227,6 +239,12 @@ interface UpdateMeInput {
   lastName?: string;
   bio?: string;
   avatar?: string | null;
+  website?: string | null;
+  location?: string | null;
+  twitterUrl?: string | null;
+  linkedinUrl?: string | null;
+  githubUrl?: string | null;
+  instagramUrl?: string | null;
   password?: string;
   currentPassword?: string;
 }
@@ -252,6 +270,12 @@ export async function updateMe(id: string, input: UpdateMeInput) {
       lastName: input.lastName !== undefined ? input.lastName : existing.lastName,
       bio: input.bio !== undefined ? input.bio : existing.bio,
       avatar: input.avatar !== undefined ? input.avatar : existing.avatar,
+      website: input.website !== undefined ? input.website : existing.website,
+      location: input.location !== undefined ? input.location : existing.location,
+      twitterUrl: input.twitterUrl !== undefined ? input.twitterUrl : existing.twitterUrl,
+      linkedinUrl: input.linkedinUrl !== undefined ? input.linkedinUrl : existing.linkedinUrl,
+      githubUrl: input.githubUrl !== undefined ? input.githubUrl : existing.githubUrl,
+      instagramUrl: input.instagramUrl !== undefined ? input.instagramUrl : existing.instagramUrl,
       ...(hashedPassword ? { password: hashedPassword } : {}),
     },
     include: userInclude,

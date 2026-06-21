@@ -1,6 +1,7 @@
 .layout {
   display: grid;
   grid-template-columns: 240px 1fr;
+  grid-template-rows: 1fr auto;
   height: 100vh;
   overflow: hidden;
 }
@@ -8,6 +9,7 @@
 /* ── Sidebar ── */
 
 .sidebar {
+  grid-row: 1 / -1;
   background: var(--sidebar-bg);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -141,6 +143,68 @@
   border-top: 1px solid var(--sep);
 }
 
+/* ── Appearance popover trigger ── */
+.appearanceWrap {
+  position: relative;
+}
+
+.appearancePopover {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  min-width: 190px;
+  background: var(--surface-overlay);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--glass-shadow), 0 8px 32px rgba(0,0,0,0.12);
+  padding: 1rem;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.appearanceLabel {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.appearanceSep {
+  border: none;
+  border-top: 1px solid var(--sep);
+  margin: 0.125rem 0;
+}
+
+/* ── Accent swatches ── */
+.swatchRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-top: 0.125rem;
+}
+
+.swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--swatch);
+  border: none;
+  outline: 2.5px solid transparent;
+  outline-offset: 2px;
+  cursor: pointer;
+  padding: 0;
+  transition: outline-color var(--ease), transform var(--ease);
+  flex-shrink: 0;
+}
+.swatch:hover { transform: scale(1.18); }
+.swatchActive { outline-color: var(--accent); }
+
+/* ── Mode switcher (reused inside popover) ── */
 .themeSwitch {
   display: inline-flex;
   align-items: center;
@@ -149,12 +213,13 @@
   border-radius: var(--r-sm);
   background: var(--ghost);
   flex-shrink: 0;
+  width: 100%;
 }
 .themeOption {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.75rem;
+  flex: 1;
   height: 1.75rem;
   border-radius: var(--r-xs);
   background: transparent;
@@ -293,11 +358,69 @@
   padding: 1.75rem 2rem 2rem;
 }
 
+/* ── Admin footer ── */
+.adminFooter {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 1.5rem;
+  height: 2.25rem;
+  background: var(--header-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-top: 1px solid var(--sep);
+  flex-shrink: 0;
+}
+
+.footerLeft {
+  font-size: 0.75rem;
+  color: var(--t3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.footerRight {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.healthLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--t3);
+  text-decoration: none;
+  transition: color var(--ease);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.healthLink:hover { color: var(--t1); }
+
+.healthDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.healthDotOk       { background: var(--success); box-shadow: 0 0 4px var(--success); }
+.healthDotDegraded { background: var(--warning); box-shadow: 0 0 4px var(--warning); }
+.healthDotDown     { background: var(--danger);  box-shadow: 0 0 4px var(--danger);  }
+.healthDotUnknown  { background: var(--t3); }
+
 /* ── Mobile: sidebar becomes an off-canvas drawer ── */
 @media (max-width: 768px) {
   .layout {
     grid-template-columns: 1fr;
   }
+  .adminFooter { grid-column: 1; }
 
   .sidebar {
     position: fixed;

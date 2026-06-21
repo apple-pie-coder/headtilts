@@ -34,7 +34,10 @@ import RolesPage from './pages/Roles';
 import ProfilePage from './pages/Profile';
 import SitemapPage from './pages/Sitemap';
 import RedirectsPage from './pages/Redirects';
+import BackupsPage from './pages/Backups';
 import WidgetsPage from './pages/Widgets';
+import LogsPage from './pages/Logs';
+import HealthPage from './pages/Health';
 
 function App() {
   return (
@@ -227,6 +230,14 @@ function App() {
             }
           />
           <Route
+            path="/admin/backups"
+            element={
+              <ProtectedRoute requiredPermission={PERMISSIONS.SYSTEM_BACKUP}>
+                <BackupsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/admin/settings"
             element={
               <ProtectedRoute requiredPermission={PERMISSIONS.SETTING_READ}>
@@ -264,6 +275,22 @@ function App() {
             element={
               <ProtectedRoute requiredPermission={PERMISSIONS.COMMENT_READ}>
                 <CommentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/logs"
+            element={
+              <ProtectedRoute requiredPermission={PERMISSIONS.LOG_READ}>
+                <LogsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/health"
+            element={
+              <ProtectedRoute>
+                <HealthPage />
               </ProtectedRoute>
             }
           />

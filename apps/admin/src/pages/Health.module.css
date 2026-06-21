@@ -1,0 +1,180 @@
+.page {
+  max-width: 1100px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.title {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--t1);
+  letter-spacing: -0.4px;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--t3);
+}
+
+.refreshBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  background: var(--ghost);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--t2);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background var(--ease), color var(--ease);
+  flex-shrink: 0;
+}
+.refreshBtn:hover { background: var(--ghost-h); color: var(--t1); }
+.refreshBtn:disabled { opacity: 0.5; cursor: default; }
+
+.errorBanner {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger);
+  border-radius: var(--r-sm);
+  color: var(--danger);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  margin-bottom: 1.5rem;
+}
+
+/* ── Summary cards ── */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.875rem;
+  margin-bottom: 1.25rem;
+}
+@media (max-width: 800px) { .cards { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .cards { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1rem 1.25rem;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+.cardLabel {
+  margin: 0 0 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--t3);
+}
+.cardValue {
+  margin: 0;
+  font-size: 1.1875rem;
+  font-weight: 700;
+  color: var(--t1);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* ── Grid layout for panels ── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.875rem;
+}
+@media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1.25rem;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.panelTitle {
+  margin: 0 0 1rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--t1);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ── Services ── */
+.serviceList { display: flex; flex-direction: column; gap: 0.625rem; }
+.serviceRow {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.9rem;
+}
+.serviceName { font-weight: 500; color: var(--t1); flex: 1; }
+.serviceDetail { color: var(--t2); font-variant-numeric: tabular-nums; }
+.serviceVersion { font-size: 0.75rem; color: var(--t3); }
+
+/* ── Status icons ── */
+.iconOk    { color: var(--success); }
+.iconWarn  { color: var(--warning); }
+.iconError { color: var(--danger);  }
+
+/* ── Sparkline charts ── */
+.chartRow { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.chartBlock { flex: 1; min-width: 0; }
+.chartLabel {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--t2);
+  margin: 0 0 0.375rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.chartCurrent { color: var(--t1); font-weight: 600; font-variant-numeric: tabular-nums; }
+.chartHint { margin: 0.5rem 0 0; font-size: 0.75rem; color: var(--t3); }
+.sparklineSvg { display: block; width: 100%; overflow: visible; }
+.sparklinePlaceholder { background: var(--ghost); border-radius: 4px; }
+
+/* ── Memory bars ── */
+.memBars { display: flex; flex-direction: column; gap: 0.875rem; }
+.memRow { display: flex; flex-direction: column; gap: 0.25rem; }
+.memLabel {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  color: var(--t2);
+}
+.memVal { font-variant-numeric: tabular-nums; }
+.memTrack {
+  height: 6px;
+  background: var(--ghost);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.memFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+/* ── System info table ── */
+.infoTable { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.infoTable td { padding: 0.375rem 0; vertical-align: top; }
+.infoTable td:first-child { color: var(--t3); width: 40%; white-space: nowrap; }
+.infoTable td:last-child  { color: var(--t1); font-weight: 500; font-variant-numeric: tabular-nums; }
+.infoTable tr + tr td { border-top: 1px solid var(--sep); }
+
+.empty { color: var(--t3); font-size: 0.875rem; margin: 0; }

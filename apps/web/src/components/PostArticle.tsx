@@ -138,36 +138,50 @@ export function PostArticle({ post }: { post: PostFull }) {
         </footer>
       )}
 
-      {allAuthors.length > 0 && (
-        <div className="post-author-cards">
-          {allAuthors.map((author, i) => (
-            <aside key={author.id} className="post-author-box">
-              {author.avatar && (
-                <Link to={`/authors/${author.username}`}>
-                  <img
-                    src={resolveMediaUrl(author.avatar)}
-                    alt={displayName(author)}
-                    className="post-author-avatar"
-                  />
-                </Link>
+      {allAuthors.length > 0 && (() => {
+        const primary = allAuthors[0];
+        const coAuthors = allAuthors.slice(1);
+        return (
+          <aside className="post-author-box">
+            <div className="post-author-primary">
+              {primary.avatar && (
+                <img
+                  src={resolveMediaUrl(primary.avatar)}
+                  alt={displayName(primary)}
+                  className="post-author-avatar"
+                />
               )}
               <div className="post-author-info">
-                <Link to={`/authors/${author.username}`} className="post-author-name">
-                  {displayName(author)}
-                  {i === 0 && allAuthors.length > 1 && (
-                    <span className="post-author-role"> · Primary Author</span>
-                  )}
-                  {i > 0 && <span className="post-author-role"> · Co-Author</span>}
+                <Link to={`/authors/${primary.username}`} className="post-author-name">
+                  {displayName(primary)}
                 </Link>
-                {author.bio && <p className="post-author-bio">{author.bio}</p>}
-                <Link to={`/authors/${author.username}`} className="post-author-link">
+                {primary.bio && <p className="post-author-bio">{primary.bio}</p>}
+                <Link to={`/authors/${primary.username}`} className="post-author-link">
                   View all posts →
                 </Link>
               </div>
-            </aside>
-          ))}
-        </div>
-      )}
+            </div>
+
+            {coAuthors.length > 0 && (
+              <div className="post-coauthors-row">
+                <span className="post-coauthors-label">Also written with</span>
+                {coAuthors.map((author) => (
+                  <Link key={author.id} to={`/authors/${author.username}`} className="post-coauthor-chip">
+                    {author.avatar && (
+                      <img
+                        src={resolveMediaUrl(author.avatar)}
+                        alt={displayName(author)}
+                        className="post-coauthor-avatar"
+                      />
+                    )}
+                    <span>{displayName(author)}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </aside>
+        );
+      })()}
 
       <PostReactions slug={post.slug} />
       <RelatedPosts slug={post.slug} />

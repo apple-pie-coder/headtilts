@@ -16,37 +16,45 @@ import PollPage from './pages/PollPage';
 import PollsListPage from './pages/PollsListPage';
 import { SearchPage } from './pages/SearchPage';
 import { RedirectGate } from './components/RedirectGate';
+import StatusPage from './pages/StatusPage';
 
 export default function App() {
   return (
     <ThemeProvider>
-    <SiteSettingsProvider>
-    <LayoutProvider>
     <Router>
-      <RedirectGate>
-      <SiteLayout>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/posts/:slug" element={<PostDetailPage />} />
-          <Route path="/pages/:slug" element={<PageDetailPage />} />
-          <Route path="/categories/:slug" element={<CategoryArchivePage />} />
-          <Route path="/tags/:slug" element={<TagArchivePage />} />
-          <Route path="/preview/:id" element={<PreviewPage />} />
-          <Route path="/date/:year" element={<DateArchivePage />} />
-          <Route path="/date/:year/:month" element={<DateArchivePage />} />
-          <Route path="/date/:year/:month/:day" element={<DateArchivePage />} />
-          <Route path="/authors/:username" element={<AuthorPage />} />
-          <Route path="/search" element={<SearchPage />} />
-          <Route path="/polls" element={<PollsListPage />} />
-          <Route path="/polls/:slug" element={<PollPage />} />
-          {/* Catch-all: resolves permalink-structure URLs to posts, else 404 */}
-          <Route path="*" element={<PermalinkPage />} />
-        </Routes>
-      </SiteLayout>
-      </RedirectGate>
+      <Routes>
+        {/* Fully independent — no site header/footer, no settings providers */}
+        <Route path="/status" element={<StatusPage />} />
+
+        {/* All other public routes wrapped in the full site layout */}
+        <Route path="*" element={
+          <SiteSettingsProvider>
+          <LayoutProvider>
+            <RedirectGate>
+            <SiteLayout>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/posts/:slug" element={<PostDetailPage />} />
+                <Route path="/pages/:slug" element={<PageDetailPage />} />
+                <Route path="/categories/:slug" element={<CategoryArchivePage />} />
+                <Route path="/tags/:slug" element={<TagArchivePage />} />
+                <Route path="/preview/:id" element={<PreviewPage />} />
+                <Route path="/date/:year" element={<DateArchivePage />} />
+                <Route path="/date/:year/:month" element={<DateArchivePage />} />
+                <Route path="/date/:year/:month/:day" element={<DateArchivePage />} />
+                <Route path="/authors/:username" element={<AuthorPage />} />
+                <Route path="/search" element={<SearchPage />} />
+                <Route path="/polls" element={<PollsListPage />} />
+                <Route path="/polls/:slug" element={<PollPage />} />
+                <Route path="*" element={<PermalinkPage />} />
+              </Routes>
+            </SiteLayout>
+            </RedirectGate>
+          </LayoutProvider>
+          </SiteSettingsProvider>
+        } />
+      </Routes>
     </Router>
-    </LayoutProvider>
-    </SiteSettingsProvider>
     </ThemeProvider>
   );
 }

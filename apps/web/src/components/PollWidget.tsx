@@ -11,9 +11,10 @@ function getVoterId(): string {
 
 interface Props {
   slug: string;
+  onLoaded?: (poll: PublicPoll) => void;
 }
 
-export function PollWidget({ slug }: Props) {
+export function PollWidget({ slug, onLoaded }: Props) {
   const [poll, setPoll] = useState<PublicPoll | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,7 +25,11 @@ export function PollWidget({ slug }: Props) {
   useEffect(() => {
     setLoading(true);
     fetchPublicPoll(slug, voterId.current)
-      .then((p) => { setPoll(p); if (p.hasVoted) setSelected(p.options.filter((o) => o.isMyVote).map((o) => o.id)); })
+      .then((p) => {
+        setPoll(p);
+        onLoaded?.(p);
+        if (p.hasVoted) setSelected(p.options.filter((o) => o.isMyVote).map((o) => o.id));
+      })
       .catch(() => setError('Failed to load poll'))
       .finally(() => setLoading(false));
   }, [slug]);

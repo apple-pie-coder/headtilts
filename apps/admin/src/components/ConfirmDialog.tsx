@@ -57,9 +57,6 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         <div
           className={styles.overlay}
           role="presentation"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) settle(false);
-          }}
         >
           <div
             className={styles.dialog}
