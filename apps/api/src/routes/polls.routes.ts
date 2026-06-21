@@ -4,6 +4,7 @@ import { asyncHandler } from '../middleware/errorHandler';
 import { PERMISSIONS } from '@headtilts/shared';
 import { sendSuccess, sendError, sendPaginatedSuccess } from '../utils/response';
 import { ApiError } from '../utils/errors';
+import { prisma } from '../config/database';
 import * as pollsService from '../services/polls.service';
 
 const router: IRouter = Router();
@@ -74,6 +75,21 @@ router.post('/:id/reset', requirePermission(PERMISSIONS.POLL_RESET), asyncHandle
   try {
     const poll = await pollsService.resetVotes(Number(req.params.id));
     sendSuccess(res, poll);
+  } catch (e) {
+    if (e instanceof ApiError) sendError(res, e.code, e.message, e.statusCode);
+    else sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+  }
+}));
+
+// Share analytics
+router.get('/:id/shares', requirePermission(PERMISSIONS.POLL_READ), asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const shares = await prisma.pollShare.findMany({
+      where: { pollId: Number(req.params.id) },
+      orderBy: { createdAt: 'desc' },
+      include: { clickDetails: { orderBy: { clickedAt: 'desc' } } },
+    });
+    sendSuccess(res, shares);
   } catch (e) {
     if (e instanceof ApiError) sendError(res, e.code, e.message, e.statusCode);
     else sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);

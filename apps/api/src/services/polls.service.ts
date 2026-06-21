@@ -20,6 +20,7 @@ const POLL_SELECT = {
   resultVisibility: true,
   voterRestriction: true,
   allowVoteChange: true,
+  showSidebar: true,
   startsAt: true,
   endsAt: true,
   featuredImage: true,
@@ -40,6 +41,7 @@ export interface PollInput {
   resultVisibility?: string;
   voterRestriction?: string;
   allowVoteChange?: boolean;
+  showSidebar?: boolean;
   startsAt?: string | null;
   endsAt?: string | null;
   featuredImage?: string | null;
@@ -92,6 +94,7 @@ export async function createPoll(input: PollInput) {
       resultVisibility: input.resultVisibility || 'after_vote',
       voterRestriction: input.voterRestriction || 'anonymous',
       allowVoteChange: input.allowVoteChange ?? false,
+      showSidebar: input.showSidebar ?? false,
       startsAt: input.startsAt ? new Date(input.startsAt) : null,
       endsAt: input.endsAt ? new Date(input.endsAt) : null,
       featuredImage: input.featuredImage || null,
@@ -138,6 +141,7 @@ export async function updatePoll(id: number, input: Partial<PollInput>) {
       ...(input.resultVisibility && { resultVisibility: input.resultVisibility }),
       ...(input.voterRestriction && { voterRestriction: input.voterRestriction }),
       ...(input.allowVoteChange !== undefined && { allowVoteChange: input.allowVoteChange }),
+      ...(input.showSidebar !== undefined && { showSidebar: input.showSidebar }),
       ...(input.startsAt !== undefined && { startsAt: input.startsAt ? new Date(input.startsAt) : null }),
       ...(input.endsAt !== undefined && { endsAt: input.endsAt ? new Date(input.endsAt) : null }),
       ...(input.featuredImage !== undefined && { featuredImage: input.featuredImage || null }),
@@ -277,6 +281,7 @@ export async function getPublicPoll(slug: string, voterIdentifier?: string) {
     startsAt: poll.startsAt,
     endsAt: poll.endsAt,
     featuredImage: poll.featuredImage,
+    showSidebar: poll.showSidebar,
     totalVotes,
     hasVoted,
     showResults,

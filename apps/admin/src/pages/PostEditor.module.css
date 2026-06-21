@@ -411,10 +411,10 @@
   border: none;
   padding: 0;
   cursor: pointer;
-  color: var(--accent);
+  color: var(--danger);
   font-size: 1rem;
   line-height: 1;
-  opacity: 0.6;
+  opacity: 0.7;
   transition: opacity var(--ease);
 }
 
@@ -456,6 +456,84 @@
 .publishActions button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── Categories ── */
+
+.panelTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.625rem;
+}
+
+.panelTitleRow h3 {
+  margin: 0;
+}
+
+.addCatToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  background: var(--ghost);
+  color: var(--t2);
+  font-size: 0.75rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--ease), color var(--ease), border-color var(--ease);
+}
+
+.addCatToggle:hover {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.addCatForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+
+.addCatInput {
+  width: 100%;
+  padding: 0.4rem 0.625rem;
+  background: var(--bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--r-xs);
+  font-size: 0.875rem;
+  color: var(--t1);
+  box-sizing: border-box;
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+
+.addCatInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--input-ring);
+}
+
+.addCatSubmit {
+  align-self: flex-start;
+  padding: 0.35rem 0.875rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--r-xs);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--ease), opacity var(--ease);
+}
+
+.addCatSubmit:hover:not(:disabled) { background: var(--accent-h); }
+.addCatSubmit:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .categoryList {
   display: flex;

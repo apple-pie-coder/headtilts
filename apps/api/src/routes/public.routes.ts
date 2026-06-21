@@ -12,6 +12,7 @@ import { getCalendarMonth } from '../services/calendar.service';
 import { getTodaysCelebrations } from '../services/celebrations.service';
 import { listPolls, getPublicPoll, submitVote } from '../services/polls.service';
 import { searchAll, searchType } from '../services/search.service';
+import { log } from '../services/logger.service';
 import rateLimit from 'express-rate-limit';
 import { publicReadLimiter } from '../middleware/rateLimit';
 import { ApiError } from '../utils/errors';
@@ -462,7 +463,7 @@ router.get('/authors/:username', publicReadLimiter, asyncHandler(async (req: Req
 
   const user = await prisma.user.findFirst({
     where: { username, isActive: true },
-    select: { id: true, username: true, firstName: true, lastName: true, avatar: true, bio: true },
+    select: { id: true, username: true, firstName: true, lastName: true, avatar: true, bio: true, website: true, location: true, twitterUrl: true, linkedinUrl: true, githubUrl: true, instagramUrl: true },
   });
   if (!user) { sendError(res, 'NOT_FOUND', 'Author not found', 404); return; }
 
@@ -674,14 +675,71 @@ router.post('/polls/:slug/vote', asyncHandler(async (req: Request, res: Response
     if (!voterIdentifier) { sendError(res, 'VALIDATION_ERROR', 'voterIdentifier is required', 400); return; }
     if (!Array.isArray(optionIds) || optionIds.length === 0) { sendError(res, 'VALIDATION_ERROR', 'optionIds must be a non-empty array', 400); return; }
     const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
-    const pollRecord = await prisma.poll.findUnique({ where: { slug: req.params.slug }, select: { id: true } });
+    const pollRecord = await prisma.poll.findUnique({ where: { slug: req.params.slug }, select: { id: true, title: true } });
     if (!pollRecord) { sendError(res, 'NOT_FOUND', 'Poll not found', 404); return; }
     const result = await submitVote(pollRecord.id, optionIds, voterIdentifier, ipAddress);
+    log({
+      site: 'public', level: 'info', category: 'poll', action: 'poll.vote',
+      targetType: 'Poll', targetId: pollRecord.id, targetTitle: pollRecord.title,
+      ip: ipAddress, userAgent: req.get('user-agent'), path: req.path, method: req.method,
+      meta: { slug: req.params.slug, optionIds },
+    });
     sendSuccess(res, result);
   } catch (e) {
     if (e instanceof ApiError) sendError(res, e.code, e.message, e.statusCode);
     else sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
   }
+}));
+
+// POST /public/polls/:slug/share — create a tracked share link
+router.post('/polls/:slug/share', asyncHandler(async (req: Request, res: Response) => {
+  const poll = await prisma.poll.findUnique({ where: { slug: req.params.slug }, select: { id: true, title: true } });
+  if (!poll) { sendError(res, 'NOT_FOUND', 'Poll not found', 404); return; }
+  const { sharerIdentifier, recipientEmail, recipientName, note, channel = 'link' } = req.body as {
+    sharerIdentifier?: string; recipientEmail?: string; recipientName?: string; note?: string; channel?: string;
+  };
+  const token = crypto.randomUUID().replace(/-/g, '');
+  const share = await prisma.pollShare.create({
+    data: { pollId: poll.id, token, sharerIdentifier, recipientEmail, recipientName, note, channel },
+  });
+  log({
+    site: 'public', level: 'info', category: 'poll', action: 'poll.share',
+    targetType: 'Poll', targetId: poll.id, targetTitle: poll.title,
+    ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.socket?.remoteAddress,
+    userAgent: req.get('user-agent'), path: req.path, method: req.method,
+    meta: { slug: req.params.slug, channel, recipientEmail },
+  });
+  sendSuccess(res, { token: share.token }, 201);
+}));
+
+// POST /public/polls/shares/:token/click — record a share link visit with optional recipient info
+router.post('/polls/shares/:token/click', asyncHandler(async (req: Request, res: Response) => {
+  const share = await prisma.pollShare.findUnique({ where: { token: req.params.token }, include: { poll: { select: { title: true } } } });
+  if (!share) { sendError(res, 'NOT_FOUND', 'Share not found', 404); return; }
+  const { name, gender, age } = req.body as { name?: string; gender?: string; age?: number };
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.pollShare.update({
+      where: { token: req.params.token },
+      data: { clicks: { increment: 1 }, lastClickAt: now, firstClickAt: share.firstClickAt ?? now },
+    }),
+    prisma.pollShareClick.create({
+      data: {
+        shareId: share.id,
+        name:   name?.trim()   || null,
+        gender: gender?.trim() || null,
+        age:    age ? Number(age) : null,
+      },
+    }),
+  ]);
+  log({
+    site: 'public', level: 'info', category: 'poll', action: 'poll.share_click',
+    targetType: 'Poll', targetId: share.pollId, targetTitle: share.poll.title,
+    ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.socket?.remoteAddress,
+    userAgent: req.get('user-agent'), path: req.path, method: req.method,
+    meta: { token: req.params.token, name: name ?? null, gender: gender ?? null, age: age ?? null },
+  });
+  sendSuccess(res, { ok: true });
 }));
 
 // GET /public/posts/:slug/og-image — generates a 1200×630 PNG OG card
@@ -756,9 +814,21 @@ router.get('/search', publicReadLimiter, asyncHandler(async (req: Request, res: 
 
   if (type === 'all') {
     const result = await searchAll(q, 4);
+    log({
+      site: 'public', level: 'info', category: 'search', action: 'search.query',
+      ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.socket?.remoteAddress,
+      userAgent: req.get('user-agent'), path: req.path, method: req.method, statusCode: 200,
+      meta: { q, type },
+    });
     sendSuccess(res, result);
   } else {
     const result = await searchType(q, type, page, 10);
+    log({
+      site: 'public', level: 'info', category: 'search', action: 'search.query',
+      ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.socket?.remoteAddress,
+      userAgent: req.get('user-agent'), path: req.path, method: req.method, statusCode: 200,
+      meta: { q, type, page },
+    });
     sendSuccess(res, result);
   }
 }));

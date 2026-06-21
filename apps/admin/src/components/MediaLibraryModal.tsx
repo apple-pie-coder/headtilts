@@ -94,10 +94,9 @@ export function MediaLibraryModal({ onSelect, onClose }: MediaLibraryModalProps)
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return createPortal(
-    <div className={styles.overlay} onClick={onClose}>
+    <div className={styles.overlay}>
       <div
         className={styles.card}
-        onClick={(e) => e.stopPropagation()}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}

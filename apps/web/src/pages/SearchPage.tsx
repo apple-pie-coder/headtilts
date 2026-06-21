@@ -172,6 +172,8 @@ export function SearchPage() {
   const [groupedResult, setGroupedResult] = useState<SearchGrouped | null>(null);
   const [pagedResult, setPagedResult] = useState<SearchPaged | null>(null);
   const [loading, setLoading] = useState(false);
+  // Persists grouped counts across tab switches so 0-result tabs stay hidden
+  const [tabCounts, setTabCounts] = useState<Record<string, number> | null>(null);
 
   useEffect(() => {
     applySeo({
@@ -187,12 +189,20 @@ export function SearchPage() {
     if (!q) {
       setGroupedResult(null);
       setPagedResult(null);
+      setTabCounts(null);
       return;
     }
     setLoading(true);
     if (activeType === 'all') {
       searchAll(q)
-        .then((r) => { setGroupedResult(r); setPagedResult(null); })
+        .then((r) => {
+          setGroupedResult(r);
+          setPagedResult(null);
+          // Cache per-type counts for tab visibility on subsequent tab switches
+          const counts: Record<string, number> = { all: r.total };
+          Object.entries(r.grouped).forEach(([k, v]) => { counts[k] = v.total; });
+          setTabCounts(counts);
+        })
         .catch(() => { setGroupedResult(null); setPagedResult(null); })
         .finally(() => setLoading(false));
     } else {
@@ -217,7 +227,7 @@ export function SearchPage() {
   }
 
   const grouped = groupedResult?.grouped;
-  const totalAll = groupedResult?.total ?? 0;
+  const totalAll = tabCounts?.all ?? groupedResult?.total ?? 0;
 
   return (
     <div className={styles.container}>
@@ -238,13 +248,9 @@ export function SearchPage() {
       {q && (
         <div className={styles.tabs} role="tablist">
           {TYPE_LABELS.map(({ key, label }) => {
-            let count: number | undefined;
-            if (groupedResult) {
-              if (key === 'all') count = totalAll;
-              else count = groupedResult.grouped[key]?.total;
-            }
-            // Hide tabs with 0 results (except 'all' which shows the empty state)
-            if (groupedResult && key !== 'all' && (count ?? 0) === 0) return null;
+            const count = tabCounts ? tabCounts[key] : undefined;
+            // Hide tabs with 0 results once counts are known (except 'all')
+            if (tabCounts && key !== 'all' && (count ?? 0) === 0) return null;
             return (
               <button
                 key={key}

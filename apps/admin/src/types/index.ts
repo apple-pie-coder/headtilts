@@ -6,6 +6,12 @@ export interface User {
   lastName?: string;
   avatar?: string;
   bio?: string | null;
+  website?: string | null;
+  location?: string | null;
+  twitterUrl?: string | null;
+  linkedinUrl?: string | null;
+  githubUrl?: string | null;
+  instagramUrl?: string | null;
   isActive: boolean;
   mfaEnabled?: boolean;
   roles: Role[];

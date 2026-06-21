@@ -225,6 +225,7 @@ export default function PagesPage() {
               type="text"
               placeholder="Search pages..."
               value={search}
+              autoFocus
               onChange={(e) => { setPage(1); setSearch(e.target.value); }}
             />
           </div>

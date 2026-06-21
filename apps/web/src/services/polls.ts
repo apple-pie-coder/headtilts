@@ -23,6 +23,7 @@ export interface PublicPoll {
   startsAt: string | null;
   endsAt: string | null;
   featuredImage: string | null;
+  showSidebar: boolean;
   totalVotes: number;
   hasVoted: boolean;
   showResults: boolean;
@@ -58,6 +59,33 @@ export async function fetchPublicPolls(page = 1, limit = 20): Promise<{ items: P
   if (!res.ok) throw new Error('Failed to load polls');
   const json = await res.json();
   return json.data;
+}
+
+export async function createShare(slug: string, body: {
+  channel: string;
+  sharerIdentifier?: string;
+  recipientEmail?: string;
+  recipientName?: string;
+  note?: string;
+}): Promise<{ token: string }> {
+  const url = new URL(`${BASE}/public/polls/${slug}/share`, window.location.origin);
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error?.message || 'Failed to create share');
+  return json.data;
+}
+
+export async function recordShareClick(token: string, data?: { name?: string; gender?: string; age?: number }): Promise<void> {
+  const url = new URL(`${BASE}/public/polls/shares/${token}/click`, window.location.origin);
+  await fetch(url.toString(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data ?? {}),
+  });
 }
 
 export async function submitVote(slug: string, optionIds: number[], voterIdentifier: string): Promise<PublicPoll> {

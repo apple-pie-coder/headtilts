@@ -146,6 +146,7 @@ export default function CommentsPage() {
               type="text"
               placeholder="Search comments, authors, emails..."
               value={search}
+              autoFocus
               onChange={(e) => { setPage(1); setSearch(e.target.value); }}
             />
           </div>

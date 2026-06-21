@@ -526,7 +526,7 @@
 .removeBtn {
   border: none;
   background: none;
-  color: var(--t3);
+  color: var(--danger);
   cursor: pointer;
   padding: 0.25rem 0.375rem;
   font-size: 0.75rem;
@@ -535,7 +535,7 @@
   flex-shrink: 0;
 }
 
-.removeBtn:hover:not(:disabled) { color: var(--danger-t); background: var(--danger-bg); }
+.removeBtn:hover:not(:disabled) { color: var(--danger-h); background: var(--danger-bg); }
 .removeBtn:disabled { opacity: 0.4; cursor: default; }
 
 /* ── Add to Zone ── */

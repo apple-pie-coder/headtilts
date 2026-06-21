@@ -173,3 +173,38 @@
   font-size: 0.9rem;
   color: var(--color-secondary-text, #6e6e73);
 }
+
+/* ── Dark mode ── */
+[data-theme='dark'] .polls-list-title  { color: #f5f5f7; }
+[data-theme='dark'] .polls-list-subtitle { color: #a1a1a6; }
+[data-theme='dark'] .polls-list-error  { color: #ff6b6b; }
+[data-theme='dark'] .polls-list-empty  { color: #8e8e93; }
+
+[data-theme='dark'] .polls-card {
+  background: #1c1c1e;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+[data-theme='dark'] .polls-card:hover {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme='dark'] .polls-card-status--open      { background: rgba(52, 199, 89, 0.18);  color: #34c759; }
+[data-theme='dark'] .polls-card-status--closed    { background: rgba(255, 255, 255, 0.08); color: #8e8e93; }
+[data-theme='dark'] .polls-card-status--scheduled { background: rgba(41, 151, 255, 0.15); color: #2997ff; }
+
+[data-theme='dark'] .polls-card-votes   { color: #8e8e93; }
+[data-theme='dark'] .polls-card-title   { color: #f5f5f7; }
+[data-theme='dark'] .polls-card-question { color: #d1d1d6; }
+[data-theme='dark'] .polls-card-desc    { color: #a1a1a6; }
+[data-theme='dark'] .polls-card-closes  { color: #8e8e93; }
+
+[data-theme='dark'] .polls-pagination-btn {
+  background: #2c2c2e;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #d1d1d6;
+}
+[data-theme='dark'] .polls-pagination-btn:hover:not(:disabled) {
+  border-color: #2997ff;
+  color: #2997ff;
+}
+[data-theme='dark'] .polls-pagination-info { color: #8e8e93; }

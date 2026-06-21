@@ -26,6 +26,7 @@ export default function PollEditorPage() {
   const [resultVisibility, setResultVisibility] = useState('after_vote');
   const [voterRestriction, setVoterRestriction] = useState('anonymous');
   const [allowVoteChange, setAllowVoteChange] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [featuredImage, setFeaturedImage] = useState('');
@@ -48,6 +49,7 @@ export default function PollEditorPage() {
         setResultVisibility(poll.resultVisibility);
         setVoterRestriction(poll.voterRestriction);
         setAllowVoteChange(poll.allowVoteChange);
+        setShowSidebar(poll.showSidebar ?? false);
         setStartsAt(poll.startsAt ? new Date(poll.startsAt).toISOString().slice(0, 16) : '');
         setEndsAt(poll.endsAt ? new Date(poll.endsAt).toISOString().slice(0, 16) : '');
         setFeaturedImage(poll.featuredImage || '');
@@ -98,6 +100,7 @@ export default function PollEditorPage() {
       resultVisibility,
       voterRestriction,
       allowVoteChange,
+      showSidebar,
       startsAt: startsAt || null,
       endsAt: endsAt || null,
       featuredImage: featuredImage || null,
@@ -219,6 +222,19 @@ export default function PollEditorPage() {
               <label>Closes at <span className={styles.optional}>(optional)</span></label>
               <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
             </div>
+            <div className={styles.formGroup}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={showSidebar}
+                  onChange={(e) => setShowSidebar(e.target.checked)}
+                  disabled={saving}
+                />
+                {' '}Show sidebar
+              </label>
+              <p className={styles.hint}>Display sidebar widgets next to this poll.</p>
+            </div>
+
             <div className={styles.publishActions}>
               <button className={styles.draftButton} onClick={() => handleSave(true)} disabled={saving}>
                 Save Draft

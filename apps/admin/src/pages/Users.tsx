@@ -83,6 +83,7 @@ export default function UsersPage() {
             type="text"
             placeholder="Search users..."
             value={search}
+            autoFocus
             onChange={(e) => {
               setPage(1);
               setSearch(e.target.value);

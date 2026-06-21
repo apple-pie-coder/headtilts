@@ -1,0 +1,20 @@
+CREATE TABLE `PollShare` (
+  `id`                INT NOT NULL AUTO_INCREMENT,
+  `pollId`            INT NOT NULL,
+  `token`             VARCHAR(191) NOT NULL,
+  `sharerIdentifier`  VARCHAR(191),
+  `recipientEmail`    VARCHAR(191),
+  `recipientName`     VARCHAR(191),
+  `note`              TEXT,
+  `channel`           VARCHAR(191) NOT NULL DEFAULT 'link',
+  `clicks`            INT NOT NULL DEFAULT 0,
+  `firstClickAt`      DATETIME(3),
+  `lastClickAt`       DATETIME(3),
+  `createdAt`         DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE INDEX `PollShare_token_key` (`token`),
+  INDEX `PollShare_pollId_idx` (`pollId`),
+  INDEX `PollShare_token_idx` (`token`),
+  INDEX `PollShare_sharerIdentifier_idx` (`sharerIdentifier`),
+  CONSTRAINT `PollShare_pollId_fkey` FOREIGN KEY (`pollId`) REFERENCES `Poll` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+);

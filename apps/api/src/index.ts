@@ -3,6 +3,8 @@ import { createApp } from './app';
 import { connectDatabase, disconnectDatabase } from './config/database';
 import { publishDuePosts } from './services/posts.service';
 import { initRealtime } from './realtime/notifications.gateway';
+import { prisma } from './config/database';
+import { startBackupScheduler } from './services/backupScheduler';
 
 const REQUIRED_ENV_VARS = ['DATABASE_URL', 'JWT_SECRET', 'JWT_REFRESH_SECRET'] as const;
 
@@ -47,14 +49,24 @@ async function start(): Promise<void> {
       console.log('✓ Real-time notifications (Socket.IO) attached');
     });
 
+    // Fail any backups that were pending at server start (crashed or orphaned by a restore)
+    await prisma.backup.updateMany({
+      where: { status: 'pending' },
+      data: { status: 'failed', errorMsg: 'Aborted — server restarted while backup was running' },
+    }).catch(() => {});
+
     // Publish scheduled posts when they come due
     const publisherTimer = startScheduledPublisher();
+    // Auto-backup scheduler — checks every minute against configured schedule
+    const backupTimer = startBackupScheduler();
+    console.log('✓ Backup scheduler running (every 60s)');
     console.log('✓ Scheduled post publisher running (every 60s)');
 
     // Graceful shutdown
     process.on('SIGTERM', async () => {
       console.log('SIGTERM received, shutting down gracefully...');
       clearInterval(publisherTimer);
+      clearInterval(backupTimer);
       await disconnectDatabase();
       process.exit(0);
     });
@@ -62,6 +74,7 @@ async function start(): Promise<void> {
     process.on('SIGINT', async () => {
       console.log('SIGINT received, shutting down gracefully...');
       clearInterval(publisherTimer);
+      clearInterval(backupTimer);
       await disconnectDatabase();
       process.exit(0);
     });

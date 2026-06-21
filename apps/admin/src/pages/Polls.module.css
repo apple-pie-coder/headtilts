@@ -295,3 +295,227 @@ tr:hover td { background: var(--ghost); }
   color: var(--t1);
   box-shadow: 0 1px 2px rgba(0,0,0,0.12);
 }
+
+/* ── Share analytics modal ── */
+.sharesOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.sharesModal {
+  background: var(--bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r);
+  padding: 1.75rem;
+  width: 100%;
+  max-width: 860px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.sharesModalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.sharesModalTitle {
+  margin: 0 0 0.2rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--t1);
+}
+
+.sharesModalSub {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--t2);
+  font-style: italic;
+}
+
+.sharesClose {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: var(--ghost);
+  color: var(--danger);
+  font-size: 0.875rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background var(--ease), color var(--ease);
+}
+.sharesClose:hover { background: var(--danger-bg); color: var(--danger-h); }
+
+.sharesEmpty {
+  color: var(--t3);
+  font-size: 0.9375rem;
+  text-align: center;
+  padding: 1.5rem 0;
+  margin: 0;
+}
+
+.sharesSummary {
+  display: flex;
+  gap: 1.5rem;
+  padding: 1rem 1.25rem;
+  background: var(--ghost);
+  border-radius: var(--r-sm);
+}
+
+.sharesStat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.sharesStatValue {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--t1);
+  letter-spacing: -0.5px;
+  text-transform: capitalize;
+}
+
+.sharesStatLabel {
+  font-size: 0.75rem;
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.sharesTableWrap {
+  overflow-x: auto;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--sep);
+}
+
+.sharesTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.sharesTable th {
+  text-align: left;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--sep);
+  white-space: nowrap;
+}
+
+.sharesTable td {
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--sep);
+  vertical-align: top;
+  color: var(--t1);
+}
+
+.sharesTable tr:last-child td { border-bottom: none; }
+
+.shareChannel {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  background: var(--ghost);
+  color: var(--t2);
+}
+.shareChannel_link      { background: rgba(0,113,227,0.1);  color: #0071e3; }
+.shareChannel_twitter   { background: rgba(0,0,0,0.06);     color: var(--t1); }
+.shareChannel_whatsapp  { background: rgba(37,211,102,0.12); color: #128c3a; }
+.shareChannel_linkedin  { background: rgba(0,119,181,0.12); color: #007ab3; }
+.shareChannel_facebook  { background: rgba(24,119,242,0.12); color: #1877f2; }
+.shareChannel_email     { background: rgba(255,149,0,0.12); color: #bf6a00; }
+
+.recipientName {
+  display: block;
+  font-weight: 600;
+  color: var(--t1);
+  font-size: 0.875rem;
+}
+
+.recipientEmail {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--t3);
+}
+
+.anon { color: var(--t3); font-style: italic; }
+
+.noteCell {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--t2);
+}
+
+.clickCell {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--accent);
+  text-align: center;
+}
+
+.dateCell {
+  color: var(--t3);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.shareRowClickable { cursor: pointer; }
+.shareRowClickable:hover td { background: var(--ghost); }
+
+.expandChevron {
+  font-size: 0.65rem;
+  color: var(--t3);
+  margin-left: 0.2rem;
+}
+
+.clickDetailRow td {
+  background: var(--ghost);
+  border-bottom: 1px solid var(--sep);
+  padding: 0.4rem 0.875rem;
+}
+
+.clickDetailIndent {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--t1);
+}
+
+.clickDetailLabel {
+  color: var(--t3);
+  font-size: 0.875rem;
+}
+
+.clickDetailMeta {
+  color: var(--t2);
+  font-size: 0.8125rem;
+}

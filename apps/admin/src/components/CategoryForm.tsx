@@ -78,6 +78,7 @@ export function CategoryForm({ category, categories, onSaved, onCancel }: Catego
             onChange={(e) => handleNameChange(e.target.value)}
             required
             disabled={saving}
+            autoFocus
           />
         </div>
 

@@ -9,7 +9,21 @@ const allowedOrigins = [
   process.env.ADMIN_URL || 'http://localhost:5173',
   process.env.WEB_URL || 'http://localhost:5173',
   'http://localhost:5174',
+  ...(process.env.CORS_ORIGINS || '').split(',').filter(Boolean),
 ];
+
+function isPrivateOrigin(origin: string): boolean {
+  try {
+    const { hostname } = new URL(origin);
+    return (
+      hostname === 'localhost' ||
+      /^127\./.test(hostname) ||
+      /^10\./.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+      /^192\.168\./.test(hostname)
+    );
+  } catch { return false; }
+}
 
 function tokenFromSocket(socket: Socket): string | undefined {
   const fromAuth = socket.handshake.auth?.token;
@@ -28,7 +42,7 @@ export function initRealtime(server: HttpServer): SocketIOServer {
   io = new SocketIOServer(server, {
     cors: {
       origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+        if (!origin || allowedOrigins.includes(origin) || isPrivateOrigin(origin)) callback(null, true);
         else callback(new Error(`CORS: ${origin} not allowed`));
       },
       credentials: true,

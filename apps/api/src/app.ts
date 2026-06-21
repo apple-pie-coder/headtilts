@@ -7,6 +7,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { uploadDir } from './middleware/upload';
 import { prisma } from './config/database';
 import { generateXml } from './services/sitemap.service';
+import { activityLogger } from './middleware/activityLogger';
 import apiRoutes from './routes';
 
 export function createApp(): Express {
@@ -23,16 +24,33 @@ export function createApp(): Express {
   }));
   app.use(compression());
 
-  const allowedOrigins = [
+  const explicitOrigins = [
     process.env.ADMIN_URL || 'http://localhost:5173',
     process.env.WEB_URL  || 'http://localhost:5173',
     'http://localhost:5174',
+    ...(process.env.CORS_ORIGINS || '').split(',').filter(Boolean),
   ].map(u => { try { return new URL(u).origin; } catch { return u; } });
+
+  function isPrivateOrigin(origin: string): boolean {
+    try {
+      const { hostname } = new URL(origin);
+      return (
+        hostname === 'localhost' ||
+        /^127\./.test(hostname) ||
+        /^10\./.test(hostname) ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+        /^192\.168\./.test(hostname)
+      );
+    } catch { return false; }
+  }
+
   app.use(cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, etc.) and listed origins
-      if (!origin || allowedOrigins.includes(origin)) callback(null, true);
-      else callback(new Error(`CORS: ${origin} not allowed`));
+      if (!origin || explicitOrigins.includes(origin) || isPrivateOrigin(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: ${origin} not allowed`));
+      }
     },
     credentials: true,
   }));
@@ -44,9 +62,28 @@ export function createApp(): Express {
   // Static file serving for uploaded media
   app.use('/uploads', express.static(uploadDir));
 
-  // Health check
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  // Public health check
+  app.get('/health', async (_req, res) => {
+    const reqStart = Date.now();
+    let dbStatus: 'ok' | 'error' = 'ok';
+    let dbLatency = 0;
+    try {
+      const t = Date.now();
+      await prisma.$queryRaw`SELECT 1`;
+      dbLatency = Date.now() - t;
+    } catch {
+      dbStatus = 'error';
+    }
+    res.json({
+      status: dbStatus === 'error' ? 'degraded' : 'ok',
+      version: '1.0.0',
+      uptime: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
+      services: {
+        api:      { status: 'ok',      latency: Date.now() - reqStart },
+        database: { status: dbStatus,  latency: dbLatency },
+      },
+    });
   });
 
   // robots.txt — honors the "search engine visibility" setting
@@ -78,6 +115,9 @@ export function createApp(): Express {
       res.status(500).send('');
     }
   });
+
+  // Activity logging for all authenticated mutations
+  app.use('/api', activityLogger);
 
   // API Routes
   app.use('/api', apiRoutes);

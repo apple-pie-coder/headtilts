@@ -284,6 +284,7 @@ export default function PostsPage() {
               type="text"
               placeholder="Search posts..."
               value={search}
+              autoFocus
               onChange={(e) => {
                 setPage(1);
                 setSearch(e.target.value);

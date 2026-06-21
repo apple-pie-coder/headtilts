@@ -1,0 +1,304 @@
+{
+  "baseUrl": "http://localhost:3000/api",
+  "description": "Headtilts API endpoints for load testing",
+  "endpoints": [
+    {
+      "path": "/auth/setup-status",
+      "method": "GET",
+      "description": "Check if setup is complete",
+      "authRequired": false
+    },
+    {
+      "path": "/auth/login",
+      "method": "POST",
+      "description": "Login user",
+      "authRequired": false,
+      "payload": {
+        "email": "admin@example.com",
+        "password": "password123"
+      }
+    },
+    {
+      "path": "/auth/me",
+      "method": "GET",
+      "description": "Get current user",
+      "authRequired": true
+    },
+    {
+      "path": "/auth/refresh",
+      "method": "POST",
+      "description": "Refresh JWT token",
+      "authRequired": true
+    },
+    {
+      "path": "/users",
+      "method": "GET",
+      "description": "List all users",
+      "authRequired": true
+    },
+    {
+      "path": "/users",
+      "method": "POST",
+      "description": "Create new user",
+      "authRequired": true,
+      "payload": {
+        "email": "newuser@example.com",
+        "name": "New User"
+      }
+    },
+    {
+      "path": "/roles",
+      "method": "GET",
+      "description": "List all roles",
+      "authRequired": true
+    },
+    {
+      "path": "/categories",
+      "method": "GET",
+      "description": "List all categories",
+      "authRequired": true
+    },
+    {
+      "path": "/categories",
+      "method": "POST",
+      "description": "Create new category",
+      "authRequired": true,
+      "payload": {
+        "name": "Test Category"
+      }
+    },
+    {
+      "path": "/tags",
+      "method": "GET",
+      "description": "List all tags",
+      "authRequired": true
+    },
+    {
+      "path": "/tags",
+      "method": "POST",
+      "description": "Create new tag",
+      "authRequired": true,
+      "payload": {
+        "name": "test-tag"
+      }
+    },
+    {
+      "path": "/posts",
+      "method": "GET",
+      "description": "List all posts",
+      "authRequired": true
+    },
+    {
+      "path": "/posts",
+      "method": "POST",
+      "description": "Create new post",
+      "authRequired": true,
+      "payload": {
+        "title": "Test Post",
+        "slug": "test-post",
+        "content": "This is test content"
+      }
+    },
+    {
+      "path": "/posts/author-list",
+      "method": "GET",
+      "description": "Get posts for authors",
+      "authRequired": true
+    },
+    {
+      "path": "/comments",
+      "method": "GET",
+      "description": "List all comments",
+      "authRequired": true
+    },
+    {
+      "path": "/dashboard/overview",
+      "method": "GET",
+      "description": "Get dashboard overview",
+      "authRequired": true
+    },
+    {
+      "path": "/dashboard/calls-over-time",
+      "method": "GET",
+      "description": "Get API calls over time",
+      "authRequired": true
+    },
+    {
+      "path": "/dashboard/calls-per-key",
+      "method": "GET",
+      "description": "Get API calls per key",
+      "authRequired": true
+    },
+    {
+      "path": "/media",
+      "method": "GET",
+      "description": "List all media",
+      "authRequired": true
+    },
+    {
+      "path": "/menus",
+      "method": "GET",
+      "description": "List all menus",
+      "authRequired": true
+    },
+    {
+      "path": "/menus",
+      "method": "POST",
+      "description": "Create new menu",
+      "authRequired": true,
+      "payload": {
+        "name": "Test Menu"
+      }
+    },
+    {
+      "path": "/widgets",
+      "method": "GET",
+      "description": "List all widgets",
+      "authRequired": true
+    },
+    {
+      "path": "/widgets",
+      "method": "POST",
+      "description": "Create new widget",
+      "authRequired": true,
+      "payload": {
+        "name": "Test Widget",
+        "type": "text"
+      }
+    },
+    {
+      "path": "/settings",
+      "method": "GET",
+      "description": "Get all settings",
+      "authRequired": true
+    },
+    {
+      "path": "/settings",
+      "method": "PUT",
+      "description": "Update settings",
+      "authRequired": true,
+      "payload": {
+        "key": "site_title",
+        "value": "Test Site"
+      }
+    },
+    {
+      "path": "/notifications",
+      "method": "GET",
+      "description": "List notifications",
+      "authRequired": true
+    },
+    {
+      "path": "/celebrations",
+      "method": "GET",
+      "description": "List celebrations",
+      "authRequired": true
+    },
+    {
+      "path": "/celebrations",
+      "method": "POST",
+      "description": "Create celebration",
+      "authRequired": true,
+      "payload": {
+        "title": "Test Celebration"
+      }
+    },
+    {
+      "path": "/polls",
+      "method": "GET",
+      "description": "List polls",
+      "authRequired": true
+    },
+    {
+      "path": "/api-keys",
+      "method": "GET",
+      "description": "List API keys",
+      "authRequired": true
+    },
+    {
+      "path": "/api-keys",
+      "method": "POST",
+      "description": "Create new API key",
+      "authRequired": true,
+      "payload": {
+        "name": "Load Test Key",
+        "scopes": ["read"]
+      }
+    },
+    {
+      "path": "/api-keys/scopes",
+      "method": "GET",
+      "description": "Get available API key scopes",
+      "authRequired": true
+    },
+    {
+      "path": "/api-analytics/overview",
+      "method": "GET",
+      "description": "Get API analytics overview",
+      "authRequired": true
+    },
+    {
+      "path": "/api-analytics/calls-over-time",
+      "method": "GET",
+      "description": "Get API calls analytics over time",
+      "authRequired": true
+    },
+    {
+      "path": "/api-analytics/top-endpoints",
+      "method": "GET",
+      "description": "Get top endpoints by usage",
+      "authRequired": true
+    },
+    {
+      "path": "/redirects",
+      "method": "GET",
+      "description": "List all redirects",
+      "authRequired": true
+    },
+    {
+      "path": "/redirects",
+      "method": "POST",
+      "description": "Create new redirect",
+      "authRequired": true,
+      "payload": {
+        "from": "/old-path",
+        "to": "/new-path"
+      }
+    },
+    {
+      "path": "/health",
+      "method": "GET",
+      "description": "Health check with no auth",
+      "authRequired": false
+    },
+    {
+      "path": "/contact-submissions",
+      "method": "POST",
+      "description": "Submit contact form (no auth)",
+      "authRequired": false,
+      "payload": {
+        "name": "Test User",
+        "email": "test@example.com",
+        "message": "Test message"
+      }
+    },
+    {
+      "path": "/public/posts",
+      "method": "GET",
+      "description": "Get public posts (no auth)",
+      "authRequired": false
+    },
+    {
+      "path": "/backups/settings",
+      "method": "GET",
+      "description": "Get backup settings",
+      "authRequired": true
+    },
+    {
+      "path": "/logs",
+      "method": "GET",
+      "description": "Get activity logs",
+      "authRequired": true
+    }
+  ]
+}

@@ -5,6 +5,7 @@ import { useToast } from '../components/ToastContext';
 import { useAuth } from '../hooks/useAuth';
 import { fetchMe, updateMe } from '../services/profile';
 import { getMfaStatus, setupMfa, enableMfa, disableMfa } from '../services/mfa';
+import { MediaPickerInput } from '../components/MediaPickerInput';
 import { User } from '../types';
 import styles from './Profile.module.css';
 
@@ -25,6 +26,12 @@ export default function ProfilePage() {
   const [lastName, setLastName] = useState('');
   const [bio, setBio] = useState('');
   const [avatar, setAvatar] = useState('');
+  const [website, setWebsite] = useState('');
+  const [location, setLocation] = useState('');
+  const [twitterUrl, setTwitterUrl] = useState('');
+  const [linkedinUrl, setLinkedinUrl] = useState('');
+  const [githubUrl, setGithubUrl] = useState('');
+  const [instagramUrl, setInstagramUrl] = useState('');
   const [infoSaving, setInfoSaving] = useState(false);
 
   // Password form
@@ -56,6 +63,12 @@ export default function ProfilePage() {
       setLastName(me.lastName || '');
       setBio(me.bio || '');
       setAvatar(me.avatar || '');
+      setWebsite(me.website || '');
+      setLocation(me.location || '');
+      setTwitterUrl(me.twitterUrl || '');
+      setLinkedinUrl(me.linkedinUrl || '');
+      setGithubUrl(me.githubUrl || '');
+      setInstagramUrl(me.instagramUrl || '');
       setMfaEnabled(status.enabled);
       setMfaBackupRemaining(status.backupCodesRemaining);
     } catch (err) {
@@ -69,7 +82,18 @@ export default function ProfilePage() {
     e.preventDefault();
     setInfoSaving(true);
     try {
-      const updated = await updateMe({ firstName: firstName.trim(), lastName: lastName.trim(), bio: bio.trim(), avatar: avatar.trim() || null });
+      const updated = await updateMe({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        bio: bio.trim(),
+        avatar: avatar.trim() || null,
+        website: website.trim() || null,
+        location: location.trim() || null,
+        twitterUrl: twitterUrl.trim() || null,
+        linkedinUrl: linkedinUrl.trim() || null,
+        githubUrl: githubUrl.trim() || null,
+        instagramUrl: instagramUrl.trim() || null,
+      });
       setProfile(updated);
       toast.success('Profile updated successfully.');
     } catch (err) {
@@ -211,13 +235,46 @@ export default function ProfilePage() {
             </div>
 
             <div className={styles.field}>
-              <label>Avatar URL</label>
-              <input value={avatar} onChange={(e) => setAvatar(e.target.value)} placeholder="https://…" disabled={infoSaving} />
+              <label>Avatar</label>
+              <MediaPickerInput value={avatar} onChange={setAvatar} disabled={infoSaving} placeholder="Paste URL or choose from library…" />
             </div>
 
             <div className={styles.field}>
               <label>Bio</label>
               <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} placeholder="A short bio…" disabled={infoSaving} />
+            </div>
+
+            <div className={styles.row}>
+              <div className={styles.field}>
+                <label>Website</label>
+                <input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://yoursite.com" disabled={infoSaving} />
+              </div>
+              <div className={styles.field}>
+                <label>Location</label>
+                <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="City, Country" disabled={infoSaving} />
+              </div>
+            </div>
+
+            <div className={styles.sectionHeading}>Social Links</div>
+            <div className={styles.row}>
+              <div className={styles.field}>
+                <label>Twitter / X</label>
+                <input value={twitterUrl} onChange={(e) => setTwitterUrl(e.target.value)} placeholder="https://x.com/username" disabled={infoSaving} />
+              </div>
+              <div className={styles.field}>
+                <label>LinkedIn</label>
+                <input value={linkedinUrl} onChange={(e) => setLinkedinUrl(e.target.value)} placeholder="https://linkedin.com/in/username" disabled={infoSaving} />
+              </div>
+            </div>
+            <div className={styles.row}>
+              <div className={styles.field}>
+                <label>GitHub</label>
+                <input value={githubUrl} onChange={(e) => setGithubUrl(e.target.value)} placeholder="https://github.com/username" disabled={infoSaving} />
+              </div>
+              <div className={styles.field}>
+                <label>Instagram</label>
+                <input value={instagramUrl} onChange={(e) => setInstagramUrl(e.target.value)} placeholder="https://instagram.com/username" disabled={infoSaving} />
+              </div>
             </div>
 
             <div className={styles.field}>

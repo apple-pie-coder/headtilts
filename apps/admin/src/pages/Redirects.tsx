@@ -156,6 +156,7 @@ export default function RedirectsPage() {
             type="text"
             placeholder="Search paths…"
             value={search}
+            autoFocus
             onChange={(e) => setSearch(e.target.value)}
           />
           <div className={styles.densitySwitch} role="group" aria-label="List density">

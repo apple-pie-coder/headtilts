@@ -68,8 +68,8 @@ export function UserFormModal({ user, roles, onClose, onSaved }: UserFormModalPr
   }
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.card} onClick={(e) => e.stopPropagation()}>
+    <div className={styles.overlay}>
+      <div className={styles.card}>
         <h2>{isEditing ? 'Edit User' : 'Add User'}</h2>
 
         <form onSubmit={handleSubmit}>

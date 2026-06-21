@@ -188,6 +188,12 @@ export interface AuthorProfile {
   lastName: string | null;
   avatar: string | null;
   bio: string | null;
+  website: string | null;
+  location: string | null;
+  twitterUrl: string | null;
+  linkedinUrl: string | null;
+  githubUrl: string | null;
+  instagramUrl: string | null;
 }
 
 export interface AuthorProfileResult {

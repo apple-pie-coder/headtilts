@@ -1,5 +1,6 @@
 import { prisma } from '../config/database';
 import { ValidationError } from '../utils/errors';
+import { BACKUP_SETTING_KEYS } from './backup.settings';
 
 const ALLOWED_SETTING_KEYS = new Set([
   'site_title', 'site_tagline', 'show_tagline', 'site_logo', 'site_logo_dark', 'site_logo_height', 'admin_logo_height', 'site_description',
@@ -14,6 +15,8 @@ const ALLOWED_SETTING_KEYS = new Set([
   'medium_size_w', 'medium_size_h', 'large_size_w', 'large_size_h',
   'uploads_use_yearmonth', 'upload_allowed_mime', 'max_upload_size', 'media_format', 'media_quality',
   'toc_enabled',
+  // Backup settings — managed via the Backups page
+  ...BACKUP_SETTING_KEYS,
 ]);
 
 export async function getSettings() {

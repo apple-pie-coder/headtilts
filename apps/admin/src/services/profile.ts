@@ -6,6 +6,12 @@ export interface UpdateProfileInput {
   lastName?: string;
   bio?: string;
   avatar?: string | null;
+  website?: string | null;
+  location?: string | null;
+  twitterUrl?: string | null;
+  linkedinUrl?: string | null;
+  githubUrl?: string | null;
+  instagramUrl?: string | null;
   currentPassword?: string;
   password?: string;
 }

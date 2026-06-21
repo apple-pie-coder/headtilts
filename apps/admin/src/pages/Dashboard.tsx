@@ -1,4 +1,4 @@
-import { DragEvent, FormEvent, ReactNode, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -144,7 +144,7 @@ export default function DashboardPage() {
   const [draftContent, setDraftContent] = useState('');
   const [draftSaving, setDraftSaving] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
+  const [, setIsDragging] = useState(false);
 
   const canCreatePost = hasPermission(PERMISSIONS.POST_CREATE);
   const canViewUsers = hasPermission(PERMISSIONS.USER_READ);
@@ -172,6 +172,20 @@ export default function DashboardPage() {
   // ── Layout state (lazy-loaded from storage; persisted synchronously on change) ──
   const [order, setOrder] = useState<PodId[]>(() => reconcileLayout(user?.id, availableIds).order);
   const [hidden, setHidden] = useState<Set<PodId>>(() => reconcileLayout(user?.id, availableIds).hidden);
+
+  // Refs give handlers synchronous access to drag state, bypassing stale-closure
+  // issues that arise when React re-renders haven't completed before the browser
+  // fires the next dragover/drop event.
+  const dragIdRef = useRef<PodId | null>(null);
+  const insertPointRef = useRef<{ id: PodId; position: 'before' | 'after' } | null>(null);
+  const orderRef = useRef<PodId[]>(order);
+  const hiddenRef = useRef<Set<PodId>>(hidden);
+  // Pointer-event drag: tracks active grab with start position for threshold detection.
+  const ptrDrag = useRef<{ id: PodId; ptId: number; x0: number; y0: number; live: boolean } | null>(null);
+  // DOM refs for each pod — used to compute hover targets from cursor coordinates.
+  const podEls = useRef<Partial<Record<PodId, HTMLElement | null>>>({});
+  // Kept in sync each render so pointer handlers see current visible order.
+  const visiblePodsRef = useRef<PodId[]>([]);
   const [showCustomize, setShowCustomize] = useState(false);
   const [dragId, setDragId] = useState<PodId | null>(null);
   // insertPoint tracks *where* the dragged card will land:
@@ -212,6 +226,10 @@ export default function DashboardPage() {
     setHidden(next.hidden);
   }, [user?.id, availableIds]);
 
+  // Keep refs in sync so drag handlers always see current values.
+  useEffect(() => { orderRef.current = order; }, [order]);
+  useEffect(() => { hiddenRef.current = hidden; }, [hidden]);
+
   async function handleQuickDraft(e: FormEvent) {
     e.preventDefault();
     if (!draftTitle.trim()) return;
@@ -229,67 +247,74 @@ export default function DashboardPage() {
     }
   }
 
-  // ── Drag-and-drop reordering ──
-  // Position-aware: detects whether the cursor is on the top or bottom half of
-  // the target pod to show an insertion line above or below it.
+  // ── Pointer-event drag ──
+  // Uses setPointerCapture so the grip span continues to receive events even when
+  // the cursor moves off it. Uses getBoundingClientRect on pod refs to find the
+  // hovered target — no HTML5 DnD API, no browser-specific quirks.
 
-  const handleDragOverPod = useCallback(
-    (e: DragEvent<HTMLElement>, id: PodId) => {
-      if (!dragId || dragId === id) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      const rect = e.currentTarget.getBoundingClientRect();
-      const position: 'before' | 'after' = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
-      setInsertPoint((prev) =>
-        prev?.id === id && prev?.position === position ? prev : { id, position },
-      );
-    },
-    [dragId],
-  );
-
-  const handleDropOnPod = useCallback(
-    (e: DragEvent<HTMLElement>, target: PodId) => {
-      e.preventDefault();
-      if (dragId && dragId !== target && insertPoint) {
-        const next = order.filter((x) => x !== dragId);
-        const targetIdx = next.indexOf(target);
-        if (targetIdx !== -1) {
-          const insertIdx = insertPoint.position === 'before' ? targetIdx : targetIdx + 1;
-          next.splice(insertIdx, 0, dragId);
-          setOrder(next);
-          writeLayout(user?.id, next, hidden);
-        }
-      }
-      handleDragEnd();
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [dragId, insertPoint, order, hidden, user?.id],
-  );
-
-  // Drop at the very end of the list (after all visible pods)
-  const handleDropAtEnd = useCallback(
-    (e: DragEvent<HTMLElement>) => {
-      e.preventDefault();
-      if (!dragId) return;
-      const next = order.filter((x) => x !== dragId);
-      next.push(dragId);
-      setOrder(next);
-      writeLayout(user?.id, next, hidden);
-      handleDragEnd();
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [dragId, order, hidden, user?.id],
-  );
-
-  function handleHandleDragStart(e: DragEvent<HTMLButtonElement>, id: PodId) {
-    setDragId(id);
-    setIsDragging(true);
-    e.dataTransfer.effectAllowed = 'move';
-    const card = (e.currentTarget.closest(`.${styles.pod}`) as HTMLElement | null);
-    if (card) e.dataTransfer.setDragImage(card, 24, 24);
+  function handleGripPointerDown(e: React.PointerEvent<HTMLSpanElement>, id: PodId) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    ptrDrag.current = { id, ptId: e.pointerId, x0: e.clientX, y0: e.clientY, live: false };
   }
 
-  function handleDragEnd() {
+  function handleGripPointerMove(e: React.PointerEvent<HTMLSpanElement>) {
+    const drag = ptrDrag.current;
+    if (!drag || drag.ptId !== e.pointerId) return;
+
+    if (!drag.live) {
+      if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 6) return;
+      drag.live = true;
+      dragIdRef.current = drag.id;
+      setDragId(drag.id);
+      setIsDragging(true);
+    }
+
+    e.preventDefault(); // prevent scroll while dragging
+
+    // Find pod under cursor (skip self)
+    let found = false;
+    for (const pid of visiblePodsRef.current) {
+      if (pid === drag.id) continue;
+      const el = podEls.current[pid];
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+        const position: 'before' | 'after' = e.clientY < r.top + r.height / 2 ? 'before' : 'after';
+        const prev = insertPointRef.current;
+        if (prev?.id !== pid || prev?.position !== position) {
+          insertPointRef.current = { id: pid, position };
+          setInsertPoint({ id: pid, position });
+        }
+        found = true;
+        break;
+      }
+    }
+    if (!found && insertPointRef.current) {
+      insertPointRef.current = null;
+      setInsertPoint(null);
+    }
+  }
+
+  function handleGripPointerUp(e: React.PointerEvent<HTMLSpanElement>) {
+    const drag = ptrDrag.current;
+    if (!drag || drag.ptId !== e.pointerId) return;
+
+    if (drag.live) {
+      const ip = insertPointRef.current;
+      if (ip && ip.id !== drag.id) {
+        const next = orderRef.current.filter((x) => x !== drag.id);
+        const ti = next.indexOf(ip.id);
+        if (ti !== -1) {
+          next.splice(ip.position === 'before' ? ti : ti + 1, 0, drag.id);
+          setOrder(next);
+          writeLayout(user?.id, next, hiddenRef.current);
+        }
+      }
+    }
+
+    ptrDrag.current = null;
+    dragIdRef.current = null;
+    insertPointRef.current = null;
     setDragId(null);
     setInsertPoint(null);
     setIsDragging(false);
@@ -660,6 +685,7 @@ export default function DashboardPage() {
   }
 
   const visiblePods = order.filter((id) => availableIds.includes(id) && !hidden.has(id));
+  visiblePodsRef.current = visiblePods; // keep ref in sync for pointer handlers
 
   return (
     <AdminLayout>
@@ -713,18 +739,11 @@ export default function DashboardPage() {
           All pods are hidden. Open <strong>Customize</strong> to bring some back.
         </div>
       ) : (
-        <div
-          className={styles.podGrid}
-          onDragLeave={(e) => {
-            // Clear insertPoint only when leaving the entire grid (not just a child)
-            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-              setInsertPoint(null);
-            }
-          }}
-        >
+        <div className={styles.podGrid}>
           {visiblePods.map((id) => (
             <section
               key={id}
+              ref={(el) => { podEls.current[id] = el; }}
               className={[
                 styles.pod,
                 id === 'stats' ? styles.podWide : '',
@@ -732,37 +751,25 @@ export default function DashboardPage() {
                 insertPoint?.id === id && insertPoint.position === 'before' ? styles.podInsertBefore : '',
                 insertPoint?.id === id && insertPoint.position === 'after' ? styles.podInsertAfter : '',
               ].filter(Boolean).join(' ')}
-              onDragOver={(e) => handleDragOverPod(e, id)}
-              onDrop={(e) => handleDropOnPod(e, id)}
             >
               <div className={styles.podHeader}>
-                <button
-                  type="button"
+                <span
                   className={styles.podHandle}
                   title="Drag to reorder"
                   aria-label={`Reorder ${POD_LABEL[id]}`}
-                  draggable
-                  onDragStart={(e) => handleHandleDragStart(e, id)}
-                  onDragEnd={handleDragEnd}
+                  onPointerDown={(e) => handleGripPointerDown(e, id)}
+                  onPointerMove={handleGripPointerMove}
+                  onPointerUp={handleGripPointerUp}
+                  onPointerCancel={handleGripPointerUp}
                 >
                   <FontAwesomeIcon icon={faGripVertical} />
-                </button>
+                </span>
                 <h3 className={styles.podTitle}>{POD_LABEL[id]}</h3>
                 <div className={styles.podActionSlot}>{renderPodAction(id)}</div>
               </div>
               <div className={styles.podBody}>{renderPodBody(id)}</div>
             </section>
           ))}
-
-          {/* Drop zone at the end — lets users append a card after all others */}
-          {isDragging && (
-            <div
-              className={styles.dropZoneEnd}
-              onDragOver={(e) => { e.preventDefault(); setInsertPoint(null); }}
-              onDrop={handleDropAtEnd}
-              aria-label="Drop here to move to end"
-            />
-          )}
         </div>
       )}
     </AdminLayout>

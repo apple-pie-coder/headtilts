@@ -71,7 +71,15 @@ export function AuthorPage() {
         <div className="author-profile-meta">
           <p className="archive-label">Author</p>
           <h1 className="page-title">{displayName}</h1>
+          {author.location && <p className="author-profile-location">{author.location}</p>}
           {author.bio && <p className="author-profile-bio">{author.bio}</p>}
+          <div className="author-profile-links">
+            {author.website && <a href={author.website} target="_blank" rel="noopener noreferrer" className="author-link">Website</a>}
+            {author.twitterUrl && <a href={author.twitterUrl} target="_blank" rel="noopener noreferrer" className="author-link">Twitter / X</a>}
+            {author.linkedinUrl && <a href={author.linkedinUrl} target="_blank" rel="noopener noreferrer" className="author-link">LinkedIn</a>}
+            {author.githubUrl && <a href={author.githubUrl} target="_blank" rel="noopener noreferrer" className="author-link">GitHub</a>}
+            {author.instagramUrl && <a href={author.instagramUrl} target="_blank" rel="noopener noreferrer" className="author-link">Instagram</a>}
+          </div>
         </div>
       </div>
 

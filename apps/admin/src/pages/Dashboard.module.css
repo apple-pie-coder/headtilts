@@ -627,15 +627,35 @@
 
 .emptyText a:hover { text-decoration: underline; }
 
-/* ── Pod grid (reorderable / hideable) ──
-   CSS Grid gives true row-first ordering so drag-and-drop insertion
-   lines match what the user sees. auto-fill + minmax for responsiveness. */
+/* ── Pod grid — masonry layout ──
+   Uses CSS Masonry (grid-template-rows: masonry) where supported (Chrome 136+,
+   Firefox with flag). Falls back to a two-column grid with align-items: start
+   so pods still stack by natural height without stretching rows. */
 
 .podGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 1.25rem;
-  align-items: start;
+  align-items: start; /* fallback: pods don't stretch to row height */
+}
+
+@supports (grid-template-rows: masonry) {
+  .podGrid {
+    grid-template-rows: masonry;
+    align-items: unset;
+  }
+}
+
+@media (min-width: 1280px) {
+  .podGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 680px) {
+  .podGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .pod {
@@ -670,27 +690,6 @@
   outline-offset: 2px;
 }
 
-/* Drop zone that appears at the end of the grid during a drag */
-.dropZoneEnd {
-  grid-column: 1 / -1;
-  height: 3rem;
-  border: 2px dashed var(--border);
-  border-radius: var(--r);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--t3);
-  font-size: 0.8125rem;
-  transition: border-color var(--ease), background var(--ease);
-  cursor: default;
-}
-
-.dropZoneEnd:hover,
-.dropZoneEnd[data-over='true'] {
-  border-color: var(--accent);
-  background: var(--accent-bg);
-  color: var(--accent);
-}
 
 .podHeader {
   display: flex;
@@ -706,12 +705,13 @@
   align-items: center;
   justify-content: center;
   background: none;
-  border: none;
   color: var(--t3);
   padding: 0.125rem 0.25rem;
   cursor: grab;
   border-radius: var(--r-xs);
   transition: color var(--ease), background var(--ease);
+  user-select: none;   /* prevent text selection on repeated clicks */
+  touch-action: none;  /* required for pointer capture on mobile */
 }
 
 .podHandle:hover { color: var(--t1); background: var(--ghost); }

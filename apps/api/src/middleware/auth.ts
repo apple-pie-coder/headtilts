@@ -93,12 +93,15 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
   // ── JWT authentication ──
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+  // Also accept token via query param for browser-initiated downloads (anchor tags can't set headers)
+  const queryToken = typeof req.query.token === 'string' ? req.query.token : null;
+  const token = bearerToken ?? queryToken;
+
+  if (!token) {
     sendError(res, 'UNAUTHORIZED', 'Missing or invalid authorization header', 401);
     return;
   }
-
-  const token = authHeader.substring(7);
   const payload = verifyAccessToken(token);
   if (!payload) {
     sendError(res, 'UNAUTHORIZED', 'Invalid or expired token', 401);

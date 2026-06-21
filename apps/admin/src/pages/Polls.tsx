@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faEdit, faTrash, faRotateLeft, faDownload, faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faEdit, faTrash, faRotateLeft, faDownload, faCompress, faGripVertical, faExpand, faShareNodes } from '@fortawesome/free-solid-svg-icons';
 import { useDensity } from '../hooks/useDensity';
 import { AdminLayout } from '../components/AdminLayout';
 import { useToast } from '../components/ToastContext';
 import { useConfirm } from '../components/ConfirmDialog';
-import { fetchPolls, deletePoll, resetPollVotes, exportPollUrl, Poll } from '../services/polls';
+import { fetchPolls, deletePoll, resetPollVotes, exportPollUrl, fetchPollShares, Poll, PollShare, PollShareClick } from '../services/polls';
 import { PERMISSIONS } from '@headtilts/shared';
 import { useAuth } from '../hooks/useAuth';
 import styles from './Polls.module.css';
@@ -40,6 +40,10 @@ export default function PollsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading]           = useState(true);
   const [density, setDensity]           = useDensity('pollsDensity');
+  const [sharesPoll,   setSharesPoll]   = useState<Poll | null>(null);
+  const [shares,       setShares]       = useState<PollShare[]>([]);
+  const [sharesLoading, setSharesLoading] = useState(false);
+  const [expandedShare, setExpandedShare] = useState<number | null>(null);
 
   useEffect(() => { load(); }, [page, search, statusFilter]);
 
@@ -90,6 +94,20 @@ export default function PollsPage() {
     }
   }
 
+  async function handleViewShares(poll: Poll) {
+    setSharesPoll(poll);
+    setShares([]);
+    setSharesLoading(true);
+    try {
+      const data = await fetchPollShares(poll.id);
+      setShares(data);
+    } catch {
+      toast.error('Failed to load share analytics');
+    } finally {
+      setSharesLoading(false);
+    }
+  }
+
   const pages = Math.max(1, Math.ceil(total / LIMIT));
 
   return (
@@ -112,6 +130,7 @@ export default function PollsPage() {
           <input
             placeholder="Search polls…"
             value={search}
+            autoFocus
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           />
         </div>
@@ -188,6 +207,13 @@ export default function PollsPage() {
                     <a href={exportPollUrl(poll.id)} download className={styles.actionBtn} title="Export CSV">
                       <FontAwesomeIcon icon={faDownload} />
                     </a>
+                    <button
+                      className={styles.actionBtn}
+                      title="Share analytics"
+                      onClick={() => handleViewShares(poll)}
+                    >
+                      <FontAwesomeIcon icon={faShareNodes} />
+                    </button>
                     {canDelete && (
                       <button
                         className={`${styles.actionBtn} ${styles.danger}`}
@@ -210,6 +236,104 @@ export default function PollsPage() {
           <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>← Prev</button>
           <span>Page {page} of {pages}</span>
           <button disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>Next →</button>
+        </div>
+      )}
+
+      {sharesPoll && (
+        <div className={styles.sharesOverlay}>
+          <div className={styles.sharesModal}>
+            <div className={styles.sharesModalHeader}>
+              <div>
+                <h2 className={styles.sharesModalTitle}>Share Analytics</h2>
+                <p className={styles.sharesModalSub}>"{sharesPoll.title}"</p>
+              </div>
+              <button className={styles.sharesClose} onClick={() => setSharesPoll(null)}>✕</button>
+            </div>
+
+            {sharesLoading ? (
+              <p className={styles.sharesEmpty}>Loading…</p>
+            ) : shares.length === 0 ? (
+              <p className={styles.sharesEmpty}>No shares recorded yet. Share buttons appear on the public poll page.</p>
+            ) : (
+              <>
+                <div className={styles.sharesSummary}>
+                  <div className={styles.sharesStat}>
+                    <span className={styles.sharesStatValue}>{shares.length}</span>
+                    <span className={styles.sharesStatLabel}>Total shares</span>
+                  </div>
+                  <div className={styles.sharesStat}>
+                    <span className={styles.sharesStatValue}>{shares.reduce((s, x) => s + x.clicks, 0)}</span>
+                    <span className={styles.sharesStatLabel}>Total clicks</span>
+                  </div>
+                  <div className={styles.sharesStat}>
+                    <span className={styles.sharesStatValue}>
+                      {(() => {
+                        const counts: Record<string,number> = {};
+                        shares.forEach(s => { counts[s.channel] = (counts[s.channel] ?? 0) + 1; });
+                        return Object.entries(counts).sort((a,b) => b[1]-a[1])[0]?.[0] ?? '—';
+                      })()}
+                    </span>
+                    <span className={styles.sharesStatLabel}>Top channel</span>
+                  </div>
+                </div>
+
+                <div className={styles.sharesTableWrap}>
+                  <table className={styles.sharesTable}>
+                    <thead>
+                      <tr>
+                        <th>Channel</th>
+                        <th>Recipient</th>
+                        <th>Note</th>
+                        <th>Clicks</th>
+                        <th>First click</th>
+                        <th>Last click</th>
+                        <th>Shared at</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {shares.map((s) => (
+                        <>
+                          <tr
+                            key={s.id}
+                            className={s.clickDetails.length > 0 ? styles.shareRowClickable : undefined}
+                            onClick={() => s.clickDetails.length > 0 && setExpandedShare(expandedShare === s.id ? null : s.id)}
+                          >
+                            <td><span className={`${styles.shareChannel} ${styles[`shareChannel_${s.channel}`]}`}>{s.channel}</span></td>
+                            <td>
+                              {s.recipientName && <span className={styles.recipientName}>{s.recipientName}</span>}
+                              {s.recipientEmail && <span className={styles.recipientEmail}>{s.recipientEmail}</span>}
+                              {!s.recipientName && !s.recipientEmail && <span className={styles.anon}>Anonymous</span>}
+                            </td>
+                            <td className={styles.noteCell}>{s.note || '—'}</td>
+                            <td className={styles.clickCell}>
+                              {s.clicks}
+                              {s.clickDetails.length > 0 && (
+                                <span className={styles.expandChevron}>{expandedShare === s.id ? ' ▲' : ' ▼'}</span>
+                              )}
+                            </td>
+                            <td className={styles.dateCell}>{s.firstClickAt ? new Date(s.firstClickAt).toLocaleString() : '—'}</td>
+                            <td className={styles.dateCell}>{s.lastClickAt ? new Date(s.lastClickAt).toLocaleString() : '—'}</td>
+                            <td className={styles.dateCell}>{new Date(s.createdAt).toLocaleString()}</td>
+                          </tr>
+                          {expandedShare === s.id && s.clickDetails.map((c: PollShareClick) => (
+                            <tr key={`click-${c.id}`} className={styles.clickDetailRow}>
+                              <td colSpan={2} className={styles.clickDetailIndent}>
+                                <span className={styles.clickDetailLabel}>↳</span>
+                                {c.name ? <strong>{c.name}</strong> : <em className={styles.anon}>No name</em>}
+                                {c.gender && <span className={styles.clickDetailMeta}> · {c.gender}</span>}
+                                {c.age && <span className={styles.clickDetailMeta}> · Age {c.age}</span>}
+                              </td>
+                              <td colSpan={5} className={styles.dateCell}>{new Date(c.clickedAt).toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
     </AdminLayout>

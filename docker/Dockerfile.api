@@ -29,8 +29,8 @@ RUN pnpm --filter @headtilts/api    build
 FROM node:22-slim AS production
 WORKDIR /app
 
-# Prisma's migration engine requires OpenSSL, which is absent in slim images.
-RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+# Prisma needs OpenSSL; backup/restore needs mysqldump and mysql clients.
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl default-mysql-client && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g pnpm
 
