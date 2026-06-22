@@ -1,7 +1,7 @@
 .events-list-page {
   max-width: 960px;
   margin: 0 auto;
-  padding: 2.5rem 1.5rem 4rem;
+  padding: 0 0 4rem;
 }
 
 /* ── Header ── */
@@ -282,6 +282,234 @@
   font-size: 0.9rem;
   color: var(--color-secondary-text, #6e6e73);
 }
+
+/* ── Featured Events Carousel ── */
+
+.efh-hero {
+  /* Container already provides side padding — hero sits flush within it */
+  margin: 0.5rem 0 2.5rem;
+}
+
+.efh-carousel {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  aspect-ratio: 16 / 7;
+  background: #e5e5e7;
+}
+
+/* Slide transition */
+.efh-carousel--slide .efh-carousel-track {
+  display: flex;
+  height: 100%;
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.efh-no-transition { transition: none !important; }
+.efh-carousel--slide .efh-carousel-pane {
+  min-width: 100%;
+  height: 100%;
+  flex-shrink: 0;
+  position: relative;
+}
+
+/* Fade transition */
+.efh-carousel--fade .efh-carousel-track {
+  position: relative;
+  height: 100%;
+}
+.efh-carousel--fade .efh-carousel-pane {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.55s ease;
+  z-index: 0;
+}
+.efh-carousel--fade .efh-carousel-pane--active {
+  opacity: 1;
+  z-index: 1;
+}
+
+/* Slide link fills the pane */
+.efh-slide-link {
+  display: block;
+  position: absolute;
+  inset: 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.efh-slide-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.efh-slide-image--placeholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #e5e5e7, #d2d2d7);
+}
+
+.efh-slide-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.75) 100%);
+}
+
+.efh-slide-content {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 1.75rem 2rem 2rem;
+  max-width: 800px;
+}
+
+.efh-slide-type {
+  display: inline-block;
+  margin-bottom: 0.625rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #fff;
+  background: rgba(0, 113, 227, 0.9);
+}
+
+.efh-slide-title {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+
+.efh-slide-excerpt {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: rgba(255,255,255,0.85);
+  max-width: 620px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.efh-slide-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.efh-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background: rgba(0,0,0,0.38);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: rgba(255,255,255,0.92);
+}
+.efh-chip svg { font-size: 0.7rem; opacity: 0.8; }
+.efh-chip--price { background: rgba(0, 113, 227, 0.85); color: #fff; }
+.efh-chip--price svg { opacity: 1; }
+
+/* Arrows */
+.efh-carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2.625rem;
+  height: 2.625rem;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.42);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #fff;
+  font-size: 1.625rem;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0 0.1em;
+  transition: background 0.2s, opacity 0.2s;
+}
+.efh-carousel-arrow:hover:not(:disabled) { background: rgba(0,0,0,0.65); }
+.efh-carousel-arrow:disabled { opacity: 0.28; cursor: not-allowed; }
+.efh-carousel-arrow--prev { left: 1rem; }
+.efh-carousel-arrow--next { right: 1rem; }
+
+/* Dots */
+.efh-carousel-dots {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.45rem;
+  z-index: 10;
+}
+.efh-carousel-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.48);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s, transform 0.2s;
+}
+.efh-carousel-dot--active {
+  background: #fff;
+  transform: scale(1.3);
+}
+
+/* ── Mobile (≤ 680px) — carousel breaks out of container; controls stack ── */
+@media (max-width: 680px) {
+  /* Negative margins cancel the container's 1.25rem padding → true full-bleed */
+  .efh-hero {
+    margin-left: -1.25rem;
+    margin-right: -1.25rem;
+    margin-bottom: 2rem;
+  }
+  .efh-carousel { aspect-ratio: 4 / 5; border-radius: 0; }
+  .efh-slide-content { padding: 1rem 1.25rem 1.375rem; }
+  .efh-carousel-arrow { width: 2rem; height: 2rem; font-size: 1.25rem; }
+  .efh-carousel-dots { bottom: 0.625rem; }
+
+  /* Controls: stack tabs above filter row */
+  .events-list-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .events-list-controls-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* ── Narrow phones (≤ 430px): hide calendar link to avoid overflow ── */
+@media (max-width: 430px) {
+  .events-list-ical { display: none; }
+}
+
+[data-theme='dark'] .efh-carousel { background: #2c2c2e; }
+[data-theme='dark'] .efh-slide-image--placeholder { background: linear-gradient(135deg, #2c2c2e, #1c1c1e); }
 
 /* ── Dark mode ── */
 

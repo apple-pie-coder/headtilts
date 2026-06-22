@@ -34,6 +34,7 @@ export async function fetchEvents(opts: {
   type?: string;
   timeframe?: string;
   featured?: boolean;
+  excludeIds?: number[];
 } = {}): Promise<EventListResult> {
   return get<EventListResult>('/public/events', {
     page: opts.page,
@@ -41,6 +42,7 @@ export async function fetchEvents(opts: {
     type: opts.type,
     timeframe: opts.timeframe ?? 'upcoming',
     ...(opts.featured ? { featured: true } : {}),
+    ...(opts.excludeIds?.length ? { excludeIds: opts.excludeIds.join(',') } : {}),
   });
 }
 

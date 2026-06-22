@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { PERMISSIONS } from '@headtilts/shared';
 import { AuthProvider } from './context/AuthContext';
@@ -42,7 +43,36 @@ import WidgetsPage from './pages/Widgets';
 import LogsPage from './pages/Logs';
 import HealthPage from './pages/Health';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'http://localhost:3000';
+
+function resolveUrl(url: string) {
+  return url.startsWith('http') ? url : `${MEDIA_URL}${url}`;
+}
+
+function useFaviconFromSettings() {
+  useEffect(() => {
+    fetch(`${API_URL}/public/site-settings`)
+      .then((r) => r.json())
+      .then((json) => {
+        const data = json?.data ?? {};
+        const raw = data.admin_favicon || data.site_favicon;
+        if (!raw) return;
+        const href = resolveUrl(raw);
+        let el = document.head.querySelector<HTMLLinkElement>('link[rel="icon"]');
+        if (!el) {
+          el = document.createElement('link');
+          el.setAttribute('rel', 'icon');
+          document.head.appendChild(el);
+        }
+        el.setAttribute('href', href);
+      })
+      .catch(() => {});
+  }, []);
+}
+
 function App() {
+  useFaviconFromSettings();
   return (
     <ThemeProvider>
     <AuthProvider>

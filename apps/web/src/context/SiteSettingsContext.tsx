@@ -1,7 +1,7 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { fetchSiteSettings } from '../services/taxonomy';
 import { setPermalinkStructure } from '../utils/permalink';
-import { applySiteDefaults } from '../utils/seo';
+import { applySiteDefaults, applyFavicon } from '../utils/seo';
 import { SiteSettings } from '../types';
 
 const DEFAULTS: SiteSettings = {
@@ -41,6 +41,7 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
         // Site-wide title/description fallback. Won't overwrite a page that has
         // already applied its own SEO (prevents the title resetting on refresh).
         applySiteDefaults({ title: merged.site_title, description: merged.site_description });
+        applyFavicon(merged.site_favicon);
       })
       .catch(() => {});
   }, []);

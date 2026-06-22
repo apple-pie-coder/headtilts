@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AdminLayout } from '../components/AdminLayout';
 import { useToast } from '../components/ToastContext';
+import { useConfirm } from '../components/ConfirmDialog';
 import {
   listBackups, createBackup, deleteBackup, restoreBackup,
   uploadBackup, pollBackup, downloadUrl, verifyBackup,
@@ -275,6 +276,7 @@ function StatusBadge({ backup, pending }: { backup: Backup; pending: boolean }) 
 
 export default function BackupsPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [backups, setBackups] = useState<Backup[]>([]);
@@ -343,7 +345,13 @@ export default function BackupsPage() {
   }
 
   async function handleDelete(b: Backup) {
-    if (!window.confirm(`Delete backup "${b.label ?? b.filename}"? This cannot be undone.`)) return;
+    const yes = await confirm({
+      title: 'Delete backup?',
+      message: `"${b.label ?? b.filename}" will be permanently removed from storage.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!yes) return;
     try {
       await deleteBackup(b.id);
       setBackups((prev) => prev.filter((x) => x.id !== b.id));

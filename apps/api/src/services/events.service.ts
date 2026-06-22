@@ -340,7 +340,7 @@ const PUBLIC_EVENT_SELECT = {
 export async function listPublicEvents(
   page = 1,
   limit = 12,
-  opts: { type?: string; timeframe?: string; featured?: boolean } = {},
+  opts: { type?: string; timeframe?: string; featured?: boolean; excludeIds?: number[] } = {},
 ) {
   const now = new Date();
   const where: Record<string, unknown> = {
@@ -350,6 +350,7 @@ export async function listPublicEvents(
     ...(opts.timeframe === 'upcoming' ? { startAt: { gte: now } } : {}),
     ...(opts.timeframe === 'past' ? { endAt: { lt: now } } : {}),
     ...(opts.featured ? { isFeatured: true } : {}),
+    ...(opts.excludeIds?.length ? { id: { notIn: opts.excludeIds } } : {}),
   };
 
   const [items, total] = await Promise.all([
