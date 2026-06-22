@@ -12,6 +12,7 @@ const LABELS: Record<string, string> = {
   tags: 'Tags',
   celebrations: 'Celebrations',
   polls: 'Polls',
+  events: 'Events',
   contact: 'Contact',
   analytics: 'Analytics',
   settings: 'Settings',
@@ -33,6 +34,7 @@ const SINGULAR: Record<string, string> = {
   posts: 'Post',
   pages: 'Page',
   polls: 'Poll',
+  events: 'Event',
   menus: 'Menu',
   users: 'User',
   roles: 'Role',
@@ -76,6 +78,9 @@ function buildCrumbs(pathname: string): Crumb[] {
     } else if (isNumericId(seg1) && seg2 === 'edit') {
       const singular = SINGULAR[seg0] ?? LABELS[seg0] ?? seg0;
       crumbs.push({ label: `Edit ${singular}`, to: null });
+    } else if (isNumericId(seg1) && seg2 === 'registrations') {
+      const singular = SINGULAR[seg0] ?? LABELS[seg0] ?? seg0;
+      crumbs.push({ label: `${singular} Registrations`, to: null });
     } else if (!isNumericId(seg1) && seg1 in LABELS) {
       crumbs.push({ label: LABELS[seg1], to: null });
     }

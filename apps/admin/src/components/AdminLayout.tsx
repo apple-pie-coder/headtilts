@@ -7,7 +7,7 @@ import {
   faTags, faBars, faPuzzlePiece, faUsers, faUserShield, faSitemap, faEnvelope,
   faGear, faSliders, faChevronDown, faFeather, faRightFromBracket, faSun, faMoon, faDesktop,
   faCakeCandles, faChartBar, faKey, faArrowRight, faChartLine, faChartPie, faBoxArchive, faClipboardList,
-  faPalette,
+  faPalette, faCalendarAlt,
 } from '@fortawesome/free-solid-svg-icons';
 import type { ThemeMode, AccentColor, AccentPreset } from '../context/ThemeContext';
 import { ACCENT_PRESETS } from '../context/ThemeContext';
@@ -38,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Tags', to: '/admin/tags', icon: faTags },
   { label: 'Celebrations', to: '/admin/celebrations', icon: faCakeCandles },
   { label: 'Polls', to: '/admin/polls', icon: faChartBar },
+  { label: 'Events', to: '/admin/events', icon: faCalendarAlt },
   { label: 'Contact', to: '/admin/contact', icon: faEnvelope },
   { label: 'Analytics', to: '/admin/analytics', icon: faChartPie },
 ];

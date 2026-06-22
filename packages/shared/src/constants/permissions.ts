@@ -104,6 +104,13 @@ export const PERMISSIONS = {
   // Activity Logs
   LOG_READ:   'logs_read',
   LOG_DELETE: 'logs_delete',
+
+  // Events
+  EVENT_CREATE: 'events_create',
+  EVENT_READ:   'events_read',
+  EVENT_EDIT:   'events_update',
+  EVENT_DELETE: 'events_delete',
+  EVENT_MANAGE_REGISTRATIONS: 'events_manage_registrations',
 } as const;
 
 // Default roles with their permissions
@@ -179,6 +186,11 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.CONTACT_MANAGE,
       PERMISSIONS.LOG_READ,
       PERMISSIONS.LOG_DELETE,
+      PERMISSIONS.EVENT_CREATE,
+      PERMISSIONS.EVENT_READ,
+      PERMISSIONS.EVENT_EDIT,
+      PERMISSIONS.EVENT_DELETE,
+      PERMISSIONS.EVENT_MANAGE_REGISTRATIONS,
     ],
   },
   EDITOR: {
@@ -213,6 +225,10 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.NOTIFICATION_MANAGE,
       PERMISSIONS.CONTACT_READ,
       PERMISSIONS.REDIRECT_READ,
+      PERMISSIONS.EVENT_CREATE,
+      PERMISSIONS.EVENT_READ,
+      PERMISSIONS.EVENT_EDIT,
+      PERMISSIONS.EVENT_MANAGE_REGISTRATIONS,
     ],
   },
   AUTHOR: {
@@ -233,6 +249,7 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.POLL_READ,
       PERMISSIONS.REVISION_READ,
       PERMISSIONS.NOTIFICATION_MANAGE,
+      PERMISSIONS.EVENT_READ,
     ],
   },
   SUBSCRIBER: {
