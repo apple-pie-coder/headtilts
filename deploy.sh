@@ -113,10 +113,10 @@ else
   MYSQL_USER="$(ask "Database user" "headtilts")"
   MYSQL_PASSWORD="$(ask "Database password (Enter = auto-generate)" "")"
   if [ -z "$MYSQL_PASSWORD" ]; then
-    MYSQL_PASSWORD="$(openssl rand -hex 16)"
+    MYSQL_PASSWORD="$(openssl rand -hex 64)"
     ok "Generated a database password (saved in .env)"
   fi
-  MYSQL_ROOT_PASSWORD="$(openssl rand -hex 16)"
+  MYSQL_ROOT_PASSWORD="$(openssl rand -hex 64)"
 
   # Optional email
   SMTP_HOST=""; SMTP_PORT="587"; SMTP_SECURE="false"; SMTP_USER=""; SMTP_PASS=""; SMTP_FROM=""
