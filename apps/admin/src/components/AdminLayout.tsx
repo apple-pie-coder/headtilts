@@ -15,6 +15,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../context/ThemeContext';
 import { Link } from 'react-router-dom';
 import { NotificationBell } from './NotificationBell';
+import { Breadcrumb } from './Breadcrumb';
 import { fetchPublicSettings } from '../services/settings';
 import { resolveMediaUrl } from '../services/media';
 import { apiClient } from '../services/api';
@@ -106,10 +107,17 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const [logoDark, setLogoDark] = useState('');
   const [siteTitle, setSiteTitle] = useState('');
   const [adminLogoHeight, setAdminLogoHeight] = useState('');
+  const [showBreadcrumbs, setShowBreadcrumbs] = useState(true);
 
   useEffect(() => {
     fetchPublicSettings()
-      .then((s) => { setLogo(s.site_logo || ''); setLogoDark(s.site_logo_dark || ''); setSiteTitle(s.site_title || ''); setAdminLogoHeight(s.admin_logo_height || ''); })
+      .then((s) => {
+        setLogo(s.site_logo || '');
+        setLogoDark(s.site_logo_dark || '');
+        setSiteTitle(s.site_title || '');
+        setAdminLogoHeight(s.admin_logo_height || '');
+        setShowBreadcrumbs(s.show_breadcrumbs !== 'no');
+      })
       .catch(() => {});
   }, []);
 
@@ -286,6 +294,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             </div>
           </div>
         </header>
+        <Breadcrumb show={showBreadcrumbs} />
         <div className={styles.content}>{children}</div>
       </main>
 

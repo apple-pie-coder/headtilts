@@ -219,6 +219,7 @@ export default function SettingsPage() {
   const [siteTitle,       setSiteTitle]       = useState('');
   const [siteTagline,     setSiteTagline]     = useState('');
   const [showTagline,     setShowTagline]     = useState('yes');
+  const [showBreadcrumbs, setShowBreadcrumbs] = useState('yes');
   const [siteLogo,        setSiteLogo]        = useState('');
   const [siteLogoDark,    setSiteLogoDark]    = useState('');
   const [siteLogoHeight,  setSiteLogoHeight]  = useState('');
@@ -325,15 +326,17 @@ export default function SettingsPage() {
       const df   = g(all, 'date_format', 'F j, Y');
       const tf   = g(all, 'time_format', 'g:i a');
       const wso  = g(all, 'week_starts_on', '0');
+      const sb   = g(all, 'show_breadcrumbs', 'yes');
       setSiteTitle(st); setSiteTagline(stag); setShowTagline(stg); setSiteLogo(slg); setSiteLogoDark(slgd);
       setSiteLogoHeight(slgh); setAdminLogoHeight(algh); setSiteDescription(sd);
       setAdminEmail(em); setTimezone(tz); setDateFormat(df); setTimeFormat(tf);
-      setWeekStartsOn(wso);
+      setWeekStartsOn(wso); setShowBreadcrumbs(sb);
       if (!DATE_FORMAT_PRESETS.includes(df)) setCustomDate(df);
       if (!TIME_FORMAT_PRESETS.includes(tf)) setCustomTime(tf);
       setSavedGeneral({ site_title: st, site_tagline: stag, show_tagline: stg, site_logo: slg, site_logo_dark: slgd,
         site_logo_height: slgh, admin_logo_height: algh, site_description: sd,
-        admin_email: em, timezone: tz, date_format: df, time_format: tf, week_starts_on: wso });
+        admin_email: em, timezone: tz, date_format: df, time_format: tf, week_starts_on: wso,
+        show_breadcrumbs: sb });
 
       // Reading
       const fpd   = g(all, 'front_page_display', 'posts');
@@ -475,7 +478,7 @@ export default function SettingsPage() {
     show_tagline: showTagline, site_logo: siteLogo, site_logo_dark: siteLogoDark,
     site_logo_height: siteLogoHeight, admin_logo_height: adminLogoHeight,
     site_description: siteDescription, admin_email: adminEmail, timezone, date_format: dateFormat,
-    time_format: timeFormat, week_starts_on: weekStartsOn };
+    time_format: timeFormat, week_starts_on: weekStartsOn, show_breadcrumbs: showBreadcrumbs };
   const curReading: Record<string, string> = { front_page_display: frontPageDisplay,
     front_page_id: frontPageId, posts_page_id: postsPageId,
     contact_page_id: contactPageId, about_page_id: aboutPageId,
@@ -627,6 +630,18 @@ export default function SettingsPage() {
                 <input id="admin_email" type="email" className={styles.regularText} value={adminEmail}
                   onChange={(e) => setAdminEmail(e.target.value)} disabled={saving} />
                 <p className={styles.fieldHint}>This address is used for site administration notifications.</p>
+              </div>
+
+              <span className={styles.formLabel}>Breadcrumbs</span>
+              <div className={styles.formField}>
+                <CheckField
+                  id="show_breadcrumbs"
+                  label="Show breadcrumb navigation in the admin panel"
+                  hint="Displays the current location (e.g. Posts › Edit Post) below the top header."
+                  checked={showBreadcrumbs !== 'no'}
+                  onChange={(v) => setShowBreadcrumbs(v ? 'yes' : 'no')}
+                  disabled={saving}
+                />
               </div>
             </div>
           </div>
