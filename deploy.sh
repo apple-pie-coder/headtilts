@@ -48,11 +48,23 @@ ask_yn() {
 
 gen_secret() { openssl rand -base64 48 | tr -d '\n'; }
 
+# Best-effort local IP for a sensible default URL.
+# Linux: `hostname -I`; macOS: `ipconfig getifaddr`. Never aborts under set -e.
+detect_ip() {
+  local ip=""
+  ip="$(hostname -I 2>/dev/null | awk '{print $1}')" || ip=""
+  if [ -z "$ip" ] && command -v ipconfig >/dev/null 2>&1; then
+    ip="$(ipconfig getifaddr en0 2>/dev/null)" || ip=""
+    [ -z "$ip" ] && { ip="$(ipconfig getifaddr en1 2>/dev/null)" || ip=""; }
+  fi
+  printf '%s' "${ip:-localhost}"
+}
+
 # ─── banner ─────────────────────────────────────────────────────────────────
 printf "${CYAN}${BOLD}"
 cat <<'EOF'
 ╔════════════════════════════════════════════════╗
-║         🚀  Headtilts — Deploy                  ║
+║               Headtilts — Deployer             ║
 ╚════════════════════════════════════════════════╝
 EOF
 printf "${NC}"
@@ -70,7 +82,7 @@ command -v openssl >/dev/null || die "openssl is required (to generate secrets).
 ok "Docker is ready and we're in the project root"
 
 # ─── choose mode ───────────────────────────────────────────────────────────────
-EXISTING="$(docker compose ps -aq 2>/dev/null | wc -l | tr -d ' ')"
+EXISTING="$(docker compose ps -aq 2>/dev/null | wc -l | tr -d ' ' || true)"; EXISTING="${EXISTING:-0}"
 MODE="fresh"
 if [ "$EXISTING" != "0" ]; then
   step "An existing Headtilts deployment was found here"
@@ -90,7 +102,7 @@ if [ "$MODE" = "update" ] && [ -f .env ]; then
   ok "Loaded existing configuration"
 else
   step "Configure this deployment"
-  DEFAULT_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"; DEFAULT_IP="${DEFAULT_IP:-localhost}"
+  DEFAULT_IP="$(detect_ip)"
 
   SITE_URL="$(ask "Public site URL"   "http://${DEFAULT_IP}")"
   HTTP_PORT="$(ask "Host port for the website" "80")"
@@ -152,8 +164,8 @@ ENVEOF
 fi
 
 # Re-read final values for the summary / health check
-HTTP_PORT="$(grep -E '^HTTP_PORT=' .env | cut -d= -f2)"; HTTP_PORT="${HTTP_PORT:-80}"
-SITE_URL="$(grep -E '^SITE_URL=' .env | cut -d= -f2-)"
+HTTP_PORT="$(grep -E '^HTTP_PORT=' .env 2>/dev/null | cut -d= -f2 || true)"; HTTP_PORT="${HTTP_PORT:-80}"
+SITE_URL="$(grep -E '^SITE_URL=' .env 2>/dev/null | cut -d= -f2- || true)"; SITE_URL="${SITE_URL:-http://localhost}"
 
 # ─── bring the stack up ─────────────────────────────────────────────────────────
 if [ "$MODE" = "fresh" ] && [ "$EXISTING" != "0" ]; then
