@@ -62,7 +62,10 @@
 
 /* ── Main column ── */
 
-.event-detail-main { min-width: 0; }
+.event-detail-main {
+  min-width: 0;
+  overflow: hidden; /* clip rich content that exceeds grid column width */
+}
 
 .event-detail-quickinfo {
   display: flex;
@@ -132,6 +135,43 @@
   color: var(--color-text, #3d3d3f);
   margin-bottom: 2rem;
   font-size: 1rem;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.event-detail-description img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+}
+
+.event-detail-description table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.event-detail-description th,
+.event-detail-description td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  text-align: left;
+}
+
+.event-detail-description pre {
+  overflow-x: auto;
+  white-space: pre;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  padding: 1rem;
+  font-size: 0.875rem;
+}
+
+.event-detail-description iframe {
+  max-width: 100%;
 }
 
 /* ── Sections ── */

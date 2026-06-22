@@ -15,12 +15,49 @@ const ALLOWED_SETTING_KEYS = new Set([
   'medium_size_w', 'medium_size_h', 'large_size_w', 'large_size_h',
   'uploads_use_yearmonth', 'upload_allowed_mime', 'max_upload_size', 'media_format', 'media_quality',
   'toc_enabled', 'show_breadcrumbs', 'background_effect',
+  'smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'smtp_from',
   // Backup settings — managed via the Backups page
   ...BACKUP_SETTING_KEYS,
+  // Favicons
+  'site_favicon', 'admin_favicon',
+  // Events carousel — managed via the gear icon on the Events admin page
+  'event_carousel_autoplay', 'event_carousel_interval', 'event_carousel_pause_on_hover',
+  'event_carousel_loop', 'event_carousel_show_arrows', 'event_carousel_show_dots',
+  'event_carousel_count', 'event_carousel_transition',
 ]);
 
 export async function getSettings() {
   return prisma.setting.findMany({ orderBy: { key: 'asc' } });
+}
+
+/**
+ * On first boot after the smtp_* keys were added to the allowlist, any SMTP
+ * config that previously lived only in .env would have been silently rejected
+ * when saved through the UI. This seeds those values from env vars so they
+ * appear in database backups. skipDuplicates ensures it never overwrites a
+ * value the user deliberately saved through the Settings UI.
+ */
+export async function seedSmtpFromEnv(): Promise<void> {
+  const mappings: { key: string; envKey: string }[] = [
+    { key: 'smtp_enabled', envKey: 'SMTP_ENABLED' },
+    { key: 'smtp_host',    envKey: 'SMTP_HOST'    },
+    { key: 'smtp_port',    envKey: 'SMTP_PORT'    },
+    { key: 'smtp_secure',  envKey: 'SMTP_SECURE'  },
+    { key: 'smtp_user',    envKey: 'SMTP_USER'    },
+    { key: 'smtp_pass',    envKey: 'SMTP_PASS'    },
+    { key: 'smtp_from',    envKey: 'SMTP_FROM'    },
+  ];
+
+  const data = mappings
+    .filter(({ envKey }) => Boolean(process.env[envKey]))
+    .map(({ key, envKey }) => ({ key, value: process.env[envKey]!, type: 'string' }));
+
+  if (!data.length) return;
+
+  const { count } = await prisma.setting.createMany({ data, skipDuplicates: true });
+  if (count > 0) {
+    console.log(`✓ Seeded ${count} SMTP setting(s) from environment into the database`);
+  }
 }
 
 export async function updateSettings(updates: Record<string, string>) {

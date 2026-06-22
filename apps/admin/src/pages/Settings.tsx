@@ -225,6 +225,8 @@ export default function SettingsPage() {
   const [siteLogoDark,    setSiteLogoDark]    = useState('');
   const [siteLogoHeight,  setSiteLogoHeight]  = useState('');
   const [adminLogoHeight, setAdminLogoHeight] = useState('');
+  const [siteFavicon,     setSiteFavicon]     = useState('');
+  const [adminFavicon,    setAdminFavicon]    = useState('');
   const [siteDescription, setSiteDescription] = useState('');
   const [adminEmail,      setAdminEmail]      = useState('');
   const [timezone,        setTimezone]        = useState('UTC');
@@ -321,6 +323,8 @@ export default function SettingsPage() {
       const slgd = g(all, 'site_logo_dark');
       const slgh = g(all, 'site_logo_height');
       const algh = g(all, 'admin_logo_height');
+      const sfav = g(all, 'site_favicon');
+      const afav = g(all, 'admin_favicon');
       const sd   = g(all, 'site_description');
       const em   = g(all, 'admin_email');
       const tz   = g(all, 'timezone', 'UTC');
@@ -330,15 +334,16 @@ export default function SettingsPage() {
       const sb   = g(all, 'show_breadcrumbs', 'yes');
       const be   = g(all, 'background_effect', 'none');
       setSiteTitle(st); setSiteTagline(stag); setShowTagline(stg); setSiteLogo(slg); setSiteLogoDark(slgd);
-      setSiteLogoHeight(slgh); setAdminLogoHeight(algh); setSiteDescription(sd);
+      setSiteLogoHeight(slgh); setAdminLogoHeight(algh); setSiteFavicon(sfav); setAdminFavicon(afav);
+      setSiteDescription(sd);
       setAdminEmail(em); setTimezone(tz); setDateFormat(df); setTimeFormat(tf);
       setWeekStartsOn(wso); setShowBreadcrumbs(sb); setBackgroundEffect(be);
       if (!DATE_FORMAT_PRESETS.includes(df)) setCustomDate(df);
       if (!TIME_FORMAT_PRESETS.includes(tf)) setCustomTime(tf);
       setSavedGeneral({ site_title: st, site_tagline: stag, show_tagline: stg, site_logo: slg, site_logo_dark: slgd,
-        site_logo_height: slgh, admin_logo_height: algh, site_description: sd,
-        admin_email: em, timezone: tz, date_format: df, time_format: tf, week_starts_on: wso,
-        show_breadcrumbs: sb, background_effect: be });
+        site_logo_height: slgh, admin_logo_height: algh, site_favicon: sfav, admin_favicon: afav,
+        site_description: sd, admin_email: em, timezone: tz, date_format: df, time_format: tf,
+        week_starts_on: wso, show_breadcrumbs: sb, background_effect: be });
 
       // Reading
       const fpd   = g(all, 'front_page_display', 'posts');
@@ -479,6 +484,7 @@ export default function SettingsPage() {
   const curGeneral: Record<string, string> = { site_title: siteTitle, site_tagline: siteTagline,
     show_tagline: showTagline, site_logo: siteLogo, site_logo_dark: siteLogoDark,
     site_logo_height: siteLogoHeight, admin_logo_height: adminLogoHeight,
+    site_favicon: siteFavicon, admin_favicon: adminFavicon,
     site_description: siteDescription, admin_email: adminEmail, timezone, date_format: dateFormat,
     time_format: timeFormat, week_starts_on: weekStartsOn, show_breadcrumbs: showBreadcrumbs,
     background_effect: backgroundEffect };
@@ -533,19 +539,21 @@ export default function SettingsPage() {
     <AdminLayout>
       <h2 className={styles.pageTitle}>Settings</h2>
 
-      <div className={styles.tabs}>
-        {TABS.map((t) => (
-          <button
-            key={t}
-            type="button"
-            className={t === tab ? styles.tabActive : styles.tab}
-            onClick={() => switchTab(t)}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+      <div className={styles.layout}>
+        <nav className={styles.tabs}>
+          {TABS.map((t) => (
+            <button
+              key={t}
+              type="button"
+              className={t === tab ? styles.tabActive : styles.tab}
+              onClick={() => switchTab(t)}
+            >
+              {t}
+            </button>
+          ))}
+        </nav>
 
+        <div className={styles.content}>
       {loading ? (
         <div className={styles.panel}><p className={styles.loadingText}>Loading…</p></div>
       ) : tab === 'General' ? (
@@ -588,6 +596,18 @@ export default function SettingsPage() {
               <div className={styles.formField}>
                 <MediaPickerInput value={siteLogoDark} onChange={setSiteLogoDark} disabled={saving} />
                 <p className={styles.fieldHint}>Used in the site header when a visitor has dark mode enabled. Leave empty to reuse the logo above.</p>
+              </div>
+
+              <label className={styles.formLabel}>Site Favicon</label>
+              <div className={styles.formField}>
+                <MediaPickerInput value={siteFavicon} onChange={setSiteFavicon} disabled={saving} />
+                <p className={styles.fieldHint}>Browser tab icon for the public site. Use a square image (PNG, ICO, SVG) — 32×32 px recommended.</p>
+              </div>
+
+              <label className={styles.formLabel}>Admin Favicon</label>
+              <div className={styles.formField}>
+                <MediaPickerInput value={adminFavicon} onChange={setAdminFavicon} disabled={saving} />
+                <p className={styles.fieldHint}>Browser tab icon for the admin panel. Leave empty to use the same as the site favicon.</p>
               </div>
 
               <label className={styles.formLabel} htmlFor="site_logo_height">Public Logo Height</label>
@@ -639,8 +659,8 @@ export default function SettingsPage() {
               <div className={styles.formField}>
                 <CheckField
                   id="show_breadcrumbs"
-                  label="Show breadcrumb navigation in the admin panel"
-                  hint="Displays the current location (e.g. Posts › Edit Post) below the top header."
+                  label="Show breadcrumb navigation"
+                  hint="Displays location trails on the public site (e.g. Home › Events) and in the admin panel (e.g. Posts › Edit Post)."
                   checked={showBreadcrumbs !== 'no'}
                   onChange={(v) => setShowBreadcrumbs(v ? 'yes' : 'no')}
                   disabled={saving}
@@ -1281,16 +1301,14 @@ export default function SettingsPage() {
           e.preventDefault();
           save(curEmail, () => setSavedEmail({ ...curEmail }));
         }}>
-          <div className={styles.panel}>
 
-            {/* Enable / Disable row */}
+          {/* Toggle */}
+          <div className={styles.panel}>
+            <h3 className={styles.sectionTitle}>Email Sending</h3>
             <div className={styles.emailToggleRow}>
-              <div className={styles.emailToggleInfo}>
-                <h3 className={styles.emailToggleTitle}>Email Sending</h3>
-                <p className={styles.emailToggleDesc}>
-                  When disabled, password resets and notifications are suppressed (logged to console instead).
-                </p>
-              </div>
+              <p className={styles.sectionDesc}>
+                When disabled, password resets and notifications are suppressed and logged to console instead.
+              </p>
               <label className={styles.emailToggleSwitch}>
                 <input
                   type="checkbox"
@@ -1304,20 +1322,16 @@ export default function SettingsPage() {
                 </span>
               </label>
             </div>
+          </div>
 
-            <hr className={styles.formDivider} />
+          {/* SMTP config — muted when disabled */}
+          <div className={smtpEnabled !== 'true' ? styles.panelMuted : undefined}>
 
-            {/* All SMTP fields — muted when disabled */}
-            <div className={smtpEnabled !== 'true' ? styles.panelMuted : undefined}>
-
+            <div className={styles.panel}>
+              <h3 className={styles.sectionTitle}>Server</h3>
               <p className={styles.sectionDesc} style={{ marginBottom: '1.25rem' }}>
-                These settings override the <code>SMTP_*</code> environment variables.
-                Leave blank to fall back to the values in <code>.env</code>.
+                Overrides <code>SMTP_*</code> environment variables. Leave blank to use <code>.env</code> values.
               </p>
-
-              {/* Server */}
-              <p className={styles.emailGroupLabel}>Server</p>
-
               <div className={styles.formTable}>
                 <label className={styles.formLabel} htmlFor="smtp_host">Host</label>
                 <div className={styles.formField}>
@@ -1326,31 +1340,28 @@ export default function SettingsPage() {
                     onChange={(e) => setSmtpHost(e.target.value)}
                     disabled={saving || smtpEnabled !== 'true'} />
                 </div>
-              </div>
 
-              <div className={styles.formTable}>
-                <label className={styles.formLabel} htmlFor="smtp_port">Port</label>
+                <label className={styles.formLabel} htmlFor="smtp_port">Port &amp; Security</label>
                 <div className={styles.formField}>
                   <div className={styles.inlineRow}>
                     <input id="smtp_port" type="number" className={styles.smallText}
                       placeholder="587" value={smtpPort}
                       onChange={(e) => setSmtpPort(e.target.value)}
                       disabled={saving || smtpEnabled !== 'true'} />
-                    <select className={styles.selectInput}
-                      value={smtpSecure}
+                    <select className={styles.selectInput} value={smtpSecure}
                       onChange={(e) => setSmtpSecure(e.target.value)}
                       disabled={saving || smtpEnabled !== 'true'}>
                       <option value="false">STARTTLS</option>
                       <option value="true">SSL / TLS</option>
                     </select>
                   </div>
-                  <p className={styles.description}>587 = STARTTLS · 465 = SSL/TLS</p>
+                  <p className={styles.fieldHint}>587 = STARTTLS · 465 = SSL/TLS</p>
                 </div>
               </div>
+            </div>
 
-              {/* Credentials */}
-              <p className={styles.emailGroupLabel} style={{ marginTop: '1.25rem' }}>Credentials</p>
-
+            <div className={styles.panel}>
+              <h3 className={styles.sectionTitle}>Credentials</h3>
               <div className={styles.formTable}>
                 <label className={styles.formLabel} htmlFor="smtp_user">Username</label>
                 <div className={styles.formField}>
@@ -1359,9 +1370,7 @@ export default function SettingsPage() {
                     onChange={(e) => setSmtpUser(e.target.value)}
                     disabled={saving || smtpEnabled !== 'true'} />
                 </div>
-              </div>
 
-              <div className={styles.formTable}>
                 <label className={styles.formLabel} htmlFor="smtp_pass">Password</label>
                 <div className={styles.formField}>
                   <input id="smtp_pass" type="password" className={styles.regularText} autoComplete="new-password"
@@ -1370,10 +1379,10 @@ export default function SettingsPage() {
                     disabled={saving || smtpEnabled !== 'true'} />
                 </div>
               </div>
+            </div>
 
-              {/* Sender */}
-              <p className={styles.emailGroupLabel} style={{ marginTop: '1.25rem' }}>Sender</p>
-
+            <div className={styles.panel}>
+              <h3 className={styles.sectionTitle}>Sender</h3>
               <div className={styles.formTable}>
                 <label className={styles.formLabel} htmlFor="smtp_from">From address</label>
                 <div className={styles.formField}>
@@ -1381,44 +1390,41 @@ export default function SettingsPage() {
                     placeholder='Site Name <no-reply@example.com>' value={smtpFrom}
                     onChange={(e) => setSmtpFrom(e.target.value)}
                     disabled={saving || smtpEnabled !== 'true'} />
-                  <p className={styles.description}>Supports <code>Name &lt;address&gt;</code> format.</p>
+                  <p className={styles.fieldHint}>Supports <code>Name &lt;address&gt;</code> format.</p>
                 </div>
               </div>
-
-            </div>
-
-            <hr className={styles.formDivider} />
-
-            {/* Actions */}
-            <div className={styles.emailActions}>
-              <button type="submit" className={styles.saveButton}
-                disabled={saving || !isDirty(curEmail, savedEmail)}>
-                {saving ? 'Saving…' : 'Save Changes'}
-              </button>
-              <button
-                type="button"
-                className={styles.testEmailButton}
-                disabled={testingEmail || saving || smtpEnabled !== 'true' || !smtpHost}
-                onClick={async () => {
-                  setTestingEmail(true);
-                  try {
-                    const result = await sendTestEmail();
-                    toast.success(`Test email sent to ${result.to}`);
-                  } catch {
-                    toast.error('Failed to send test email. Check your SMTP credentials.');
-                  } finally {
-                    setTestingEmail(false);
-                  }
-                }}
-              >
-                {testingEmail ? 'Sending…' : 'Send Test Email'}
-              </button>
-              <p className={styles.description}>
-                Save first, then test. Test email goes to your account address.
-              </p>
             </div>
 
           </div>
+
+          <div className={styles.emailActions}>
+            <button type="submit" className={styles.saveButton}
+              disabled={saving || !isDirty(curEmail, savedEmail)}>
+              {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+            <button
+              type="button"
+              className={styles.testEmailButton}
+              disabled={testingEmail || saving || smtpEnabled !== 'true' || !smtpHost}
+              onClick={async () => {
+                setTestingEmail(true);
+                try {
+                  const result = await sendTestEmail();
+                  toast.success(`Test email sent to ${result.to}`);
+                } catch {
+                  toast.error('Failed to send test email. Check your SMTP credentials.');
+                } finally {
+                  setTestingEmail(false);
+                }
+              }}
+            >
+              {testingEmail ? 'Sending…' : 'Send Test Email'}
+            </button>
+          </div>
+          <p className={styles.fieldHint} style={{ paddingBottom: '1.5rem' }}>
+            Save first, then test. Test email goes to your account email address.
+          </p>
+
         </form>
       ) : tab === 'Notifications' ? (
         /* ═══════════════ NOTIFICATIONS ═══════════════ */
@@ -1518,6 +1524,8 @@ export default function SettingsPage() {
           </div>
         </div>
       ) : null}
+        </div>
+      </div>
     </AdminLayout>
   );
 }

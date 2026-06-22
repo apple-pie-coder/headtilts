@@ -68,11 +68,15 @@ const postPublicFullSelect = {
 router.get('/site-settings', publicReadLimiter, asyncHandler(async (_req: Request, res: Response) => {
   const SAFE_KEYS = [
     'site_title', 'site_tagline', 'show_tagline', 'site_logo', 'site_logo_dark', 'site_logo_height', 'admin_logo_height', 'site_description',
+    'site_favicon', 'admin_favicon',
     'timezone', 'date_format', 'time_format',
     'posts_per_page', 'front_page_display', 'front_page_id', 'posts_page_id',
     'contact_page_id', 'about_page_id', 'privacy_policy_page_id', 'terms_page_id',
     'search_engine_visibility', 'permalink_structure',
     'toc_enabled', 'show_breadcrumbs', 'background_effect',
+    'event_carousel_autoplay', 'event_carousel_interval', 'event_carousel_pause_on_hover',
+    'event_carousel_loop', 'event_carousel_show_arrows', 'event_carousel_show_dots',
+    'event_carousel_count', 'event_carousel_transition',
   ];
   const PAGE_ID_KEYS = ['front_page_id', 'posts_page_id', 'contact_page_id', 'about_page_id', 'privacy_policy_page_id', 'terms_page_id'];
 
@@ -844,7 +848,10 @@ router.get('/events', publicReadLimiter, asyncHandler(async (req: Request, res: 
   const type = typeof req.query.type === 'string' ? req.query.type : undefined;
   const timeframe = typeof req.query.timeframe === 'string' ? req.query.timeframe : 'upcoming';
   const featured = req.query.featured === 'true';
-  const { items, total } = await listPublicEvents(page, limit, { type, timeframe, featured });
+  const excludeIds = typeof req.query.excludeIds === 'string'
+    ? req.query.excludeIds.split(',').map(Number).filter((n) => n > 0)
+    : undefined;
+  const { items, total } = await listPublicEvents(page, limit, { type, timeframe, featured, excludeIds });
   const pages = Math.ceil(total / limit);
   sendSuccess(res, { items, pagination: { page, limit, total, pages } });
 }));

@@ -56,16 +56,17 @@ export async function createBackup(label?: string): Promise<number> {
   return record.id;
 }
 
-/** Awaited variant used for the pre-restore safety backup. */
-async function createBackupAndWait(label: string): Promise<void> {
+/** Awaited variant used for the pre-restore safety backup. Skips retention to avoid deleting the backup being restored from. Returns the completed record so the caller can re-insert it after the restore wipes the DB. */
+async function createBackupAndWait(label: string): Promise<BackupRow> {
   const filename = buildFilename(label);
   const record = await prisma.backup.create({
     data: { filename, label, status: 'pending' },
   });
-  await runBackup(record.id, filename, label);
+  await runBackup(record.id, filename, label, { skipRetention: true });
+  return prisma.backup.findUniqueOrThrow({ where: { id: record.id } });
 }
 
-async function runBackup(id: number, filename: string, label?: string) {
+async function runBackup(id: number, filename: string, label?: string, opts: { skipRetention?: boolean } = {}) {
   const storage = await resolveStorageProvider();
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ht-backup-'));
   try {
@@ -122,8 +123,8 @@ async function runBackup(id: number, filename: string, label?: string) {
       data: { status: 'ready', sizeBytes, completedAt: new Date() },
     });
 
-    // 6. Enforce retention policy
-    await enforceRetention();
+    // 6. Enforce retention policy (skipped for pre-restore safety backups)
+    if (!opts.skipRetention) await enforceRetention();
 
     // 7. Success notification
     await notifyResult(label ?? filename, true);
@@ -182,6 +183,31 @@ async function notifyResult(label: string, success: boolean, errorMsg?: string) 
   } catch { /* non-fatal */ }
 }
 
+// ── Reconcile ─────────────────────────────────────────────────────────────────
+
+/**
+ * Runs at startup. Marks any "ready" backup records whose files no longer
+ * exist in storage as failed, preventing stale records from causing confusing
+ * "file not found" errors in the UI (most commonly caused by a DB restore that
+ * resurrects records for files that were cleaned up after the backup was taken).
+ */
+export async function reconcileBackupRecords(): Promise<void> {
+  try {
+    const storage = await resolveStorageProvider();
+    const ready = await prisma.backup.findMany({ where: { status: 'ready' } });
+    const stale = await Promise.all(
+      ready.map(async (b) => ({ b, exists: await storage.exists(b.filename) }))
+    );
+    const toMark = stale.filter(({ exists }) => !exists).map(({ b }) => b);
+    if (!toMark.length) return;
+    await prisma.backup.updateMany({
+      where: { id: { in: toMark.map((b) => b.id) } },
+      data: { status: 'failed', errorMsg: 'File missing from storage — possibly orphaned by a database restore' },
+    });
+    console.log(`⚠ Marked ${toMark.length} backup record(s) as failed: files not found in storage`);
+  } catch { /* non-fatal */ }
+}
+
 // ── List / Get ────────────────────────────────────────────────────────────────
 
 export async function listBackups(): Promise<SerializedBackup[]> {
@@ -218,6 +244,15 @@ export async function verifyBackup(id: number): Promise<{ valid: boolean; manife
   const record = await findBackup(id);
   if (record.status !== 'ready') return { valid: false, manifest: null, error: 'Backup is not in ready state' };
 
+  const storage = await resolveStorageProvider();
+  if (!await storage.exists(record.filename)) {
+    await prisma.backup.update({
+      where: { id },
+      data: { status: 'failed', errorMsg: 'File missing from storage — possibly orphaned by a database restore' },
+    });
+    return { valid: false, manifest: null, error: `Backup file not found in storage: ${record.filename}` };
+  }
+
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ht-verify-'));
   try {
     const storage = await resolveStorageProvider();
@@ -252,18 +287,29 @@ export async function restoreBackup(id: number, scope: RestoreScope = 'all'): Pr
   const record = await findBackup(id);
   if (record.status !== 'ready') throw new Error('Backup is not ready for restore');
 
-  // Pre-restore safety backup (full scope only, to avoid infinite loops)
+  const storageCheck = await resolveStorageProvider();
+  if (!await storageCheck.exists(record.filename)) {
+    await prisma.backup.update({
+      where: { id },
+      data: { status: 'failed', errorMsg: 'File missing from storage — possibly orphaned by a database restore' },
+    });
+    throw new Error(`Backup file not found in storage: ${record.filename}`);
+  }
+
+  // Pre-restore safety backup (full scope only, to avoid infinite loops).
+  // We save the completed record so we can re-insert it after the restore wipes the DB.
+  let safetyRecord: BackupRow | null = null;
   if (scope === 'all') {
     const { preRestoreBackup } = await getBackupSettings();
     if (preRestoreBackup) {
-      await createBackupAndWait(`pre-restore-${record.label ?? record.id}`);
+      safetyRecord = await createBackupAndWait(`pre-restore-${record.label ?? record.id}`);
     }
   }
 
   await runRestore(record.filename, scope);
 
-  // mysqldump captures the record as 'pending' (before it completes), so the restored
-  // DB has it as pending. Re-establish it as ready with the data we captured above.
+  // The DB restore replaces all table data. Re-establish both the restored backup and the
+  // pre-restore safety backup so they remain visible and subject to future retention.
   await prisma.backup.upsert({
     where: { filename: record.filename },
     update: { status: 'ready', errorMsg: null, completedAt: record.completedAt },
@@ -275,6 +321,20 @@ export async function restoreBackup(id: number, scope: RestoreScope = 'all'): Pr
       completedAt: record.completedAt,
     },
   });
+
+  if (safetyRecord) {
+    await prisma.backup.upsert({
+      where: { filename: safetyRecord.filename },
+      update: { status: 'ready', errorMsg: null, completedAt: safetyRecord.completedAt },
+      create: {
+        filename: safetyRecord.filename,
+        label: safetyRecord.label,
+        status: 'ready',
+        sizeBytes: safetyRecord.sizeBytes,
+        completedAt: safetyRecord.completedAt,
+      },
+    });
+  }
 }
 
 async function runRestore(filename: string, scope: RestoreScope) {

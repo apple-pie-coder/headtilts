@@ -4,7 +4,9 @@ import { connectDatabase, disconnectDatabase } from './config/database';
 import { publishDuePosts } from './services/posts.service';
 import { initRealtime } from './realtime/notifications.gateway';
 import { prisma } from './config/database';
-import { startBackupScheduler } from './services/backupScheduler';
+import { startBackupScheduler, } from './services/backupScheduler';
+import { seedSmtpFromEnv } from './services/settings.service';
+import { reconcileBackupRecords } from './services/backup.service';
 
 const REQUIRED_ENV_VARS = ['DATABASE_URL', 'JWT_SECRET', 'JWT_REFRESH_SECRET'] as const;
 
@@ -37,6 +39,8 @@ async function start(): Promise<void> {
   try {
     // Connect to database
     await connectDatabase();
+    await seedSmtpFromEnv();
+    await reconcileBackupRecords();
 
     // Create the Express app and wrap it in an HTTP server so Socket.IO can
     // share the same port for real-time admin notifications.

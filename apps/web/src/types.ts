@@ -92,6 +92,8 @@ export interface SiteSettings {
   site_logo_dark: string;
   site_logo_height?: string;
   admin_logo_height?: string;
+  site_favicon?: string;
+  admin_favicon?: string;
   site_description: string;
   timezone: string;
   date_format: string;
@@ -103,6 +105,14 @@ export interface SiteSettings {
   toc_enabled?: string;
   show_breadcrumbs?: string;
   background_effect?: string;
+  event_carousel_autoplay?: string;
+  event_carousel_interval?: string;
+  event_carousel_pause_on_hover?: string;
+  event_carousel_loop?: string;
+  event_carousel_show_arrows?: string;
+  event_carousel_show_dots?: string;
+  event_carousel_count?: string;
+  event_carousel_transition?: string;
   front_page_id: string;
   posts_page_id: string;
   contact_page_id: string;

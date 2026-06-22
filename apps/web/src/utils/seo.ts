@@ -25,6 +25,21 @@ function upsertMeta(attr: 'name' | 'property', key: string, content: string | nu
   el.setAttribute('content', content);
 }
 
+export function applyFavicon(url: string | null | undefined) {
+  const resolved = url ? resolveMediaUrl(url) : null;
+  let el = document.head.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  if (!resolved) {
+    el?.remove();
+    return;
+  }
+  if (!el) {
+    el = document.createElement('link');
+    el.setAttribute('rel', 'icon');
+    document.head.appendChild(el);
+  }
+  el.setAttribute('href', resolved);
+}
+
 function upsertCanonical(href: string | null | undefined) {
   let el = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
   if (!href) {

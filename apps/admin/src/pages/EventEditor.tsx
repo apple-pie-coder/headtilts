@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import { slugify } from '@headtilts/shared';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faTrash, faArrowLeft, faSave } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faTrash, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { AdminLayout } from '../components/AdminLayout';
 import { useToast } from '../components/ToastContext';
 import { MediaPickerInput } from '../components/MediaPickerInput';
@@ -284,14 +284,22 @@ export default function EventEditorPage() {
 
   return (
     <AdminLayout>
-      <div className={styles.page}>
-        <div className={styles.pageHeader}>
-          <h1 className={styles.pageTitle}>
-            <Link to="/admin/events" className={styles.cancelLink} style={{ marginRight: '0.5rem' }}>
-              <FontAwesomeIcon icon={faArrowLeft} />
-            </Link>
-            {isNew ? 'New Event' : 'Edit Event'}
-          </h1>
+      <div>
+        <div className={styles.header}>
+          <div className={styles.headerLeft}>
+            <button className={styles.backButton} onClick={() => navigate('/admin/events')}>
+              <FontAwesomeIcon icon={faArrowLeft} /> Events
+            </button>
+            <h1 className={styles.title}>{isNew ? 'New Event' : 'Edit Event'}</h1>
+          </div>
+          <div className={styles.publishActions}>
+            <button className={styles.draftButton} disabled={saving} onClick={() => { setStatus('draft'); setTimeout(handleSave, 0); }}>
+              Save Draft
+            </button>
+            <button className={styles.primaryButton} disabled={saving} onClick={handleSave}>
+              {saving ? 'Saving…' : isNew ? 'Create Event' : 'Update Event'}
+            </button>
+          </div>
         </div>
 
         <nav className={styles.tabs}>
@@ -328,12 +336,14 @@ export default function EventEditorPage() {
               </div>
               <div className={styles.field}>
                 <label className={styles.label}>Description</label>
-                <ReactQuill
-                  theme="snow"
-                  value={description}
-                  onChange={setDescription}
-                  modules={quillModules()}
-                />
+                <div className={styles.editorWrapper}>
+                  <ReactQuill
+                    theme="snow"
+                    value={description}
+                    onChange={setDescription}
+                    modules={quillModules()}
+                  />
+                </div>
               </div>
               <div className={styles.row2}>
                 <div className={styles.field}>
@@ -782,13 +792,6 @@ export default function EventEditorPage() {
           </div>
         )}
 
-        <div className={styles.actionBar}>
-          <button className={styles.saveBtn} onClick={handleSave} disabled={saving}>
-            <FontAwesomeIcon icon={faSave} />
-            {saving ? ' Saving…' : ' Save Event'}
-          </button>
-          <Link to="/admin/events" className={styles.cancelLink}>Cancel</Link>
-        </div>
       </div>
     </AdminLayout>
   );
