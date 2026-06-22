@@ -12,6 +12,7 @@ import { useTheme, ThemeMode } from '../context/ThemeContext';
 import { useLayout } from '../context/LayoutContext';
 import { applyRobotsPolicy } from '../utils/seo';
 import { SearchBar } from './SearchBar';
+import { BackgroundEffect } from './BackgroundEffect';
 
 const THEME_OPTIONS: { value: ThemeMode; icon: typeof faSun; label: string }[] = [
   { value: 'system', icon: faDesktop, label: 'System' },
@@ -92,7 +93,9 @@ export function SiteLayout({ children }: { children: ReactNode }) {
   const innerClass = isBlank || isFullBleed ? undefined : 'site-body';
 
   return (
-    <div className="site-wrap">
+    <>
+    <BackgroundEffect />
+    <div className="site-wrap" style={{ position: 'relative', zIndex: 2 }}>
       {!isBlank && <CelebrationSpotlight />}
       {!isBlank && (
         <header className={`site-header${isFullBleed ? ' site-header--transparent' : ''}`}>
@@ -169,5 +172,6 @@ export function SiteLayout({ children }: { children: ReactNode }) {
         </footer>
       )}
     </div>
+    </>
   );
 }

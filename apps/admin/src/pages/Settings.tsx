@@ -220,6 +220,7 @@ export default function SettingsPage() {
   const [siteTagline,     setSiteTagline]     = useState('');
   const [showTagline,     setShowTagline]     = useState('yes');
   const [showBreadcrumbs, setShowBreadcrumbs] = useState('yes');
+  const [backgroundEffect, setBackgroundEffect] = useState('none');
   const [siteLogo,        setSiteLogo]        = useState('');
   const [siteLogoDark,    setSiteLogoDark]    = useState('');
   const [siteLogoHeight,  setSiteLogoHeight]  = useState('');
@@ -327,16 +328,17 @@ export default function SettingsPage() {
       const tf   = g(all, 'time_format', 'g:i a');
       const wso  = g(all, 'week_starts_on', '0');
       const sb   = g(all, 'show_breadcrumbs', 'yes');
+      const be   = g(all, 'background_effect', 'none');
       setSiteTitle(st); setSiteTagline(stag); setShowTagline(stg); setSiteLogo(slg); setSiteLogoDark(slgd);
       setSiteLogoHeight(slgh); setAdminLogoHeight(algh); setSiteDescription(sd);
       setAdminEmail(em); setTimezone(tz); setDateFormat(df); setTimeFormat(tf);
-      setWeekStartsOn(wso); setShowBreadcrumbs(sb);
+      setWeekStartsOn(wso); setShowBreadcrumbs(sb); setBackgroundEffect(be);
       if (!DATE_FORMAT_PRESETS.includes(df)) setCustomDate(df);
       if (!TIME_FORMAT_PRESETS.includes(tf)) setCustomTime(tf);
       setSavedGeneral({ site_title: st, site_tagline: stag, show_tagline: stg, site_logo: slg, site_logo_dark: slgd,
         site_logo_height: slgh, admin_logo_height: algh, site_description: sd,
         admin_email: em, timezone: tz, date_format: df, time_format: tf, week_starts_on: wso,
-        show_breadcrumbs: sb });
+        show_breadcrumbs: sb, background_effect: be });
 
       // Reading
       const fpd   = g(all, 'front_page_display', 'posts');
@@ -478,7 +480,8 @@ export default function SettingsPage() {
     show_tagline: showTagline, site_logo: siteLogo, site_logo_dark: siteLogoDark,
     site_logo_height: siteLogoHeight, admin_logo_height: adminLogoHeight,
     site_description: siteDescription, admin_email: adminEmail, timezone, date_format: dateFormat,
-    time_format: timeFormat, week_starts_on: weekStartsOn, show_breadcrumbs: showBreadcrumbs };
+    time_format: timeFormat, week_starts_on: weekStartsOn, show_breadcrumbs: showBreadcrumbs,
+    background_effect: backgroundEffect };
   const curReading: Record<string, string> = { front_page_display: frontPageDisplay,
     front_page_id: frontPageId, posts_page_id: postsPageId,
     contact_page_id: contactPageId, about_page_id: aboutPageId,
@@ -642,6 +645,31 @@ export default function SettingsPage() {
                   onChange={(v) => setShowBreadcrumbs(v ? 'yes' : 'no')}
                   disabled={saving}
                 />
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.panel}>
+            <h3 className={styles.sectionTitle}>Visual Effects</h3>
+            <div className={styles.formTable}>
+              <label className={styles.formLabel} htmlFor="background_effect">Public Site Background</label>
+              <div className={styles.formField}>
+                <select
+                  id="background_effect"
+                  className={styles.selectInput}
+                  value={backgroundEffect}
+                  onChange={(e) => setBackgroundEffect(e.target.value)}
+                  disabled={saving}
+                >
+                  <option value="none">None — no background effect</option>
+                  <option value="diya">✦ Diya Glow — warm flickering amber orbs</option>
+                  <option value="petals">✿ Marigold Petals — falling orange &amp; gold petals</option>
+                  <option value="rangoli">★ Rangoli Sparkles — colourful twinkling stars</option>
+                  <option value="holi">◉ Holi Colors — floating festive colour clouds</option>
+                </select>
+                <p className={styles.fieldHint}>
+                  Adds a decorative canvas animation to every public page. Renders behind your content with pointer-events disabled so it never interferes with interaction.
+                </p>
               </div>
             </div>
           </div>

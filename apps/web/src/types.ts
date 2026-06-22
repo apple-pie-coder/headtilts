@@ -102,6 +102,7 @@ export interface SiteSettings {
   permalink_structure?: string;
   toc_enabled?: string;
   show_breadcrumbs?: string;
+  background_effect?: string;
   front_page_id: string;
   posts_page_id: string;
   contact_page_id: string;
