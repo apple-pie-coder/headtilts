@@ -22,3 +22,6 @@ coverage/
 .env*.local
 .env.*.local
 old-repo.git/
+
+# Local deploy script — contains server credentials, never commit
+deploy-to-pi.sh
