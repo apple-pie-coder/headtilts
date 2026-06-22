@@ -71,7 +71,7 @@ router.get('/site-settings', publicReadLimiter, asyncHandler(async (_req: Reques
     'posts_per_page', 'front_page_display', 'front_page_id', 'posts_page_id',
     'contact_page_id', 'about_page_id', 'privacy_policy_page_id', 'terms_page_id',
     'search_engine_visibility', 'permalink_structure',
-    'toc_enabled',
+    'toc_enabled', 'show_breadcrumbs',
   ];
   const PAGE_ID_KEYS = ['front_page_id', 'posts_page_id', 'contact_page_id', 'about_page_id', 'privacy_policy_page_id', 'terms_page_id'];
 
