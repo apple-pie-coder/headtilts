@@ -14,7 +14,7 @@ const ALLOWED_SETTING_KEYS = new Set([
   'thumbnail_size_w', 'thumbnail_size_h', 'thumbnail_crop',
   'medium_size_w', 'medium_size_h', 'large_size_w', 'large_size_h',
   'uploads_use_yearmonth', 'upload_allowed_mime', 'max_upload_size', 'media_format', 'media_quality',
-  'toc_enabled',
+  'toc_enabled', 'show_breadcrumbs', 'background_effect',
   // Backup settings — managed via the Backups page
   ...BACKUP_SETTING_KEYS,
 ]);
