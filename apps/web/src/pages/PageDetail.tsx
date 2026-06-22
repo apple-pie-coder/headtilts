@@ -10,6 +10,7 @@ import { ContactForm } from '../components/ContactForm';
 import { applySeo, resetSeo } from '../utils/seo';
 import { resolveShortcodes } from '../utils/shortcodes';
 import { RichContent } from '../components/RichContent';
+import { Breadcrumb } from '../components/Breadcrumb';
 import { PostsArchive } from './PostsArchive';
 
 export function PageDetailPage() {
@@ -88,12 +89,17 @@ export function PageDetail({ slug }: { slug: string }) {
   const template = page.template || 'default';
 
   return (
-    <article className={`post-full page-template-${template}`}>
+    <>
+      {template !== 'blank' && template !== 'full-bleed' && (
+        <Breadcrumb crumbs={[{ label: 'Home', href: '/' }, { label: page.title }]} />
+      )}
+      <article className={`post-full page-template-${template}`}>
       <header className="post-header">
         <h1 className="post-title">{page.title}</h1>
       </header>
       <RichContent html={resolvedContent} className="post-content" />
       {template === 'contact' && <ContactForm />}
     </article>
+    </>
   );
 }

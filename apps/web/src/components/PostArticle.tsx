@@ -15,6 +15,7 @@ import { TableOfContents } from './TableOfContents';
 import { PostReactions } from './PostReactions';
 import { RelatedPosts } from './RelatedPosts';
 import { SeriesNav } from './SeriesNav';
+import { Breadcrumb } from './Breadcrumb';
 import { Author, PostFull } from '../types';
 import { readingTime } from '../utils/readingTime';
 
@@ -73,8 +74,16 @@ export function PostArticle({ post }: { post: PostFull }) {
     return () => resetSeo(site_title);
   }, [post, site_title]);
 
+  const primaryCategory = post.categories[0]?.category ?? null;
+
   return (
-    <article className="post-full" ref={articleRef}>
+    <>
+      <Breadcrumb crumbs={[
+        { label: 'Home', href: '/' },
+        ...(primaryCategory ? [{ label: primaryCategory.name, href: `/categories/${primaryCategory.slug}` }] : []),
+        { label: post.title },
+      ]} />
+      <article className="post-full" ref={articleRef}>
       <ReadingProgress targetRef={articleRef} />
 
       {post.featuredImage && (
@@ -187,5 +196,6 @@ export function PostArticle({ post }: { post: PostFull }) {
       <RelatedPosts slug={post.slug} />
       <Comments slug={post.slug} />
     </article>
+    </>
   );
 }

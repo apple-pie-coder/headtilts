@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faArrowRight } from '@fortawesome/free-solid-svg-icons';
 import { PostCard } from '../components/PostCard';
+import { Breadcrumb } from '../components/Breadcrumb';
 import { fetchPosts } from '../services/posts';
 import { useSiteSettings } from '../context/SiteSettingsContext';
 import { applySeo, resetSeo } from '../utils/seo';
@@ -57,6 +58,7 @@ export function DateArchivePage() {
 
   return (
     <div>
+      <Breadcrumb crumbs={[{ label: 'Home', href: '/' }, { label }]} />
       <div className="page-hero">
         <p className="archive-label">Archive</p>
         <h1 className="page-title">{label}</h1>

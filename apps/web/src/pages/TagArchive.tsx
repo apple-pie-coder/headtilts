@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faArrowRight } from '@fortawesome/free-solid-svg-icons';
 import { PostCard } from '../components/PostCard';
+import { Breadcrumb } from '../components/Breadcrumb';
 import { fetchPosts } from '../services/posts';
 import { fetchTags } from '../services/taxonomy';
 import { useSiteSettings } from '../context/SiteSettingsContext';
@@ -51,6 +52,7 @@ export function TagArchivePage() {
 
   return (
     <div>
+      <Breadcrumb crumbs={[{ label: 'Home', href: '/' }, { label: tag?.name ? `#${tag.name}` : `#${slug}` }]} />
       <div className="page-hero">
         <p className="archive-label">Tag</p>
         <h1 className="page-title">#{tag?.name || slug}</h1>

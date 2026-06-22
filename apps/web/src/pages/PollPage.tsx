@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { PollWidget } from '../components/PollWidget';
 import { SharePollModal } from '../components/SharePollModal';
 import { ShareRecipientBanner } from '../components/ShareRecipientBanner';
+import { Breadcrumb } from '../components/Breadcrumb';
 import { useLayout } from '../context/LayoutContext';
 import { fetchPublicPolls, PublicPoll, PublicPollSummary } from '../services/polls';
 import './PollPage.css';
@@ -54,6 +55,11 @@ export default function PollPage() {
 
   return (
     <>
+      <Breadcrumb crumbs={[
+        { label: 'Home', href: '/' },
+        { label: 'Polls', href: '/polls' },
+        ...(pollTitle ? [{ label: pollTitle }] : []),
+      ]} />
       <div className="poll-page">
         {/* Sidebar */}
         <nav className="poll-page-sidebar">
