@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faArrowRight } from '@fortawesome/free-solid-svg-icons';
 import { PostCard } from '../components/PostCard';
+import { Breadcrumb } from '../components/Breadcrumb';
 import { fetchAuthorProfile, resolveMediaUrl } from '../services/api';
 import { useLayout } from '../context/LayoutContext';
 import { useSiteSettings } from '../context/SiteSettingsContext';
@@ -60,6 +61,7 @@ export function AuthorPage() {
 
   return (
     <div>
+      <Breadcrumb crumbs={[{ label: 'Home', href: '/' }, { label: displayName }]} />
       <div className="author-profile-hero">
         {author.avatar && (
           <img

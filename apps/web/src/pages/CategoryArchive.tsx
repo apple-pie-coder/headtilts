@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faArrowRight } from '@fortawesome/free-solid-svg-icons';
 import { PostCard } from '../components/PostCard';
+import { Breadcrumb } from '../components/Breadcrumb';
 import { fetchPosts } from '../services/posts';
 import { fetchCategories } from '../services/taxonomy';
 import { useLayout } from '../context/LayoutContext';
@@ -57,6 +58,7 @@ export function CategoryArchivePage() {
 
   return (
     <div>
+      <Breadcrumb crumbs={[{ label: 'Home', href: '/' }, { label: category?.name || slug || 'Category' }]} />
       <div className="page-hero">
         <p className="archive-label">Category</p>
         <h1 className="page-title">{category?.name || slug}</h1>
