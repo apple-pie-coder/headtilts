@@ -20,6 +20,9 @@ import TagsPage from './pages/Tags';
 import CelebrationsPage from './pages/Celebrations';
 import PollsPage from './pages/Polls';
 import PollEditorPage from './pages/PollEditor';
+import EventsPage from './pages/Events';
+import EventEditorPage from './pages/EventEditor';
+import EventRegistrationsPage from './pages/EventRegistrations';
 import PostsPage from './pages/Posts';
 import PagesPage from './pages/Pages';
 import PostEditorPage from './pages/PostEditor';
@@ -186,6 +189,38 @@ function App() {
             element={
               <ProtectedRoute requiredPermission={PERMISSIONS.POLL_EDIT}>
                 <PollEditorPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/events"
+            element={
+              <ProtectedRoute requiredPermission={PERMISSIONS.EVENT_READ}>
+                <EventsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/events/new"
+            element={
+              <ProtectedRoute requiredPermission={PERMISSIONS.EVENT_CREATE}>
+                <EventEditorPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/events/:id/edit"
+            element={
+              <ProtectedRoute requiredPermission={PERMISSIONS.EVENT_EDIT}>
+                <EventEditorPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/events/:id/registrations"
+            element={
+              <ProtectedRoute requiredPermission={PERMISSIONS.EVENT_MANAGE_REGISTRATIONS}>
+                <EventRegistrationsPage />
               </ProtectedRoute>
             }
           />

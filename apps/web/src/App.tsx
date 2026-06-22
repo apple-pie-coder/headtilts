@@ -14,6 +14,8 @@ import { DateArchivePage } from './pages/DateArchive';
 import { AuthorPage } from './pages/AuthorPage';
 import PollPage from './pages/PollPage';
 import PollsListPage from './pages/PollsListPage';
+import EventsPage from './pages/EventsPage';
+import EventDetailPage from './pages/EventDetailPage';
 import { SearchPage } from './pages/SearchPage';
 import { RedirectGate } from './components/RedirectGate';
 import StatusPage from './pages/StatusPage';
@@ -46,6 +48,8 @@ export default function App() {
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/polls" element={<PollsListPage />} />
                 <Route path="/polls/:slug" element={<PollPage />} />
+                <Route path="/events" element={<EventsPage />} />
+                <Route path="/events/:slug" element={<EventDetailPage />} />
                 <Route path="*" element={<PermalinkPage />} />
               </Routes>
             </SiteLayout>

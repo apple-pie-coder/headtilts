@@ -11,6 +11,7 @@ import { buildPostPath, getPermalinkStructure, matchPostPath } from '../utils/pe
 import { getCalendarMonth } from '../services/calendar.service';
 import { getTodaysCelebrations } from '../services/celebrations.service';
 import { listPolls, getPublicPoll, submitVote } from '../services/polls.service';
+import { listPublicEvents, getPublicEvent, registerForEvent, verifyPayment, cancelRegistration, generateIcal } from '../services/events.service';
 import { searchAll, searchType } from '../services/search.service';
 import { log } from '../services/logger.service';
 import rateLimit from 'express-rate-limit';
@@ -834,6 +835,92 @@ router.get('/search', publicReadLimiter, asyncHandler(async (req: Request, res: 
 }));
 
 // GET /public/redirects/resolve?from=<path> — look up a redirect by source path
+// ─── Events (public) ─────────────────────────────────────────────────────────
+
+// GET /public/events — listing
+router.get('/events', publicReadLimiter, asyncHandler(async (req: Request, res: Response) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 12));
+  const type = typeof req.query.type === 'string' ? req.query.type : undefined;
+  const timeframe = typeof req.query.timeframe === 'string' ? req.query.timeframe : 'upcoming';
+  const featured = req.query.featured === 'true';
+  const { items, total } = await listPublicEvents(page, limit, { type, timeframe, featured });
+  const pages = Math.ceil(total / limit);
+  sendSuccess(res, { items, pagination: { page, limit, total, pages } });
+}));
+
+// GET /public/events/calendar.ics — iCal feed for all published events
+router.get('/events/calendar.ics', asyncHandler(async (_req: Request, res: Response) => {
+  const ical = await generateIcal();
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="events.ics"');
+  res.send(ical);
+}));
+
+// GET /public/events/:slug — single event detail
+router.get('/events/:slug', publicReadLimiter, asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const event = await getPublicEvent(req.params.slug);
+    sendSuccess(res, event);
+  } catch (e) {
+    if (e instanceof ApiError) sendError(res, e.code, e.message, e.statusCode);
+    else sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+  }
+}));
+
+// GET /public/events/:slug/calendar.ics — single event iCal
+router.get('/events/:slug/calendar.ics', asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const ical = await generateIcal([req.params.slug]);
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${req.params.slug}.ics"`);
+    res.send(ical);
+  } catch (e) {
+    if (e instanceof ApiError) sendError(res, e.code, e.message, e.statusCode);
+    else sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+  }
+}));
+
+// POST /public/events/:slug/register — register or create Razorpay order
+const registerLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 5,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { success: false, error: { code: 'RATE_LIMITED', message: 'Too many registration attempts.' } },
+});
+router.post('/events/:slug/register', registerLimiter, asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const result = await registerForEvent(req.params.slug, req.body);
+    sendSuccess(res, result, 201);
+  } catch (e) {
+    if (e instanceof ApiError) sendError(res, e.code, e.message, e.statusCode);
+    else sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+  }
+}));
+
+// POST /public/events/:slug/register/verify — verify Razorpay payment
+router.post('/events/:slug/register/verify', asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const reg = await verifyPayment(req.body);
+    sendSuccess(res, reg);
+  } catch (e) {
+    if (e instanceof ApiError) sendError(res, e.code, e.message, e.statusCode);
+    else sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+  }
+}));
+
+// POST /public/events/cancel/:code — self-cancel by ticket code
+router.post('/events/cancel/:code', asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const reg = await cancelRegistration(req.params.code);
+    sendSuccess(res, reg);
+  } catch (e) {
+    if (e instanceof ApiError) sendError(res, e.code, e.message, e.statusCode);
+    else sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+  }
+}));
+
 router.get('/redirects/resolve', publicReadLimiter, asyncHandler(async (req: Request, res: Response) => {
   const from = String(req.query.from || '').trim();
   if (!from) { sendSuccess(res, { redirect: null }); return; }

@@ -202,3 +202,106 @@ export interface AuthorProfileResult {
   author: AuthorProfile;
   posts: PostListResult;
 }
+
+// ─── Events ──────────────────────────────────────────────────────────────────
+
+export interface EventTicketTier {
+  id: number;
+  name: string;
+  description?: string | null;
+  price: number;
+  currency: string;
+  quantity: number | null;
+  soldCount: number;
+  availableFrom?: string | null;
+  availableUntil?: string | null;
+  perOrderMin: number;
+  perOrderMax: number;
+}
+
+export interface EventSpeaker {
+  id: number;
+  name: string;
+  bio?: string | null;
+  photo?: string | null;
+  designation?: string | null;
+  company?: string | null;
+  socialLinks?: Record<string, string> | null;
+  position: number;
+}
+
+export interface EventAgendaItem {
+  id: number;
+  title: string;
+  description?: string | null;
+  startsAt: string;
+  endsAt: string;
+  type: string;
+  speakerId?: number | null;
+  position: number;
+}
+
+export interface EventCustomField {
+  id: number;
+  label: string;
+  fieldType: string;
+  options?: string[] | null;
+  required: boolean;
+  position: number;
+}
+
+export interface EventSummary {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  startAt: string;
+  endAt: string;
+  timezone: string;
+  type: string;
+  status: string;
+  featuredImage: string | null;
+  bannerImage: string | null;
+  venueName: string | null;
+  venueCity: string | null;
+  venueState: string | null;
+  venueCountry: string | null;
+  streamUrl: string | null;
+  streamPlatform: string | null;
+  isFeatured: boolean;
+  isRegistrationRequired: boolean;
+  maxAttendees: number | null;
+  showAttendeesCount: boolean;
+  registrationDeadline: string | null;
+  ticketTiers: EventTicketTier[];
+  speakers: EventSpeaker[];
+  agendaItems: EventAgendaItem[];
+  customFields: EventCustomField[];
+  _count: { registrations: number };
+}
+
+export interface EventFull extends EventSummary {
+  description: string | null;
+  venueAddress: string | null;
+  venueMapEmbed: string | null;
+  showAttendeesNames: boolean;
+  requireApproval: boolean;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  ogImage: string | null;
+  attendees: { name: string; email: string }[] | null;
+}
+
+export interface EventListResult {
+  items: EventSummary[];
+  pagination: Pagination;
+}
+
+export interface EventRegistrationResult {
+  registration: { id: number; ticketCode: string; status: string; quantity: number };
+  requiresPayment: boolean;
+  orderId?: string;
+  amount?: number;
+  currency?: string;
+  keyId?: string;
+}
