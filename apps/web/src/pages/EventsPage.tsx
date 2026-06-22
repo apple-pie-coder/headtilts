@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { useLayout } from '../context/LayoutContext';
+import { useSiteSettings } from '../context/SiteSettingsContext';
+import { applySeo, resetSeo } from '../utils/seo';
 import { resolveMediaUrl } from '../services/api';
 import { fetchEvents, eventIcalUrl } from '../services/events';
 import { EventSummary } from '../types';
+import './EventsPage.css';
 
 const TYPE_LABELS: Record<string, string> = {
   in_person: 'In Person', online: 'Online', hybrid: 'Hybrid',
@@ -41,24 +44,42 @@ function minPrice(ev: EventSummary): string {
 
 export default function EventsPage() {
   const { setShowSidebar } = useLayout();
+  const { site_title } = useSiteSettings();
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [total, setTotal]   = useState(0);
   const [page, setPage]     = useState(1);
   const [timeframe, setTimeframe] = useState<'upcoming' | 'past'>('upcoming');
   const [type, setType]     = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError]   = useState('');
   const limit = 12;
 
-  useEffect(() => { setShowSidebar(false); }, []);
+  useEffect(() => {
+    setShowSidebar(false);
+    return () => setShowSidebar(true);
+  }, [setShowSidebar]);
+
+  useEffect(() => {
+    applySeo({
+      title: `Events — ${site_title}`,
+      description: 'Browse upcoming and past events.',
+      ogType: 'website',
+    });
+    return () => resetSeo(site_title);
+  }, [site_title]);
+
   useEffect(() => { load(); }, [page, timeframe, type]);
 
   async function load() {
     setLoading(true);
+    setError('');
     try {
       const data = await fetchEvents({ page, limit, timeframe, type: type || undefined });
       setEvents(data.items);
       setTotal(data.pagination.total);
-    } catch { /* ignore */ } finally {
+    } catch {
+      setError('Failed to load events');
+    } finally {
       setLoading(false);
     }
   }
@@ -66,34 +87,28 @@ export default function EventsPage() {
   const pages = Math.ceil(total / limit);
 
   return (
-    <>
+    <div className="events-list-page">
       <Breadcrumb crumbs={[{ label: 'Home', href: '/' }, { label: 'Events' }]} />
 
-      <div className="events-page">
-        <header className="events-page__header">
-          <h1 className="events-page__title">Events</h1>
-          <a
-            href={eventIcalUrl()}
-            className="events-page__ical-btn"
-            title="Subscribe to iCal feed"
-          >
-            📅 Subscribe to Calendar
-          </a>
-        </header>
+      <div className="events-list-header">
+        <h1 className="events-list-title">Events</h1>
+        <p className="events-list-subtitle">Browse upcoming events and register your spot.</p>
+      </div>
 
-        <div className="events-page__filters">
-          <div className="events-page__tabs">
-            <button
-              className={`events-page__tab${timeframe === 'upcoming' ? ' active' : ''}`}
-              onClick={() => { setTimeframe('upcoming'); setPage(1); }}
-            >Upcoming</button>
-            <button
-              className={`events-page__tab${timeframe === 'past' ? ' active' : ''}`}
-              onClick={() => { setTimeframe('past'); setPage(1); }}
-            >Past</button>
-          </div>
+      <div className="events-list-controls">
+        <div className="events-list-tabs">
+          <button
+            className={`events-list-tab${timeframe === 'upcoming' ? ' active' : ''}`}
+            onClick={() => { setTimeframe('upcoming'); setPage(1); }}
+          >Upcoming</button>
+          <button
+            className={`events-list-tab${timeframe === 'past' ? ' active' : ''}`}
+            onClick={() => { setTimeframe('past'); setPage(1); }}
+          >Past</button>
+        </div>
+        <div className="events-list-controls-right">
           <select
-            className="events-page__type-filter"
+            className="events-list-filter"
             value={type}
             onChange={(e) => { setType(e.target.value); setPage(1); }}
           >
@@ -102,64 +117,83 @@ export default function EventsPage() {
             <option value="online">Online</option>
             <option value="hybrid">Hybrid</option>
           </select>
+          <a href={eventIcalUrl()} className="events-list-ical" title="Subscribe via iCal">
+            Subscribe to Calendar
+          </a>
         </div>
-
-        {loading ? (
-          <p className="events-page__loading">Loading events…</p>
-        ) : events.length === 0 ? (
-          <p className="events-page__empty">No {timeframe === 'upcoming' ? 'upcoming' : 'past'} events.</p>
-        ) : (
-          <div className="events-grid">
-            {events.map((ev) => {
-              const seats = seatsLeft(ev);
-              const price = minPrice(ev);
-              const location = ev.type === 'online'
-                ? 'Online'
-                : [ev.venueName, ev.venueCity].filter(Boolean).join(', ') || '';
-              return (
-                <Link key={ev.id} to={`/events/${ev.slug}`} className="event-card">
-                  {ev.bannerImage || ev.featuredImage ? (
-                    <img
-                      className="event-card__img"
-                      src={resolveMediaUrl(ev.bannerImage ?? ev.featuredImage!)}
-                      alt={ev.title}
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="event-card__img event-card__img--placeholder">🗓️</div>
-                  )}
-                  <div className="event-card__body">
-                    <div className="event-card__meta">
-                      <span className={`event-card__type event-card__type--${ev.type}`}>
-                        {TYPE_LABELS[ev.type] ?? ev.type}
-                      </span>
-                      {seats && <span className="event-card__seats">{seats}</span>}
-                    </div>
-                    <h2 className="event-card__title">{ev.title}</h2>
-                    {ev.excerpt && <p className="event-card__excerpt">{ev.excerpt}</p>}
-                    <div className="event-card__footer">
-                      <div className="event-card__date">
-                        <span className="event-card__date-day">{formatDate(ev.startAt, ev.timezone)}</span>
-                        <span className="event-card__date-time">{formatTime(ev.startAt, ev.timezone)}</span>
-                      </div>
-                      {location && <span className="event-card__location">📍 {location}</span>}
-                      {price && <span className="event-card__price">{price}</span>}
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-
-        {pages > 1 && (
-          <div className="events-page__pagination">
-            <button disabled={page <= 1} onClick={() => setPage(page - 1)}>← Previous</button>
-            <span>{page} / {pages}</span>
-            <button disabled={page >= pages} onClick={() => setPage(page + 1)}>Next →</button>
-          </div>
-        )}
       </div>
-    </>
+
+      {loading && (
+        <div className="events-list-loading">
+          <div className="events-list-spinner" />
+        </div>
+      )}
+
+      {error && <p className="events-list-empty" style={{ color: '#c0392b' }}>{error}</p>}
+
+      {!loading && !error && events.length === 0 && (
+        <p className="events-list-empty">
+          No {timeframe === 'upcoming' ? 'upcoming' : 'past'} events at the moment. Check back soon.
+        </p>
+      )}
+
+      {!loading && !error && events.length > 0 && (
+        <div className="events-grid">
+          {events.map((ev) => {
+            const seats = seatsLeft(ev);
+            const price = minPrice(ev);
+            const location = ev.type === 'online'
+              ? 'Online'
+              : [ev.venueName, ev.venueCity].filter(Boolean).join(', ') || '';
+            return (
+              <Link key={ev.id} to={`/events/${ev.slug}`} className="event-card">
+                {ev.bannerImage || ev.featuredImage ? (
+                  <img
+                    className="event-card__img"
+                    src={resolveMediaUrl(ev.bannerImage ?? ev.featuredImage!)}
+                    alt={ev.title}
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="event-card__img event-card__img--placeholder" aria-hidden>—</div>
+                )}
+                <div className="event-card__body">
+                  <div className="event-card__meta">
+                    <span className={`event-card__type event-card__type--${ev.type}`}>
+                      {TYPE_LABELS[ev.type] ?? ev.type}
+                    </span>
+                    {seats && <span className="event-card__seats">{seats}</span>}
+                  </div>
+                  <h2 className="event-card__title">{ev.title}</h2>
+                  {ev.excerpt && <p className="event-card__excerpt">{ev.excerpt}</p>}
+                  <div className="event-card__footer">
+                    <span className="event-card__date-day">{formatDate(ev.startAt, ev.timezone)}</span>
+                    <span className="event-card__date-time">{formatTime(ev.startAt, ev.timezone)}</span>
+                    {location && <span className="event-card__location">{location}</span>}
+                    {price && <span className="event-card__price">{price}</span>}
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {pages > 1 && (
+        <div className="events-list-pagination">
+          <button
+            className="events-list-pagination-btn"
+            disabled={page <= 1}
+            onClick={() => setPage(page - 1)}
+          >Previous</button>
+          <span className="events-list-pagination-info">Page {page} of {pages}</span>
+          <button
+            className="events-list-pagination-btn"
+            disabled={page >= pages}
+            onClick={() => setPage(page + 1)}
+          >Next</button>
+        </div>
+      )}
+    </div>
   );
 }
