@@ -50,11 +50,35 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       return;
     }
 
+    // Register usage log NOW — before scope check — so every valid-key request
+    // (including 403 scope rejections) is recorded with its actual status code.
+    const startTime = Date.now();
+    const capturedBaseUrl = req.baseUrl;
+    const capturedMethod  = req.method;
+    res.on('finish', () => {
+      const durationMs = Date.now() - startTime;
+      // req.route.path is the matched route pattern (e.g. "/:id"); fall back to baseUrl.
+      const routePath = (req.route?.path && req.route.path !== '/') ? req.route.path : '';
+      const endpoint = `${capturedMethod} ${capturedBaseUrl}${routePath}`;
+      prisma.apiKeyUsageLog.create({
+        data: {
+          apiKeyId: result.id,
+          method: capturedMethod,
+          endpoint,
+          statusCode: res.statusCode,
+          durationMs,
+          ip: (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0].trim()
+            ?? req.socket.remoteAddress
+            ?? null,
+        },
+      }).catch(() => { /* non-fatal */ });
+    });
+
     // Enforce scope based on the requested resource (use baseUrl which includes the resource name)
     const requiredScope = inferRequiredScope(req.method, req.baseUrl);
     if (requiredScope && !result.scopes.includes(requiredScope)) {
       sendError(res, 'FORBIDDEN', `API key missing required scope: ${requiredScope}`, 403);
-      return;
+      return; // res.on('finish') still fires and records the 403
     }
 
     // Synthesise a JWTPayload-compatible object so existing permission checks keep working
@@ -67,25 +91,6 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     } as unknown as JWTPayload;
     req.apiKeyScopes = result.scopes;
     req.apiKeyId = result.id;
-
-    // Log API key usage fire-and-forget after response finishes
-    const startTime = Date.now();
-    res.on('finish', () => {
-      const durationMs = Date.now() - startTime;
-      const endpoint = req.route?.path
-        ? `${req.method} ${req.baseUrl}${req.route.path === '/' ? '' : req.route.path}`
-        : `${req.method} ${req.baseUrl}`;
-      prisma.apiKeyUsageLog.create({
-        data: {
-          apiKeyId: result.id,
-          method: req.method,
-          endpoint,
-          statusCode: res.statusCode,
-          durationMs,
-          ip: (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0].trim() ?? req.socket.remoteAddress ?? null,
-        },
-      }).catch(() => { /* non-fatal */ });
-    });
 
     next();
     return;
