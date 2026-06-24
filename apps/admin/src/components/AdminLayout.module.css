@@ -331,6 +331,55 @@
   margin-left: auto;
 }
 
+/* Search trigger — pill button that opens the spotlight search */
+.searchTrigger {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 2rem;
+  padding: 0 0.75rem;
+  background: var(--ghost);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--t2);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background var(--ease), border-color var(--ease), color var(--ease);
+  white-space: nowrap;
+}
+
+.searchTrigger:hover {
+  background: var(--ghost-h);
+  border-color: var(--border-strong);
+  color: var(--t1);
+}
+
+.searchTriggerIcon {
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.searchTriggerLabel {
+  flex: 1;
+  text-align: left;
+}
+
+.searchTriggerKbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.25rem;
+  padding: 0 0.3rem;
+  background: var(--surface-overlay);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.65rem;
+  color: var(--t3);
+  line-height: 1;
+}
+
 /* Hamburger — only shown on mobile (see media query). Toggles the drawer. */
 .hamburger {
   display: none;
@@ -448,6 +497,16 @@
 
   .hamburger {
     display: flex;
+  }
+
+  .searchTriggerLabel,
+  .searchTriggerKbd {
+    display: none;
+  }
+
+  .searchTrigger {
+    padding: 0 0.6rem;
+    gap: 0;
   }
 
   .topHeader {
