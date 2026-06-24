@@ -7,8 +7,9 @@ import {
   faTags, faBars, faPuzzlePiece, faUsers, faUserShield, faSitemap, faEnvelope,
   faGear, faSliders, faChevronDown, faFeather, faRightFromBracket, faSun, faMoon, faDesktop,
   faCakeCandles, faChartBar, faKey, faArrowRight, faChartLine, faChartPie, faBoxArchive, faClipboardList,
-  faPalette, faCalendarAlt,
+  faPalette, faCalendarAlt, faMagnifyingGlass,
 } from '@fortawesome/free-solid-svg-icons';
+import { useSpotlight } from '../context/SpotlightContext';
 import type { ThemeMode, AccentColor, AccentPreset } from '../context/ThemeContext';
 import { ACCENT_PRESETS } from '../context/ThemeContext';
 import { useAuth } from '../hooks/useAuth';
@@ -65,6 +66,7 @@ interface AdminLayoutProps {
 export function AdminLayout({ children }: AdminLayoutProps) {
   const { user, logout } = useAuth();
   const { mode, setMode, theme, accent, setAccent } = useTheme();
+  const { open: openSpotlight } = useSpotlight();
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const appearanceRef = useRef<HTMLDivElement>(null);
   const [healthStatus, setHealthStatus] = useState<'ok' | 'degraded' | 'down' | 'unknown'>('unknown');
@@ -237,6 +239,17 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             <FontAwesomeIcon icon={faBars} />
           </button>
           <div className={styles.topHeaderActions}>
+            <button
+              type="button"
+              className={styles.searchTrigger}
+              onClick={openSpotlight}
+              title="Quick search"
+              aria-label="Open search (⌘K)"
+            >
+              <FontAwesomeIcon icon={faMagnifyingGlass} className={styles.searchTriggerIcon} />
+              <span className={styles.searchTriggerLabel}>Search…</span>
+              <kbd className={styles.searchTriggerKbd}>⌘K</kbd>
+            </button>
             <NotificationBell />
             <div className={styles.appearanceWrap} ref={appearanceRef}>
               <button

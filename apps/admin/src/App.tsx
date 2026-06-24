@@ -6,6 +6,8 @@ import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { ConfirmProvider } from './components/ConfirmDialog';
 import { ToastProvider } from './components/ToastContext';
+import { SpotlightProvider } from './context/SpotlightContext';
+import { SpotlightSearch } from './components/SpotlightSearch';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import LoginPage from './pages/Login';
 import ForgotPasswordPage from './pages/ForgotPassword';
@@ -80,6 +82,8 @@ function App() {
     <ConfirmProvider>
     <NotificationProvider>
       <Router>
+      <SpotlightProvider>
+        <SpotlightSearch />
         <Routes>
           <Route path="/admin/setup" element={<SetupPage />} />
           <Route path="/admin/wizard" element={<ProtectedRoute><WizardPage /></ProtectedRoute>} />
@@ -361,6 +365,7 @@ function App() {
           />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
+      </SpotlightProvider>
       </Router>
     </NotificationProvider>
     </ConfirmProvider>
