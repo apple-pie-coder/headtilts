@@ -320,7 +320,7 @@
   <div class="env-card">
     <div class="env-card-title"><span class="dot dot-dev"></span> Development</div>
     <div class="env-card-file">.env.dev</div>
-    <div class="env-card-desc">Local machine. Weak secrets, localhost URLs, MailHog for email. Suitable for native pnpm dev or Docker on port 8080.</div>
+    <div class="env-card-desc">Local machine. Weak secrets, localhost URLs, Mailpit for email. Suitable for native pnpm dev or Docker on port 8080.</div>
   </div>
   <div class="env-card">
     <div class="env-card-title"><span class="dot dot-staging"></span> Staging</div>
@@ -659,7 +659,7 @@ openssl rand -hex 32
 <h3>Email not sending</h3>
 <ul>
   <li>If <code>SMTP_HOST</code> is empty, email is intentionally disabled — look for log output in the API console.</li>
-  <li>For local testing, start MailHog (<code>docker compose up mailhog</code>) and set <code>SMTP_HOST=localhost SMTP_PORT=1025</code>. MailHog UI: <code>http://localhost:8025</code>.</li>
+  <li>For local testing, start Mailpit (<code>docker compose up mailpit</code>) and set <code>SMTP_HOST=localhost SMTP_PORT=1025</code>. Mailpit UI: <code>http://localhost:8025</code>.</li>
 </ul>
 
 <h3>Sessions invalidated after restart</h3>

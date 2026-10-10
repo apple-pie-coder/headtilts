@@ -2,6 +2,8 @@
 FROM node:22-slim AS builder
 WORKDIR /app
 
+# pnpm's native @pnpm/exe binary (pinned via packageManager) needs libatomic
+RUN apt-get update -y && apt-get install -y --no-install-recommends libatomic1 && rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm
 
 # Copy manifests first — this layer is re-used unless a dependency changes
@@ -30,7 +32,7 @@ FROM node:22-slim AS production
 WORKDIR /app
 
 # Prisma needs OpenSSL; backup/restore needs mysqldump and mysql clients.
-RUN apt-get update -y && apt-get install -y --no-install-recommends openssl default-mysql-client && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl default-mysql-client libatomic1 && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g pnpm
 
