@@ -9,14 +9,16 @@
 #   docker compose exec api sh -c "cd apps/api && node_modules/.bin/prisma db seed"
 
 services:
-  # ───Mail Hog─────────────────────────────────────────────────────────────────
-  mailhog:
-    image: mailhog/mailhog
-    platform: linux/amd64
+  # ── Mailpit (local SMTP catcher; multi-arch MailHog replacement) ────────────
+  mailpit:
+    image: axllent/mailpit
     restart: unless-stopped
+    # Bound to localhost by default — the UI/API has no auth. The api container
+    # reaches it over the internal network as mailpit:1025. Set MAILPIT_BIND=0.0.0.0
+    # in .env to open the UI to the LAN.
     ports:
-      - "1025:1025"  # SMTP
-      - "8025:8025"  # Web UI
+      - "${MAILPIT_BIND:-127.0.0.1}:1025:1025"  # SMTP
+      - "${MAILPIT_BIND:-127.0.0.1}:8025:8025"  # Web UI
     networks:
       - internal
   # ── MySQL 8 ─────────────────────────────────────────────────────────────────
