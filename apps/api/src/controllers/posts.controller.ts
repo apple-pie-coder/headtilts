@@ -6,6 +6,7 @@ import { sendSuccess, sendError } from '../utils/response';
 import { ApiError, ForbiddenError, parseIntParam } from '../utils/errors';
 import { PERMISSIONS } from '@headtilts/shared';
 import { prisma } from '../config/database';
+import { loadPermissions } from '../middleware/auth';
 
 function handleError(res: Response, error: unknown): void {
   if (error instanceof ApiError) {
@@ -15,12 +16,43 @@ function handleError(res: Response, error: unknown): void {
   }
 }
 
-function assertCanSetStatus(req: Request, status: string | undefined): void {
+// Checked against the DB, not the token's (possibly stale) permission claims.
+async function assertCanSetStatus(req: Request, status: string | undefined): Promise<void> {
   if (
     (status === 'published' || status === 'scheduled') &&
-    !req.user!.permissions.includes(PERMISSIONS.POST_PUBLISH)
+    !(await loadPermissions(req)).includes(PERMISSIONS.POST_PUBLISH)
   ) {
     throw new ForbiddenError('You do not have permission to publish or schedule posts');
+  }
+}
+
+const LIVE_STATUSES = ['published', 'scheduled'];
+
+/**
+ * Ownership + workflow rules for changing existing posts:
+ * - without POST_EDIT_OTHERS you may only touch posts you (co-)author;
+ * - without POST_PUBLISH you may not change posts that are live or scheduled
+ *   (that would publish edits — or unpublish/trash a live post — without review).
+ */
+export async function assertCanModifyPosts(req: Request, ids: number[]): Promise<void> {
+  const perms = await loadPermissions(req);
+  const canEditOthers = perms.includes(PERMISSIONS.POST_EDIT_OTHERS);
+  const canPublish = perms.includes(PERMISSIONS.POST_PUBLISH);
+  if (canEditOthers && canPublish) return;
+
+  const userId = req.user!.sub;
+  const posts = await prisma.post.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, authorId: true, status: true, coAuthors: { select: { userId: true } } },
+  });
+  for (const post of posts) {
+    const isOwn = post.authorId === userId || post.coAuthors.some((c) => c.userId === userId);
+    if (!canEditOthers && !isOwn) {
+      throw new ForbiddenError('You can only modify your own posts');
+    }
+    if (!canPublish && LIVE_STATUSES.includes(post.status)) {
+      throw new ForbiddenError('You do not have permission to modify published or scheduled posts');
+    }
   }
 }
 
@@ -144,7 +176,7 @@ export async function getOne(req: Request, res: Response): Promise<void> {
 export async function create(req: Request, res: Response): Promise<void> {
   try {
     const input = postInputFromBody(req);
-    assertCanSetStatus(req, input.status);
+    await assertCanSetStatus(req, input.status);
     const post = await postsService.createPost(input, req.user!.sub);
     revisionsService.recordRevision({
       postId: post.id,
@@ -170,8 +202,13 @@ export async function update(req: Request, res: Response): Promise<void> {
   try {
     const id = parseIntParam(req.params.id);
     const input = postInputFromBody(req);
-    assertCanSetStatus(req, input.status);
+    await assertCanSetStatus(req, input.status);
     const old = await postsService.getPostById(id);
+    await assertCanModifyPosts(req, [id]);
+    // Only users who manage everyone's posts may reassign authorship.
+    if (!(await loadPermissions(req)).includes(PERMISSIONS.POST_EDIT_OTHERS)) {
+      input.authorId = undefined;
+    }
     const post = await postsService.updatePost(id, input);
     const changes = revisionsService.computeDiff(old, post, input);
     const action = revisionsService.deriveAction(old.status, post.status);
@@ -185,6 +222,7 @@ export async function update(req: Request, res: Response): Promise<void> {
 export async function remove(req: Request, res: Response): Promise<void> {
   try {
     const id = parseIntParam(req.params.id);
+    await assertCanModifyPosts(req, [id]);
     await postsService.deletePost(id);
     sendSuccess(res, { message: 'Post deleted successfully' });
   } catch (error) {
@@ -234,11 +272,17 @@ export async function bulk(req: Request, res: Response): Promise<void> {
       sendError(res, 'VALIDATION_ERROR', `action must be one of: ${validActions.join(', ')}`, 422);
       return;
     }
-    if (action === 'publish') assertCanSetStatus(req, 'published');
-    if (action === 'delete' && !req.user!.permissions.includes(PERMISSIONS.POST_DELETE)) {
+    const postIds = ids.map(Number);
+    if (postIds.some((id) => !Number.isInteger(id) || id <= 0)) {
+      sendError(res, 'VALIDATION_ERROR', 'ids must be valid post ids', 422);
+      return;
+    }
+    if (action === 'publish') await assertCanSetStatus(req, 'published');
+    if (action === 'delete' && !(await loadPermissions(req)).includes(PERMISSIONS.POST_DELETE)) {
       throw new ForbiddenError('You do not have permission to delete posts');
     }
-    const count = await postsService.bulkUpdatePosts(ids.map(Number), action);
+    await assertCanModifyPosts(req, postIds);
+    const count = await postsService.bulkUpdatePosts(postIds, action);
     sendSuccess(res, { count });
   } catch (error) {
     handleError(res, error);

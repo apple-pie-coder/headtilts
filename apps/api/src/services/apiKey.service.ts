@@ -77,7 +77,8 @@ export async function validateApiKey(raw: string) {
   if (!raw.startsWith('htk_')) return null;
   const hash = hashKey(raw);
   const record = await prisma.apiKey.findFirst({
-    where: { keyHash: hash, active: true },
+    // Keys stop working the moment their owner is deactivated.
+    where: { keyHash: hash, active: true, user: { isActive: true } },
     include: {
       user: {
         include: {

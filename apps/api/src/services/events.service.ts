@@ -418,12 +418,7 @@ export async function registerForEvent(
     where: { slug, status: 'published' },
     include: {
       ticketTiers: { where: { isVisible: true } },
-      _count: {
-        select: {
-          registrations: { where: { status: { in: ['confirmed', 'waitlisted'] as string[] } } },
-          ticketTiers: true,
-        },
-      },
+      _count: { select: { ticketTiers: true } },
     },
   });
   if (!event) throw new NotFoundError('Event not found');
@@ -445,7 +440,12 @@ export async function registerForEvent(
   if (!Number.isInteger(qty) || qty < 1 || qty > MAX_QTY_PER_ORDER) {
     throw new ValidationError(`Quantity must be a whole number between 1 and ${MAX_QTY_PER_ORDER}`);
   }
-  const confirmedCount = event._count.registrations;
+  // Capacity is measured in tickets (sum of quantities), not registration rows.
+  const taken = await prisma.eventRegistration.aggregate({
+    where: { eventId: event.id, status: { in: ['confirmed', 'waitlisted'] } },
+    _sum: { quantity: true },
+  });
+  const confirmedCount = taken._sum.quantity ?? 0;
   const isWaitlisted = event.maxAttendees !== null && confirmedCount + qty > event.maxAttendees;
 
   // Ticket tier
@@ -481,29 +481,36 @@ export async function registerForEvent(
   // Fail before creating a pending row if paid checkout isn't possible.
   const razorpay = isFree ? null : getRazorpay();
 
-  // Create registration record
-  const reg = await prisma.eventRegistration.create({
-    data: {
-      eventId: event.id,
-      ticketTierId: tier?.id ?? null,
-      name,
-      email,
-      phone: input.phone,
-      quantity: qty,
-      status: isFree ? status : 'pending',
-      paymentStatus: isFree ? 'free' : 'pending',
-      paymentProvider: isFree ? null : 'razorpay',
-      customData: (input.customData ?? Prisma.DbNull) as Prisma.InputJsonValue,
-    },
+  // Create registration record. Free tier stock is reserved atomically in the
+  // same transaction, so concurrent sign-ups can't oversell the tier.
+  const reg = await prisma.$transaction(async (tx) => {
+    if (isFree && tier) {
+      const { count } = await tx.eventTicketTier.updateMany({
+        where: {
+          id: tier.id,
+          ...(tier.quantity !== null ? { soldCount: { lte: tier.quantity - qty } } : {}),
+        },
+        data: { soldCount: { increment: qty } },
+      });
+      if (count === 0) throw new ValidationError('Selected ticket tier is sold out');
+    }
+    return tx.eventRegistration.create({
+      data: {
+        eventId: event.id,
+        ticketTierId: tier?.id ?? null,
+        name,
+        email,
+        phone: input.phone,
+        quantity: qty,
+        status: isFree ? status : 'pending',
+        paymentStatus: isFree ? 'free' : 'pending',
+        paymentProvider: isFree ? null : 'razorpay',
+        customData: (input.customData ?? Prisma.DbNull) as Prisma.InputJsonValue,
+      },
+    });
   });
 
   if (isFree) {
-    if (tier) {
-      await prisma.eventTicketTier.update({
-        where: { id: tier.id },
-        data: { soldCount: { increment: qty } },
-      });
-    }
     if (status === 'confirmed') {
       await sendTicketEmail(reg, event);
     }
@@ -607,6 +614,26 @@ export async function verifyPayment(input: {
   return updated;
 }
 
+/**
+ * Cancel exactly once and release tier stock only if this registration ever
+ * took it (free sign-ups reserve at registration, paid ones on payment). An
+ * unpaid pending registration never held stock, so cancelling it must not
+ * hand inventory back — that used to let anyone inflate ticket availability.
+ */
+async function cancelAndReleaseStock(reg: { id: number; ticketTierId: number | null; quantity: number; paymentStatus: string }) {
+  await prisma.$transaction(async (tx) => {
+    const { count } = await tx.eventRegistration.updateMany({
+      where: { id: reg.id, status: { not: 'cancelled' } },
+      data: { status: 'cancelled', cancelledAt: new Date() },
+    });
+    if (count === 0 || !reg.ticketTierId || !['free', 'paid'].includes(reg.paymentStatus)) return;
+    await tx.eventTicketTier.updateMany({
+      where: { id: reg.ticketTierId, soldCount: { gte: reg.quantity } },
+      data: { soldCount: { decrement: reg.quantity } },
+    });
+  });
+}
+
 export async function cancelRegistration(ticketCode: string) {
   const reg = await prisma.eventRegistration.findUnique({ where: { ticketCode }, include: { event: true } });
   if (!reg) throw new NotFoundError('Registration not found');
@@ -615,18 +642,7 @@ export async function cancelRegistration(ticketCode: string) {
   // Allow self-cancel up to event start
   if (reg.event.startAt <= new Date()) throw new ValidationError('Event has already started');
 
-  await prisma.eventRegistration.update({
-    where: { id: reg.id },
-    data: { status: 'cancelled', cancelledAt: new Date() },
-  });
-
-  if (reg.ticketTierId) {
-    await prisma.eventTicketTier.update({
-      where: { id: reg.ticketTierId },
-      data: { soldCount: { decrement: reg.quantity } },
-    });
-  }
-
+  await cancelAndReleaseStock(reg);
   return reg;
 }
 
@@ -673,20 +689,17 @@ export async function updateRegistration(
   if (!reg) throw new NotFoundError('Registration not found');
 
   if (action === 'approve') {
+    // Approving must never turn an unpaid order into a valid ticket.
+    if (!['free', 'paid'].includes(reg.paymentStatus)) {
+      throw new ValidationError('This registration has not been paid for yet');
+    }
+    if (reg.status === 'cancelled') throw new ValidationError('Cancelled registrations cannot be approved');
     await prisma.eventRegistration.update({
       where: { id }, data: { status: 'confirmed' },
     });
     await sendTicketEmail({ ...reg, status: 'confirmed' }, reg.event);
   } else if (action === 'cancel') {
-    await prisma.eventRegistration.update({
-      where: { id }, data: { status: 'cancelled', cancelledAt: new Date() },
-    });
-    if (reg.ticketTier) {
-      await prisma.eventTicketTier.update({
-        where: { id: reg.ticketTier.id },
-        data: { soldCount: { decrement: reg.quantity } },
-      });
-    }
+    await cancelAndReleaseStock(reg);
   } else if (action === 'check-in') {
     await prisma.eventRegistration.update({
       where: { id }, data: { checkInAt: new Date() },
