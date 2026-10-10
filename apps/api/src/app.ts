@@ -32,6 +32,8 @@ export function createApp(): Express {
     ...(process.env.CORS_ORIGINS || '').split(',').filter(Boolean),
   ].map(u => { try { return new URL(u).origin; } catch { return u; } });
 
+  const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
   function isPrivateOrigin(origin: string): boolean {
     try {
       const { hostname } = new URL(origin);
@@ -47,7 +49,10 @@ export function createApp(): Express {
 
   app.use(cors({
     origin: (origin, callback) => {
-      if (!origin || explicitOrigins.includes(origin) || isPrivateOrigin(origin)) {
+      // Any private-network origin is allowed only in development. In production
+      // the admin and site are same-origin behind nginx; trusting every LAN
+      // origin would let other apps on the same host read authenticated responses.
+      if (!origin || explicitOrigins.includes(origin) || (!IS_PRODUCTION && isPrivateOrigin(origin))) {
         callback(null, true);
       } else {
         callback(new Error(`CORS: ${origin} not allowed`));
@@ -58,7 +63,12 @@ export function createApp(): Express {
 
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-  app.use(morgan('combined'));
+  // Same as 'combined', but tokens in query strings (preview / download links)
+  // are redacted so they never end up in the access log.
+  morgan.token('safe-url', (req) =>
+    ((req as { originalUrl?: string }).originalUrl ?? req.url ?? '').replace(/([?&](?:token|dt|refreshToken)=)[^&]*/gi, '$1[redacted]'),
+  );
+  app.use(morgan(':remote-addr - :remote-user [:date[clf]] ":method :safe-url HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent"'));
 
   // Static file serving for uploaded media. Uploads share an origin with the
   // admin panel, so every file is served sandboxed (no script execution even if

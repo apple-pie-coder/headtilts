@@ -13,7 +13,9 @@ router.post('/login', authLimiter, asyncHandler(authController.login));
 router.post('/refresh', authLimiter, asyncHandler(authController.refresh));
 router.post('/forgot-password', authLimiter, asyncHandler(authController.forgotPassword));
 router.post('/reset-password', authLimiter, asyncHandler(authController.resetPassword));
-router.post('/logout', authenticate, asyncHandler(authController.logout));
+// No access token needed: logout only revokes the refresh token it is given, and
+// must work even after the access token has expired.
+router.post('/logout', asyncHandler(authController.logout));
 router.get('/me', authenticate, asyncHandler(authController.me));
 
 // MFA — unauthenticated step-2 login

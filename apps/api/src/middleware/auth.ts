@@ -3,6 +3,7 @@ import { verifyAccessToken, JWTPayload } from '../utils/jwt';
 import { sendError } from '../utils/response';
 import { validateApiKey } from '../services/apiKey.service';
 import { prisma } from '../config/database';
+import { clientIp } from '../utils/clientIp';
 
 /* eslint-disable @typescript-eslint/no-namespace */
 declare global {
@@ -67,9 +68,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
           endpoint,
           statusCode: res.statusCode,
           durationMs,
-          ip: (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0].trim()
-            ?? req.socket.remoteAddress
-            ?? null,
+          ip: clientIp(req),
         },
       }).catch(() => { /* non-fatal */ });
     });
@@ -104,11 +103,10 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   }
 
   // ── JWT authentication ──
+  // Header only — tokens in query strings leak into logs, history and Referer.
+  // (Backup downloads use a dedicated single-use token, see backup.routes.ts.)
   const authHeader = req.headers.authorization;
-  const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
-  // Also accept token via query param for browser-initiated downloads (anchor tags can't set headers)
-  const queryToken = typeof req.query.token === 'string' ? req.query.token : null;
-  const token = bearerToken ?? queryToken;
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
 
   if (!token) {
     sendError(res, 'UNAUTHORIZED', 'Missing or invalid authorization header', 401);

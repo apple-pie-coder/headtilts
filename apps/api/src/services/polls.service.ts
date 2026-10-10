@@ -164,6 +164,8 @@ export async function resetVotes(id: number) {
   return getPoll(id);
 }
 
+const MAX_VOTERS_PER_IP = 10;
+
 export async function submitVote(
   pollId: number,
   optionIds: number[],
@@ -200,20 +202,32 @@ export async function submitVote(
 
   if (existingVotes.length > 0) {
     if (!poll.allowVoteChange) throw new ValidationError('You have already voted on this poll');
-    // Delete existing votes before re-voting
-    await prisma.pollVote.deleteMany({ where: { pollId, voterIdentifier } });
+  } else if (ipAddress) {
+    // voterIdentifier is chosen by the browser, so on its own it doesn't stop
+    // ballot stuffing. Cap how many distinct voters one network address can
+    // add to a poll (generous enough for a shared office / household).
+    const votersFromIp = await prisma.pollVote.groupBy({
+      by: ['voterIdentifier'],
+      where: { pollId, ipAddress },
+    });
+    if (votersFromIp.length >= MAX_VOTERS_PER_IP) {
+      throw new ValidationError('Too many votes have been cast from your network on this poll');
+    }
   }
 
-  // Create votes
-  await prisma.pollVote.createMany({
-    data: optionIds.map((optionId) => ({
-      pollId,
-      optionId,
-      voterIdentifier,
-      ipAddress: ipAddress || null,
-      userId: userId || null,
-    })),
-  });
+  // Replace any previous votes and record the new ones atomically.
+  await prisma.$transaction([
+    prisma.pollVote.deleteMany({ where: { pollId, voterIdentifier } }),
+    prisma.pollVote.createMany({
+      data: optionIds.map((optionId) => ({
+        pollId,
+        optionId,
+        voterIdentifier,
+        ipAddress: ipAddress || null,
+        userId: userId || null,
+      })),
+    }),
+  ]);
 
   return getPublicPollWithResults(poll.slug, voterIdentifier);
 }

@@ -9,6 +9,7 @@ import {
   markNotificationsUnread,
   markAllNotificationsRead,
 } from '../services/notifications';
+import { getAccessToken } from '../services/api';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 // Socket.IO connects to the server origin, not the /api path.
@@ -67,9 +68,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     // Live push. Socket is authenticated at the handshake with the current
     // access token; on reconnect it re-reads the latest token. An expired
     // token is rejected, which matches the app's session-expiry behavior.
-    const token = localStorage.getItem('accessToken') || '';
     const socket = io(SOCKET_ORIGIN, {
-      auth: { token },
+      auth: (cb) => cb({ token: getAccessToken() || '' }),
       transports: ['websocket', 'polling'],
     });
     socketRef.current = socket;

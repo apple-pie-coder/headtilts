@@ -10,7 +10,7 @@ const allowedOrigins = [
   process.env.WEB_URL || 'http://localhost:5173',
   'http://localhost:5174',
   ...(process.env.CORS_ORIGINS || '').split(',').filter(Boolean),
-];
+].map((u) => { try { return new URL(u).origin; } catch { return u; } });
 
 function isPrivateOrigin(origin: string): boolean {
   try {
@@ -42,7 +42,9 @@ export function initRealtime(server: HttpServer): SocketIOServer {
   io = new SocketIOServer(server, {
     cors: {
       origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin) || isPrivateOrigin(origin)) callback(null, true);
+        // Private-network origins only in development (see CORS note in app.ts).
+        const devPrivate = process.env.NODE_ENV !== 'production' && isPrivateOrigin(origin ?? '');
+        if (!origin || allowedOrigins.includes(origin) || devPrivate) callback(null, true);
         else callback(new Error(`CORS: ${origin} not allowed`));
       },
       credentials: true,
