@@ -1,10 +1,11 @@
 import { prisma } from '../config/database';
-import { ValidationError } from '../utils/errors';
+import { ValidationError, ForbiddenError } from '../utils/errors';
+import { isSuperAdmin } from './authz.service';
 import { BACKUP_SETTING_KEYS } from './backup.settings';
 
 const ALLOWED_SETTING_KEYS = new Set([
   'site_title', 'site_tagline', 'show_tagline', 'site_logo', 'site_logo_dark', 'site_logo_height', 'admin_logo_height', 'site_description',
-  'admin_email', 'timezone', 'date_format', 'time_format', 'week_starts_on',
+  'admin_email', 'users_can_register', 'timezone', 'date_format', 'time_format', 'week_starts_on',
   'front_page_display', 'front_page_id', 'posts_page_id', 'contact_page_id', 'about_page_id',
   'privacy_policy_page_id', 'terms_page_id',
   'posts_per_page', 'posts_per_rss', 'rss_content', 'search_engine_visibility', 'permalink_structure',
@@ -27,12 +28,24 @@ const ALLOWED_SETTING_KEYS = new Set([
   'event_carousel_count', 'event_carousel_transition',
 ]);
 
+// Secrets are never sent back to the browser; the UI echoes this placeholder
+// back when the field is left untouched, and it is then ignored on save.
+export const SECRET_MASK = '••••••••';
+const SECRET_KEYS = new Set(['smtp_pass']);
+
+// Whoever controls the SMTP server receives every password-reset email, so
+// changing it is reserved for super-admins.
+const SUPER_ADMIN_ONLY_KEYS = new Set([
+  'smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'smtp_from',
+]);
+
 export async function getSettings() {
   // Backup settings (incl. S3 credentials) are served by /backups/settings only.
-  return prisma.setting.findMany({
+  const rows = await prisma.setting.findMany({
     where: { key: { notIn: [...BACKUP_SETTING_KEYS] } },
     orderBy: { key: 'asc' },
   });
+  return rows.map((r) => (SECRET_KEYS.has(r.key) && r.value ? { ...r, value: SECRET_MASK } : r));
 }
 
 /**
@@ -65,15 +78,36 @@ export async function seedSmtpFromEnv(): Promise<void> {
   }
 }
 
-export async function updateSettings(updates: Record<string, string>) {
-  const keys = Object.keys(updates);
-  if (!keys.length) {
-    throw new ValidationError('No settings provided to update');
-  }
-
-  const unknown = keys.filter((k) => !ALLOWED_SETTING_KEYS.has(k));
+export async function updateSettings(input: Record<string, unknown>, requestingUserId: string) {
+  const unknown = Object.keys(input).filter((k) => !ALLOWED_SETTING_KEYS.has(k));
   if (unknown.length) {
     throw new ValidationError(`Unknown setting key(s): ${unknown.join(', ')}`);
+  }
+
+  const updates: Record<string, string> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+      throw new ValidationError(`Setting "${key}" must be a string`);
+    }
+    if (SECRET_KEYS.has(key) && value === SECRET_MASK) continue;
+    updates[key] = String(value);
+  }
+
+  // Only real changes to SMTP keys require super-admin, so admins can still
+  // save forms that echo the current values back.
+  const protectedKeys = Object.keys(updates).filter((k) => SUPER_ADMIN_ONLY_KEYS.has(k));
+  if (protectedKeys.length) {
+    const current = await prisma.setting.findMany({ where: { key: { in: protectedKeys } } });
+    const currentMap = new Map(current.map((r) => [r.key, r.value]));
+    const changed = protectedKeys.filter((k) => (currentMap.get(k) ?? '') !== updates[k]);
+    if (changed.length && !(await isSuperAdmin(requestingUserId))) {
+      throw new ForbiddenError('Only super-admins can change the email (SMTP) settings');
+    }
+  }
+
+  const keys = Object.keys(updates);
+  if (!keys.length) {
+    return getSettings();
   }
 
   await prisma.$transaction(

@@ -12,7 +12,8 @@ router.use(authenticate);
 router.get('/', requirePermission(PERMISSIONS.POST_READ), asyncHandler(postsController.list));
 router.get('/author-list', requirePermission(PERMISSIONS.POST_EDIT), asyncHandler(postsController.authorList));
 router.get('/:id', requirePermission(PERMISSIONS.POST_READ), asyncHandler(postsController.getOne));
-router.get('/:id/preview-link', requirePermission(PERMISSIONS.POST_READ), asyncHandler(postsController.previewLink));
+// Preview links expose unpublished content publicly — only for people who can edit posts.
+router.get('/:id/preview-link', requirePermission(PERMISSIONS.POST_EDIT), asyncHandler(postsController.previewLink));
 router.get('/:postId/revisions', requirePermission(PERMISSIONS.REVISION_READ), asyncHandler(revisionsController.list));
 router.patch('/:postId/revisions/:id/archive', requirePermission(PERMISSIONS.REVISION_ARCHIVE), asyncHandler(revisionsController.archive));
 router.post('/:postId/revisions/:id/restore', requirePermission(PERMISSIONS.POST_EDIT), asyncHandler(revisionsController.restore));

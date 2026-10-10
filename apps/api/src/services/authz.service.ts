@@ -25,6 +25,11 @@ interface Access {
   permissions: Set<string>;
 }
 
+export async function isSuperAdmin(userId: string): Promise<boolean> {
+  const row = await prisma.userRole.findFirst({ where: { userId, role: { name: SUPER_ADMIN_ROLE } } });
+  return Boolean(row);
+}
+
 async function getUserAccess(userId: string): Promise<Access> {
   const userRoles = await prisma.userRole.findMany({
     where: { userId },

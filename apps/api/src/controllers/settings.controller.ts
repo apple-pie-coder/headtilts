@@ -28,7 +28,7 @@ export async function update(req: Request, res: Response): Promise<void> {
       throw new ValidationError('Request body must be an object of setting key-value pairs');
     }
 
-    const settings = await settingsService.updateSettings(updates);
+    const settings = await settingsService.updateSettings(updates, req.user!.sub);
     sendSuccess(res, settings, 200, 'Settings updated successfully');
   } catch (error) {
     handleError(res, error);

@@ -6,6 +6,8 @@ export const PERMISSIONS = {
   POST_EDIT: 'posts_update',
   POST_DELETE: 'posts_delete',
   POST_PUBLISH: 'posts_publish',
+  // Edit/trash/delete posts authored by someone else (authors only manage their own)
+  POST_EDIT_OTHERS: 'posts_edit_others',
 
   // Media
   MEDIA_UPLOAD: 'media_create',
@@ -129,6 +131,7 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.POST_EDIT,
       PERMISSIONS.POST_DELETE,
       PERMISSIONS.POST_PUBLISH,
+      PERMISSIONS.POST_EDIT_OTHERS,
       PERMISSIONS.MEDIA_UPLOAD,
       PERMISSIONS.MEDIA_READ,
       PERMISSIONS.MEDIA_DELETE,
@@ -201,6 +204,7 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.POST_READ,
       PERMISSIONS.POST_EDIT,
       PERMISSIONS.POST_PUBLISH,
+      PERMISSIONS.POST_EDIT_OTHERS,
       PERMISSIONS.MEDIA_UPLOAD,
       PERMISSIONS.MEDIA_READ,
       PERMISSIONS.MEDIA_DELETE,
@@ -255,6 +259,7 @@ export const DEFAULT_ROLES = {
   SUBSCRIBER: {
     name: 'subscriber',
     description: 'Subscriber access',
-    permissions: [PERMISSIONS.POST_READ, PERMISSIONS.CATEGORY_READ, PERMISSIONS.TAG_READ, PERMISSIONS.POLL_READ, PERMISSIONS.NOTIFICATION_MANAGE],
+    // No POST_READ: on the admin API that exposes every draft and scheduled post.
+    permissions: [PERMISSIONS.CATEGORY_READ, PERMISSIONS.TAG_READ, PERMISSIONS.POLL_READ, PERMISSIONS.NOTIFICATION_MANAGE],
   },
 } as const;

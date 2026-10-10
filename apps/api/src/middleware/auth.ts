@@ -74,9 +74,16 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       }).catch(() => { /* non-fatal */ });
     });
 
-    // Enforce scope based on the requested resource (use baseUrl which includes the resource name)
+    // Enforce scope based on the requested resource (use baseUrl which includes the resource name).
+    // Deny by default: endpoints with no scope (api-keys, backups, roles, auth, ...)
+    // are never reachable with an API key — otherwise a narrowly scoped key could
+    // mint a new all-scopes key or download backups.
     const requiredScope = inferRequiredScope(req.method, req.baseUrl);
-    if (requiredScope && !result.scopes.includes(requiredScope)) {
+    if (!requiredScope) {
+      sendError(res, 'FORBIDDEN', 'This endpoint cannot be used with an API key', 403);
+      return;
+    }
+    if (!result.scopes.includes(requiredScope)) {
       sendError(res, 'FORBIDDEN', `API key missing required scope: ${requiredScope}`, 403);
       return; // res.on('finish') still fires and records the 403
     }
@@ -117,6 +124,46 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   next();
 }
 
+/**
+ * The caller's current permissions. API keys use the owner's permissions
+ * resolved at authenticate time; JWTs are always checked against the DB (not
+ * the token's claims) so permission changes and deactivation apply at once.
+ * Cached per request.
+ */
+export async function loadPermissions(req: Request): Promise<string[]> {
+  if (!req.user) return [];
+  if (req.apiKeyId !== undefined) return req.user.permissions ?? [];
+
+  const cache = req as unknown as Record<string, unknown>;
+  let perms = cache._cachedPermissions as string[] | undefined;
+  if (!perms) {
+    const row = await prisma.user.findUnique({
+      where: { id: req.user.sub },
+      select: {
+        isActive: true,
+        userRoles: {
+          select: {
+            role: {
+              select: {
+                permissions: {
+                  select: { permission: { select: { module: true, action: true } } },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    perms = row?.isActive
+      ? row.userRoles
+        .flatMap((ur) => ur.role.permissions)
+        .map((rp) => `${rp.permission.module}_${rp.permission.action}`)
+      : [];
+    cache._cachedPermissions = perms;
+  }
+  return perms;
+}
+
 export function requirePermission(permission: string) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     if (!req.user) {
@@ -124,43 +171,8 @@ export function requirePermission(permission: string) {
       return;
     }
 
-    // API key auth: use scope-based permissions already resolved at authenticate time
-    if (req.apiKeyId !== undefined) {
-      if (!req.user.permissions?.includes(permission)) {
-        sendError(res, 'FORBIDDEN', 'Insufficient permissions', 403);
-        return;
-      }
-      next();
-      return;
-    }
-
-    // JWT auth: always check the DB so permission changes take effect immediately
     try {
-      // Cache per request — multiple requirePermission calls on the same route share one DB query
-      let perms: string[] | undefined = (req as unknown as Record<string, unknown>)._cachedPermissions as string[] | undefined;
-      if (!perms) {
-        const row = await prisma.user.findUnique({
-          where: { id: req.user.sub },
-          select: {
-            userRoles: {
-              select: {
-                role: {
-                  select: {
-                    permissions: {
-                      select: { permission: { select: { module: true, action: true } } },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        });
-        perms = row?.userRoles
-          .flatMap((ur) => ur.role.permissions)
-          .map((rp) => `${rp.permission.module}_${rp.permission.action}`) ?? [];
-        (req as unknown as Record<string, unknown>)._cachedPermissions = perms;
-      }
-
+      const perms = await loadPermissions(req);
       if (!perms.includes(permission)) {
         sendError(res, 'FORBIDDEN', 'Insufficient permissions', 403);
         return;

@@ -63,6 +63,12 @@ export async function register(
   firstName?: string,
   lastName?: string
 ) {
+  // Public sign-up is opt-in (Settings → users_can_register = "yes").
+  const registration = await prisma.setting.findUnique({ where: { key: 'users_can_register' } });
+  if (registration?.value !== 'yes') {
+    throw new ForbiddenError('Registration is disabled');
+  }
+
   const user = await createUser(email, username, password, firstName, lastName);
 
   // Assign default 'subscriber' role

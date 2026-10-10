@@ -3,6 +3,7 @@ import * as revisionsService from '../services/revisions.service';
 import * as postsService from '../services/posts.service';
 import { sendSuccess, sendError } from '../utils/response';
 import { ApiError, parseIntParam } from '../utils/errors';
+import { assertCanModifyPosts } from './posts.controller';
 
 function handleError(res: Response, error: unknown): void {
   if (error instanceof ApiError) {
@@ -38,6 +39,7 @@ export async function restore(req: Request, res: Response): Promise<void> {
   try {
     const postId = parseIntParam(req.params.postId, 'postId');
     const id = parseIntParam(req.params.id);
+    await assertCanModifyPosts(req, [postId]);
     const snapshot = await revisionsService.restoreRevision(id, postId);
 
     // 1. Fetch current state and save it as a pre-restore checkpoint so it can be recovered
