@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import * as usersService from '../services/users.service';
 import { sendSuccess, sendPaginatedSuccess, sendError } from '../utils/response';
 import { ApiError } from '../utils/errors';
+import { parseIdList } from '../services/authz.service';
 
 function handleError(res: Response, error: unknown): void {
   if (error instanceof ApiError) {
@@ -57,8 +58,10 @@ export async function getOne(req: Request, res: Response): Promise<void> {
 
 export async function create(req: Request, res: Response): Promise<void> {
   try {
-    const { email, username, password, firstName, lastName, roleIds } = req.body;
-    const user = await usersService.createUser({ email, username, password, firstName, lastName, roleIds });
+    if (!req.user) { sendError(res, 'UNAUTHORIZED', 'Unauthorized', 401); return; }
+    const { email, username, password, firstName, lastName } = req.body;
+    const roleIds = parseIdList(req.body.roleIds, 'roleIds');
+    const user = await usersService.createUser({ email, username, password, firstName, lastName, roleIds }, req.user.sub);
     sendSuccess(res, user, 201, 'User created successfully');
   } catch (error) {
     handleError(res, error);
@@ -69,7 +72,8 @@ export async function update(req: Request, res: Response): Promise<void> {
   try {
     if (!req.user) { sendError(res, 'UNAUTHORIZED', 'Unauthorized', 401); return; }
     const id = req.params.id;
-    const { email, username, firstName, lastName, avatar, isActive, roleIds } = req.body;
+    const { email, username, firstName, lastName, avatar, isActive } = req.body;
+    const roleIds = parseIdList(req.body.roleIds, 'roleIds');
     const user = await usersService.updateUser(id, { email, username, firstName, lastName, avatar: avatar ?? undefined, isActive, roleIds }, req.user.sub);
     sendSuccess(res, user, 200, 'User updated successfully');
   } catch (error) {

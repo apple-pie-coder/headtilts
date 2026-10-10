@@ -15,6 +15,34 @@ const uploaderInclude = {
 // Raster types sharp can re-encode. GIF is excluded so animation survives.
 const RASTER_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
+// Declared MIME → format sharp must detect in the actual bytes.
+const SHARP_FORMAT: Record<string, string[]> = {
+  'image/jpeg': ['jpeg'],
+  'image/png': ['png'],
+  'image/gif': ['gif'],
+  'image/webp': ['webp'],
+  'image/avif': ['heif'],
+  'image/tiff': ['tiff'],
+  'image/svg+xml': ['svg'],
+};
+
+// The multipart Content-Type is client-controlled; make sure the file really is
+// the image type it claims to be before it is stored and served.
+async function assertContentMatchesMime(absPath: string, mimetype: string, originalname: string): Promise<void> {
+  const expected = SHARP_FORMAT[mimetype.toLowerCase()];
+  if (!expected) return;
+  let format: string | undefined;
+  try {
+    format = (await sharp(absPath).metadata()).format;
+  } catch {
+    format = undefined;
+  }
+  if (!format || !expected.includes(format)) {
+    await unlinkSafe(absPath);
+    throw new ValidationError(`"${originalname}" is not a valid ${mimetype} file`);
+  }
+}
+
 interface MediaSettings {
   thumbW: number;
   thumbH: number;
@@ -193,6 +221,7 @@ export async function createMedia(
     await unlinkSafe(tempPath);
     throw new ValidationError(`"${file.originalname}" exceeds the ${Math.round(settings.maxBytes / (1024 * 1024))} MB limit`);
   }
+  await assertContentMatchesMime(tempPath, file.mimetype, file.originalname);
 
   // ── Dedup by content hash ──
   const buffer = await fs.readFile(tempPath);
@@ -375,6 +404,7 @@ export async function replaceMedia(id: number, file: Express.Multer.File) {
     await unlinkSafe(tempPath);
     throw new ValidationError(`"${file.originalname}" exceeds the ${Math.round(settings.maxBytes / (1024 * 1024))} MB limit`);
   }
+  await assertContentMatchesMime(tempPath, file.mimetype, file.originalname);
 
   const buffer = await fs.readFile(tempPath);
   const contentHash = crypto.createHash('sha256').update(buffer).digest('hex');

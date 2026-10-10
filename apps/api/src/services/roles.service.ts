@@ -1,5 +1,6 @@
 import { prisma } from '../config/database';
 import { NotFoundError, ValidationError, ConflictError } from '../utils/errors';
+import { assertCanGrantPermissions, assertCanManageRole } from './authz.service';
 
 const roleInclude = {
   permissions: {
@@ -44,8 +45,12 @@ export async function getRoleById(id: number) {
   return toRoleDTO(role);
 }
 
-export async function createRole(input: { name: string; description?: string; permissionIds?: number[]; mfaRequired?: boolean }) {
+export async function createRole(
+  input: { name: string; description?: string; permissionIds?: number[]; mfaRequired?: boolean },
+  requestingUserId: string,
+) {
   if (!input.name?.trim()) throw new ValidationError('Role name is required');
+  if (input.permissionIds?.length) await assertCanGrantPermissions(requestingUserId, input.permissionIds);
 
   const existing = await prisma.role.findUnique({ where: { name: input.name.trim() } });
   if (existing) throw new ConflictError('A role with that name already exists');
@@ -65,9 +70,21 @@ export async function createRole(input: { name: string; description?: string; pe
   return toRoleDTO(role);
 }
 
-export async function updateRole(id: number, input: { name?: string; description?: string; permissionIds?: number[]; mfaRequired?: boolean }) {
+export async function updateRole(
+  id: number,
+  input: { name?: string; description?: string; permissionIds?: number[]; mfaRequired?: boolean },
+  requestingUserId: string,
+) {
   const existing = await prisma.role.findUnique({ where: { id } });
   if (!existing) throw new NotFoundError('Role not found');
+
+  await assertCanManageRole(requestingUserId, id);
+  // Role names are used for authorization checks (e.g. "super-admin"), so
+  // built-in roles can never be renamed.
+  if (existing.isSystem && input.name !== undefined && input.name.trim() !== existing.name) {
+    throw new ValidationError('System roles cannot be renamed');
+  }
+  if (input.permissionIds?.length) await assertCanGrantPermissions(requestingUserId, input.permissionIds);
 
   if (input.name && input.name.trim() !== existing.name) {
     const conflict = await prisma.role.findUnique({ where: { name: input.name.trim() } });
@@ -99,10 +116,11 @@ export async function updateRole(id: number, input: { name?: string; description
   return toRoleDTO(role);
 }
 
-export async function deleteRole(id: number) {
+export async function deleteRole(id: number, requestingUserId: string) {
   const existing = await prisma.role.findUnique({ where: { id } });
   if (!existing) throw new NotFoundError('Role not found');
   if (existing.isSystem) throw new ValidationError('System roles cannot be deleted');
+  await assertCanManageRole(requestingUserId, id);
 
   await prisma.role.delete({ where: { id } });
 }
