@@ -1,7 +1,7 @@
 import { createContext, useState, useEffect, ReactNode } from 'react';
 import { AxiosError } from 'axios';
 import { AuthContextType, SetupInput, User } from '../types';
-import { apiClient } from '../services/api';
+import { apiClient, refreshSession, setAccessToken } from '../services/api';
 import { setupAdmin } from '../services/auth';
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,19 +25,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('auth:userRefreshed', handleUserRefreshed);
   }, []);
 
+  // Resume the session from the HttpOnly refresh cookie (no token is kept in
+  // browser storage). No cookie / expired session simply means logged out.
   async function loadUser() {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      setLoading(false);
-      return;
-    }
     try {
-      const response = await apiClient.get('/auth/me');
-      setUser(response.data.data);
+      const { user: sessionUser } = await refreshSession();
+      setUser(sessionUser as User);
       setError(null);
     } catch {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
+      setAccessToken(null);
       setUser(null);
     } finally {
       setLoading(false);
@@ -55,8 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { mfaRequired: true as const, mfaToken: data.mfaToken as string };
       }
 
-      localStorage.setItem('accessToken', data.accessToken);
-      if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
+      setAccessToken(data.accessToken);
       setUser(data.user);
     } catch (err: unknown) {
       const message = (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || 'Login failed';
@@ -72,9 +67,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const response = await apiClient.post('/auth/mfa/verify', { mfaToken, code });
-      const { accessToken, refreshToken, user: userData } = response.data.data;
-      localStorage.setItem('accessToken', accessToken);
-      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+      const { accessToken, user: userData } = response.data.data;
+      setAccessToken(accessToken);
       setUser(userData);
     } catch (err: unknown) {
       const message = (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || 'Invalid code';
@@ -90,9 +84,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const response = await apiClient.post('/auth/mfa/verify-backup', { mfaToken, backupCode });
-      const { accessToken, refreshToken, user: userData } = response.data.data;
-      localStorage.setItem('accessToken', accessToken);
-      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+      const { accessToken, user: userData } = response.data.data;
+      setAccessToken(accessToken);
       setUser(userData);
     } catch (err: unknown) {
       const message = (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || 'Invalid backup code';
@@ -107,9 +100,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const { accessToken, refreshToken, user: userData } = await setupAdmin(input);
-      localStorage.setItem('accessToken', accessToken);
-      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+      const { accessToken, user: userData } = await setupAdmin(input);
+      setAccessToken(accessToken);
       setUser(userData);
     } catch (err: unknown) {
       const message = (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || 'Setup failed';
@@ -127,8 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Continue logout even if API call fails
     } finally {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
+      setAccessToken(null);
       setUser(null);
       setLoading(false);
     }

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { exec } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
 import { pipeline } from 'stream/promises';
 import { createReadStream, createWriteStream } from 'fs';
@@ -13,7 +13,53 @@ import { sendMail } from './mail.service';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const archiver = require('archiver') as (format: string, options?: object) => import('archiver').Archiver;
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+
+// All external commands run via execFile (argument arrays, no shell), and the
+// DB password is passed in MYSQL_PWD rather than on the command line where it
+// would be visible in `ps` and break on shell metacharacters.
+function mysqlEnv(password: string): NodeJS.ProcessEnv {
+  return { ...process.env, MYSQL_PWD: password };
+}
+
+async function importSqlDump(db: ReturnType<typeof parseDatabaseUrl>, dumpPath: string): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn('mysql', ['-h', db.host, '-P', db.port, '-u', db.user, db.database], {
+      env: mysqlEnv(db.password),
+      stdio: ['pipe', 'ignore', 'pipe'],
+    });
+    let stderr = '';
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    child.on('error', reject);
+    child.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`mysql import failed: ${stderr.trim()}`))));
+    createReadStream(dumpPath).on('error', reject).pipe(child.stdin);
+  });
+}
+
+/**
+ * Reject archives that could write outside the extraction directory or plant
+ * links (a symlink restored into uploads/ would be served by express.static).
+ */
+async function assertSafeArchive(archivePath: string): Promise<string[]> {
+  const { stdout } = await execFileAsync('tar', ['-tvzf', archivePath], { maxBuffer: 50 * 1024 * 1024 });
+  const { stdout: names } = await execFileAsync('tar', ['-tzf', archivePath], { maxBuffer: 50 * 1024 * 1024 });
+  for (const line of stdout.split('\n').filter(Boolean)) {
+    const type = line[0];
+    if (type !== '-' && type !== 'd') throw new Error('Invalid backup: archive contains links or special files');
+  }
+  const entries = names.split('\n').filter(Boolean);
+  for (const name of entries) {
+    if (name.startsWith('/') || name.split('/').includes('..')) {
+      throw new Error('Invalid backup: archive contains unsafe paths');
+    }
+  }
+  return entries;
+}
+
+async function extractArchive(archivePath: string, destDir: string, members: string[] = []): Promise<void> {
+  await assertSafeArchive(archivePath);
+  await execFileAsync('tar', ['-xzf', archivePath, '-C', destDir, '--no-same-owner', '--no-same-permissions', ...members]);
+}
 
 export type RestoreScope = 'all' | 'db' | 'uploads';
 
@@ -22,7 +68,13 @@ export type RestoreScope = 'all' | 'db' | 'uploads';
 function parseDatabaseUrl(url: string) {
   const m = url.match(/mysql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/);
   if (!m) throw new Error('Cannot parse DATABASE_URL');
-  return { user: m[1], password: m[2], host: m[3], port: m[4], database: m[5] };
+  return {
+    user: decodeURIComponent(m[1]),
+    password: decodeURIComponent(m[2]),
+    host: m[3],
+    port: m[4],
+    database: m[5].split('?')[0],
+  };
 }
 
 function buildFilename(label?: string): string {
@@ -74,8 +126,11 @@ async function runBackup(id: number, filename: string, label?: string, opts: { s
 
     // 1. MySQL dump — write directly to file (avoids exec 1 MB buffer limit)
     const dumpPath = path.join(tmpDir, 'database.sql');
-    await execAsync(
-      `mysqldump -h ${db.host} -P ${db.port} -u ${db.user} --password=${db.password} --single-transaction --routines --triggers ${db.database} > "${dumpPath}"`,
+    await execFileAsync(
+      'mysqldump',
+      ['-h', db.host, '-P', db.port, '-u', db.user, '--single-transaction', '--routines', '--triggers',
+        `--result-file=${dumpPath}`, db.database],
+      { env: mysqlEnv(db.password), maxBuffer: 10 * 1024 * 1024 },
     );
 
     // 2. Manifest
@@ -255,7 +310,7 @@ export async function verifyBackup(id: number): Promise<{ valid: boolean; manife
     await pipeline(stream, createWriteStream(tmpArchive));
 
     // List archive contents — this validates the gzip/tar integrity
-    const { stdout: listing } = await execAsync(`tar -tzf "${tmpArchive}"`, { maxBuffer: 10 * 1024 * 1024 });
+    const listing = (await assertSafeArchive(tmpArchive)).join('\n');
 
     if (!listing.includes('manifest.json')) {
       return { valid: false, manifest: null, error: 'manifest.json missing from archive' };
@@ -265,7 +320,7 @@ export async function verifyBackup(id: number): Promise<{ valid: boolean; manife
     }
 
     // Extract just the manifest for metadata
-    await execAsync(`tar -xzf "${tmpArchive}" -C "${tmpDir}" manifest.json`);
+    await extractArchive(tmpArchive, tmpDir, ['manifest.json']);
     const manifest = JSON.parse(fs.readFileSync(path.join(tmpDir, 'manifest.json'), 'utf8'));
     return { valid: true, manifest };
   } catch (err) {
@@ -339,7 +394,7 @@ async function runRestore(filename: string, scope: RestoreScope) {
     const archiveStream = await storage.read(filename);
     const tmpArchive = path.join(tmpDir, 'upload.tar.gz');
     await pipeline(archiveStream, createWriteStream(tmpArchive));
-    await execAsync(`tar -xzf "${tmpArchive}" -C "${tmpDir}"`);
+    await extractArchive(tmpArchive, tmpDir);
 
     // 2. Validate manifest
     const manifestPath = path.join(tmpDir, 'manifest.json');
@@ -353,9 +408,7 @@ async function runRestore(filename: string, scope: RestoreScope) {
     if (scope === 'all' || scope === 'db') {
       const dumpPath = path.join(tmpDir, 'database.sql');
       if (!fs.existsSync(dumpPath)) throw new Error('Invalid backup: missing database.sql');
-      await execAsync(
-        `mysql -h ${db.host} -P ${db.port} -u ${db.user} --password=${db.password} ${db.database} < "${dumpPath}"`,
-      );
+      await importSqlDump(db, dumpPath);
       // Clean up orphaned pending records from the restored snapshot
       await prisma.backup.updateMany({
         where: { status: 'pending' },
@@ -374,7 +427,7 @@ async function runRestore(filename: string, scope: RestoreScope) {
         } else {
           fs.mkdirSync(uploadDir, { recursive: true });
         }
-        await execAsync(`cp -r "${uploadsSource}/." "${uploadDir}/"`);
+        await execFileAsync('cp', ['-r', `${uploadsSource}/.`, `${uploadDir}/`]);
       }
     }
 

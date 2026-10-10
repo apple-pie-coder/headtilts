@@ -16,7 +16,8 @@ import { searchAll, searchType } from '../services/search.service';
 import { log } from '../services/logger.service';
 import rateLimit from 'express-rate-limit';
 import { publicReadLimiter } from '../middleware/rateLimit';
-import { ApiError } from '../utils/errors';
+import { ApiError, ValidationError } from '../utils/errors';
+import { clientIp } from '../utils/clientIp';
 
 // Throttle comment/reaction writes per IP
 const commentLimiter = rateLimit({
@@ -29,6 +30,32 @@ const commentLimiter = rateLimit({
     error: { code: 'RATE_LIMITED', message: 'Too many comments. Please slow down.' },
   },
 });
+
+// Throttle other anonymous writes (contact form, poll votes/shares, payment
+// verification, self-cancel) so they can't be scripted to flood the DB. Each
+// route gets its own counter, so e.g. contact-form use can never block a buyer
+// from verifying a payment.
+function publicWriteLimiter() {
+  return rateLimit({
+    windowMs: 60 * 1000,
+    limit: 10,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: {
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many requests. Please slow down.' },
+    },
+  });
+}
+
+/** Optional string field: trimmed, length-capped; non-strings are rejected. */
+function optionalText(value: unknown, field: string, max: number): string | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value !== 'string') throw new ValidationError(`${field} must be text`);
+  const trimmed = value.trim();
+  if (trimmed.length > max) throw new ValidationError(`${field} is too long (max ${max} characters)`);
+  return trimmed || undefined;
+}
 
 const router: IRouter = Router();
 
@@ -257,8 +284,17 @@ router.get('/menus/:location', publicReadLimiter, asyncHandler(async (req: Reque
 }));
 
 // POST /public/contact — contact form submission
-router.post('/contact', asyncHandler(async (req: Request, res: Response) => {
-  const { name, email, subject, message } = req.body as Record<string, string>;
+router.post('/contact', publicWriteLimiter(), asyncHandler(async (req: Request, res: Response) => {
+  let name: string | undefined, email: string | undefined, subject: string | undefined, message: string | undefined;
+  try {
+    name = optionalText(req.body?.name, 'name', 100);
+    email = optionalText(req.body?.email, 'email', 254);
+    subject = optionalText(req.body?.subject, 'subject', 200);
+    message = optionalText(req.body?.message, 'message', 5000);
+  } catch (e) {
+    sendError(res, 'VALIDATION_ERROR', (e as Error).message, 400);
+    return;
+  }
   if (!name || !email || !message) {
     sendError(res, 'VALIDATION_ERROR', 'name, email and message are required', 400);
     return;
@@ -268,7 +304,7 @@ router.post('/contact', asyncHandler(async (req: Request, res: Response) => {
     sendError(res, 'VALIDATION_ERROR', 'Invalid email address', 400);
     return;
   }
-  await createSubmission({ name: name.trim(), email: email.trim(), subject: subject?.trim(), message: message.trim() });
+  await createSubmission({ name, email, subject, message });
   sendSuccess(res, { ok: true });
 }));
 
@@ -674,12 +710,19 @@ router.get('/polls/:slug', publicReadLimiter, asyncHandler(async (req: Request, 
 }));
 
 // POST /public/polls/:slug/vote
-router.post('/polls/:slug/vote', asyncHandler(async (req: Request, res: Response) => {
+router.post('/polls/:slug/vote', publicWriteLimiter(), asyncHandler(async (req: Request, res: Response) => {
   try {
-    const { optionIds, voterIdentifier } = req.body as { optionIds: number[]; voterIdentifier: string };
-    if (!voterIdentifier) { sendError(res, 'VALIDATION_ERROR', 'voterIdentifier is required', 400); return; }
-    if (!Array.isArray(optionIds) || optionIds.length === 0) { sendError(res, 'VALIDATION_ERROR', 'optionIds must be a non-empty array', 400); return; }
-    const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
+    const { voterIdentifier } = req.body as { voterIdentifier: unknown };
+    const rawOptionIds = (req.body as { optionIds: unknown }).optionIds;
+    if (typeof voterIdentifier !== 'string' || voterIdentifier.length < 8 || voterIdentifier.length > 64) {
+      sendError(res, 'VALIDATION_ERROR', 'voterIdentifier is required', 400); return;
+    }
+    if (!Array.isArray(rawOptionIds) || rawOptionIds.length === 0 || rawOptionIds.length > 50) {
+      sendError(res, 'VALIDATION_ERROR', 'optionIds must be a non-empty array', 400); return;
+    }
+    const optionIds = [...new Set(rawOptionIds.map(Number))];
+    if (optionIds.some((id) => !Number.isInteger(id))) { sendError(res, 'VALIDATION_ERROR', 'optionIds must be valid ids', 400); return; }
+    const ipAddress = clientIp(req);
     const pollRecord = await prisma.poll.findUnique({ where: { slug: req.params.slug }, select: { id: true, title: true } });
     if (!pollRecord) { sendError(res, 'NOT_FOUND', 'Poll not found', 404); return; }
     const result = await submitVote(pollRecord.id, optionIds, voterIdentifier, ipAddress);
@@ -697,12 +740,21 @@ router.post('/polls/:slug/vote', asyncHandler(async (req: Request, res: Response
 }));
 
 // POST /public/polls/:slug/share — create a tracked share link
-router.post('/polls/:slug/share', asyncHandler(async (req: Request, res: Response) => {
+router.post('/polls/:slug/share', publicWriteLimiter(), asyncHandler(async (req: Request, res: Response) => {
   const poll = await prisma.poll.findUnique({ where: { slug: req.params.slug }, select: { id: true, title: true } });
   if (!poll) { sendError(res, 'NOT_FOUND', 'Poll not found', 404); return; }
-  const { sharerIdentifier, recipientEmail, recipientName, note, channel = 'link' } = req.body as {
-    sharerIdentifier?: string; recipientEmail?: string; recipientName?: string; note?: string; channel?: string;
-  };
+  let sharerIdentifier: string | undefined, recipientEmail: string | undefined, recipientName: string | undefined;
+  let note: string | undefined, channel: string;
+  try {
+    sharerIdentifier = optionalText(req.body?.sharerIdentifier, 'sharerIdentifier', 64);
+    recipientEmail = optionalText(req.body?.recipientEmail, 'recipientEmail', 254);
+    recipientName = optionalText(req.body?.recipientName, 'recipientName', 100);
+    note = optionalText(req.body?.note, 'note', 500);
+    channel = optionalText(req.body?.channel, 'channel', 30) ?? 'link';
+  } catch (e) {
+    sendError(res, 'VALIDATION_ERROR', (e as Error).message, 400);
+    return;
+  }
   const token = crypto.randomUUID().replace(/-/g, '');
   const share = await prisma.pollShare.create({
     data: { pollId: poll.id, token, sharerIdentifier, recipientEmail, recipientName, note, channel },
@@ -710,7 +762,7 @@ router.post('/polls/:slug/share', asyncHandler(async (req: Request, res: Respons
   log({
     site: 'public', level: 'info', category: 'poll', action: 'poll.share',
     targetType: 'Poll', targetId: poll.id, targetTitle: poll.title,
-    ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.socket?.remoteAddress,
+    ip: clientIp(req),
     userAgent: req.get('user-agent'), path: req.path, method: req.method,
     meta: { slug: req.params.slug, channel, recipientEmail },
   });
@@ -718,10 +770,19 @@ router.post('/polls/:slug/share', asyncHandler(async (req: Request, res: Respons
 }));
 
 // POST /public/polls/shares/:token/click — record a share link visit with optional recipient info
-router.post('/polls/shares/:token/click', asyncHandler(async (req: Request, res: Response) => {
+router.post('/polls/shares/:token/click', publicWriteLimiter(), asyncHandler(async (req: Request, res: Response) => {
   const share = await prisma.pollShare.findUnique({ where: { token: req.params.token }, include: { poll: { select: { title: true } } } });
   if (!share) { sendError(res, 'NOT_FOUND', 'Share not found', 404); return; }
-  const { name, gender, age } = req.body as { name?: string; gender?: string; age?: number };
+  let name: string | undefined, gender: string | undefined;
+  const age = req.body?.age === undefined || req.body?.age === null || req.body?.age === '' ? undefined : Number(req.body.age);
+  try {
+    name = optionalText(req.body?.name, 'name', 100);
+    gender = optionalText(req.body?.gender, 'gender', 30);
+    if (age !== undefined && (!Number.isInteger(age) || age < 0 || age > 130)) throw new ValidationError('age must be a whole number');
+  } catch (e) {
+    sendError(res, 'VALIDATION_ERROR', (e as Error).message, 400);
+    return;
+  }
   const now = new Date();
   await prisma.$transaction([
     prisma.pollShare.update({
@@ -731,16 +792,16 @@ router.post('/polls/shares/:token/click', asyncHandler(async (req: Request, res:
     prisma.pollShareClick.create({
       data: {
         shareId: share.id,
-        name:   name?.trim()   || null,
-        gender: gender?.trim() || null,
-        age:    age ? Number(age) : null,
+        name:   name ?? null,
+        gender: gender ?? null,
+        age:    age ?? null,
       },
     }),
   ]);
   log({
     site: 'public', level: 'info', category: 'poll', action: 'poll.share_click',
     targetType: 'Poll', targetId: share.pollId, targetTitle: share.poll.title,
-    ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.socket?.remoteAddress,
+    ip: clientIp(req),
     userAgent: req.get('user-agent'), path: req.path, method: req.method,
     meta: { token: req.params.token, name: name ?? null, gender: gender ?? null, age: age ?? null },
   });
@@ -821,7 +882,7 @@ router.get('/search', publicReadLimiter, asyncHandler(async (req: Request, res: 
     const result = await searchAll(q, 4);
     log({
       site: 'public', level: 'info', category: 'search', action: 'search.query',
-      ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.socket?.remoteAddress,
+      ip: clientIp(req),
       userAgent: req.get('user-agent'), path: req.path, method: req.method, statusCode: 200,
       meta: { q, type },
     });
@@ -830,7 +891,7 @@ router.get('/search', publicReadLimiter, asyncHandler(async (req: Request, res: 
     const result = await searchType(q, type, page, 10);
     log({
       site: 'public', level: 'info', category: 'search', action: 'search.query',
-      ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.socket?.remoteAddress,
+      ip: clientIp(req),
       userAgent: req.get('user-agent'), path: req.path, method: req.method, statusCode: 200,
       meta: { q, type, page },
     });
@@ -907,7 +968,7 @@ router.post('/events/:slug/register', registerLimiter, asyncHandler(async (req: 
 }));
 
 // POST /public/events/:slug/register/verify — verify Razorpay payment
-router.post('/events/:slug/register/verify', asyncHandler(async (req: Request, res: Response) => {
+router.post('/events/:slug/register/verify', publicWriteLimiter(), asyncHandler(async (req: Request, res: Response) => {
   try {
     const reg = await verifyPayment(req.body);
     sendSuccess(res, reg);
@@ -918,7 +979,7 @@ router.post('/events/:slug/register/verify', asyncHandler(async (req: Request, r
 }));
 
 // POST /public/events/cancel/:code — self-cancel by ticket code
-router.post('/events/cancel/:code', asyncHandler(async (req: Request, res: Response) => {
+router.post('/events/cancel/:code', publicWriteLimiter(), asyncHandler(async (req: Request, res: Response) => {
   try {
     const reg = await cancelRegistration(req.params.code);
     sendSuccess(res, reg);

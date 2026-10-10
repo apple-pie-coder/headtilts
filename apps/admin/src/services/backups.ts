@@ -48,10 +48,17 @@ export async function deleteBackup(id: number): Promise<void> {
   await apiClient.delete(`/backups/${id}`);
 }
 
-export function downloadUrl(id: number): string {
+// Starts a browser download using a single-use, 60-second token so the
+// access token never appears in a URL.
+export async function downloadBackup(id: number): Promise<void> {
+  const res = await apiClient.post(`/backups/${id}/download-token`);
   const base = (import.meta.env.VITE_API_URL as string) || '/api';
-  const token = localStorage.getItem('accessToken') ?? '';
-  return `${base}/backups/${id}/download?token=${encodeURIComponent(token)}`;
+  const a = document.createElement('a');
+  a.href = `${base}/backups/${id}/download?dt=${encodeURIComponent(res.data.data.token)}`;
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 export async function restoreBackup(id: number, scope: RestoreScope = 'all'): Promise<void> {

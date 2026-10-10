@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { log, inferCategory, inferAction, lookupTitle, extractEntityId } from '../services/logger.service';
+import { clientIp } from '../utils/clientIp';
 
 const SKIP_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const SKIP_PATH_PREFIXES = ['/auth', '/public']; // handled explicitly
@@ -49,7 +50,7 @@ export function activityLogger(req: Request, res: Response, next: NextFunction):
       action,
       actorId: user.sub,
       actorEmail: user.email,
-      ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.socket?.remoteAddress,
+      ip: clientIp(req),
       userAgent: req.get('user-agent'),
       path: capturedPath,
       method: req.method,

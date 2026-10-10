@@ -198,11 +198,17 @@ export async function createPublicComment(input: CreateCommentInput) {
   let status = 'approved';
   if (settings.moderateAll) {
     status = 'pending';
-  } else if (settings.moderateFirst && email) {
-    const previouslyApproved = await prisma.comment.findFirst({
-      where: { authorEmail: email, status: 'approved' },
-      select: { id: true },
-    });
+  } else if (settings.moderateFirst) {
+    // The email is self-asserted (anyone can type a regular's address), so a
+    // previous approval only counts when it came from the same browser too —
+    // visitorId is a random per-browser id that is never exposed publicly.
+    const visitorId = input.visitorId?.trim();
+    const previouslyApproved = email && visitorId && visitorId.length >= 8
+      ? await prisma.comment.findFirst({
+        where: { authorEmail: email, visitorId, status: 'approved' },
+        select: { id: true },
+      })
+      : null;
     if (!previouslyApproved) status = 'pending';
   }
 

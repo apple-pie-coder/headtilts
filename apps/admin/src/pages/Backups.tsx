@@ -4,7 +4,7 @@ import { useToast } from '../components/ToastContext';
 import { useConfirm } from '../components/ConfirmDialog';
 import {
   listBackups, createBackup, deleteBackup, restoreBackup,
-  uploadBackup, pollBackup, downloadUrl, verifyBackup,
+  uploadBackup, pollBackup, downloadBackup, verifyBackup,
   getBackupSettings, updateBackupSettings,
   Backup, BackupSettings, RestoreScope,
 } from '../services/backups';
@@ -495,9 +495,10 @@ export default function BackupsPage() {
                     <td className={styles.actions}>
                       {b.status === 'ready' && (
                         <>
-                          <a href={downloadUrl(b.id)} className={styles.actionBtn} title="Download" download>
+                          <button className={styles.actionBtn} title="Download"
+                            onClick={() => downloadBackup(b.id).catch(() => alert('Could not start the download'))}>
                             <FontAwesomeIcon icon={faDownload} />
-                          </a>
+                          </button>
                           <button className={`${styles.actionBtn} ${styles.verifyBtn}`} title="Verify integrity"
                             onClick={() => handleVerify(b)} disabled={verifying !== null}>
                             {verifying === b.id ? <FontAwesomeIcon icon={faCircleNotch} spin /> : <FontAwesomeIcon icon={faShieldHalved} />}
