@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { useLayout } from '../context/LayoutContext';
 import { resolveMediaUrl } from '../services/api';
+import { sanitizeHtml, sanitizeMapEmbed } from '../utils/sanitize';
 import { fetchEvent, registerForEvent, verifyEventPayment, eventIcalUrl, googleCalendarUrl } from '../services/events';
 import { EventFull, EventCustomField, EventRegistrationResult } from '../types';
 import './EventDetailPage.css';
@@ -260,7 +261,7 @@ export default function EventDetailPage() {
             {event.description && (
               <div
                 className="event-detail-description rich-content"
-                dangerouslySetInnerHTML={{ __html: event.description }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(event.description) }}
               />
             )}
 
@@ -315,7 +316,7 @@ export default function EventDetailPage() {
             {event.venueMapEmbed && (
               <section className="event-detail-section">
                 <h2 className="event-detail-section-title">Location</h2>
-                <div className="event-detail-map" dangerouslySetInnerHTML={{ __html: event.venueMapEmbed }} />
+                <div className="event-detail-map" dangerouslySetInnerHTML={{ __html: sanitizeMapEmbed(event.venueMapEmbed) }} />
               </section>
             )}
 

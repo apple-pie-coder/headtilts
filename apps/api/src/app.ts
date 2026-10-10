@@ -1,3 +1,4 @@
+import path from 'path';
 import express, { Express } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -59,8 +60,26 @@ export function createApp(): Express {
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(morgan('combined'));
 
-  // Static file serving for uploaded media
-  app.use('/uploads', express.static(uploadDir));
+  // Static file serving for uploaded media. Uploads share an origin with the
+  // admin panel, so every file is served sandboxed (no script execution even if
+  // something hostile slips through) and anything that isn't plain media is
+  // forced to download instead of rendering.
+  const INLINE_UPLOAD_EXT = new Set([
+    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.svg', '.ico', '.tiff',
+    '.mp4', '.webm', '.mp3', '.ogg', '.wav', '.pdf',
+  ]);
+  app.use('/uploads', express.static(uploadDir, {
+    dotfiles: 'deny',
+    setHeaders: (res, filePath) => {
+      const ext = path.extname(filePath).toLowerCase();
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      // Browsers' built-in PDF viewers refuse to run inside a CSP sandbox.
+      if (ext !== '.pdf') {
+        res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'; sandbox");
+      }
+      if (!INLINE_UPLOAD_EXT.has(ext)) res.setHeader('Content-Disposition', 'attachment');
+    },
+  }));
 
   // Public health check
   app.get('/health', async (_req, res) => {

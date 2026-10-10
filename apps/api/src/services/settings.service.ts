@@ -16,8 +16,9 @@ const ALLOWED_SETTING_KEYS = new Set([
   'uploads_use_yearmonth', 'upload_allowed_mime', 'max_upload_size', 'media_format', 'media_quality',
   'toc_enabled', 'show_breadcrumbs', 'background_effect',
   'smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'smtp_from',
-  // Backup settings — managed via the Backups page
-  ...BACKUP_SETTING_KEYS,
+  // Backup settings are NOT writable here — only via /backups/settings, which
+  // requires the system_backup permission. Otherwise SETTING_EDIT could redirect
+  // backups (full DB dumps) to an attacker-controlled S3 endpoint.
   // Favicons
   'site_favicon', 'admin_favicon',
   // Events carousel — managed via the gear icon on the Events admin page
@@ -27,7 +28,11 @@ const ALLOWED_SETTING_KEYS = new Set([
 ]);
 
 export async function getSettings() {
-  return prisma.setting.findMany({ orderBy: { key: 'asc' } });
+  // Backup settings (incl. S3 credentials) are served by /backups/settings only.
+  return prisma.setting.findMany({
+    where: { key: { notIn: [...BACKUP_SETTING_KEYS] } },
+    orderBy: { key: 'asc' },
+  });
 }
 
 /**

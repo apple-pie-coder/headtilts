@@ -394,6 +394,8 @@ export async function getPublicEvent(slug: string) {
 
 // ─── Registration ─────────────────────────────────────────────────────────────
 
+const MAX_QTY_PER_ORDER = 20;
+
 function getRazorpay(): Razorpay {
   const key = process.env.RAZORPAY_KEY_ID ?? '';
   const secret = process.env.RAZORPAY_KEY_SECRET ?? '';
@@ -416,10 +418,22 @@ export async function registerForEvent(
     where: { slug, status: 'published' },
     include: {
       ticketTiers: { where: { isVisible: true } },
-      _count: { select: { registrations: { where: { status: { in: ['confirmed', 'waitlisted'] as string[] } } } } },
+      _count: {
+        select: {
+          registrations: { where: { status: { in: ['confirmed', 'waitlisted'] as string[] } } },
+          ticketTiers: true,
+        },
+      },
     },
   });
   if (!event) throw new NotFoundError('Event not found');
+
+  const name = typeof input.name === 'string' ? input.name.trim() : '';
+  const email = typeof input.email === 'string' ? input.email.trim().toLowerCase() : '';
+  if (!name || name.length > 200) throw new ValidationError('A valid name is required');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+    throw new ValidationError('A valid email address is required');
+  }
 
   // Registration deadline check
   if (event.registrationDeadline && new Date() > event.registrationDeadline) {
@@ -427,14 +441,23 @@ export async function registerForEvent(
   }
 
   // Capacity check
-  const qty = input.quantity ?? 1;
+  const qty = input.quantity == null ? 1 : Number(input.quantity);
+  if (!Number.isInteger(qty) || qty < 1 || qty > MAX_QTY_PER_ORDER) {
+    throw new ValidationError(`Quantity must be a whole number between 1 and ${MAX_QTY_PER_ORDER}`);
+  }
   const confirmedCount = event._count.registrations;
   const isWaitlisted = event.maxAttendees !== null && confirmedCount + qty > event.maxAttendees;
 
   // Ticket tier
   let tier: typeof event.ticketTiers[0] | null = null;
+  // An event that sells tickets can't be joined by simply omitting the tier —
+  // that used to fall through to a free, confirmed registration.
+  if (event._count.ticketTiers > 0 && !input.ticketTierId) {
+    throw new ValidationError('Please select a ticket type');
+  }
   if (input.ticketTierId) {
-    tier = event.ticketTiers.find((t) => t.id === input.ticketTierId) ?? null;
+    const tierId = Number(input.ticketTierId);
+    tier = event.ticketTiers.find((t) => t.id === tierId) ?? null;
     if (!tier) throw new ValidationError('Invalid ticket tier');
 
     // Tier availability window
@@ -455,13 +478,16 @@ export async function registerForEvent(
   const isFree = !tier || tier.price === 0;
   const status = event.requireApproval ? 'pending' : (isWaitlisted ? 'waitlisted' : 'confirmed');
 
+  // Fail before creating a pending row if paid checkout isn't possible.
+  const razorpay = isFree ? null : getRazorpay();
+
   // Create registration record
   const reg = await prisma.eventRegistration.create({
     data: {
       eventId: event.id,
       ticketTierId: tier?.id ?? null,
-      name: input.name,
-      email: input.email,
+      name,
+      email,
       phone: input.phone,
       quantity: qty,
       status: isFree ? status : 'pending',
@@ -485,9 +511,8 @@ export async function registerForEvent(
   }
 
   // Paid — create Razorpay order
-  const razorpay = getRazorpay();
   const amountPaise = tier!.price * qty;
-  const order = await razorpay.orders.create({
+  const order = await razorpay!.orders.create({
     amount: amountPaise,
     currency: tier!.currency,
     receipt: `reg_${reg.id}`,
@@ -515,31 +540,58 @@ export async function verifyPayment(input: {
   razorpay_payment_id: string;
   razorpay_signature: string;
 }) {
+  const secret = process.env.RAZORPAY_KEY_SECRET;
+  if (!secret) throw new ValidationError('Payments are not configured');
+
+  const fail = () => new ValidationError('Payment verification failed');
+  const registrationId = Number(input.registrationId);
+  const orderId = typeof input.razorpay_order_id === 'string' ? input.razorpay_order_id : '';
+  const paymentId = typeof input.razorpay_payment_id === 'string' ? input.razorpay_payment_id : '';
+  const signature = typeof input.razorpay_signature === 'string' ? input.razorpay_signature : '';
+  if (!Number.isInteger(registrationId) || !orderId || !paymentId || !signature) throw fail();
+
   const reg = await prisma.eventRegistration.findUnique({
-    where: { id: input.registrationId },
+    where: { id: registrationId },
     include: { event: true, ticketTier: true },
   });
   if (!reg) throw new NotFoundError('Registration not found');
+
+  // The signed order must be the one created for THIS registration; otherwise a
+  // cheap payment's signature could be replayed against any other registration.
+  // Checked before anything is returned, so registration ids can't be enumerated
+  // to read other attendees' ticket codes.
+  if (!reg.paymentOrderId || reg.paymentOrderId !== orderId) throw fail();
   if (reg.paymentStatus === 'paid') return reg;
+  if (reg.status === 'cancelled') throw fail();
 
-  const body = `${input.razorpay_order_id}|${input.razorpay_payment_id}`;
-  const expected = crypto
-    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET ?? '')
-    .update(body)
-    .digest('hex');
+  const expected = Buffer.from(
+    crypto.createHmac('sha256', secret).update(`${reg.paymentOrderId}|${paymentId}`).digest('hex'),
+  );
+  const given = Buffer.from(signature);
+  if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) throw fail();
 
-  if (expected !== input.razorpay_signature) {
-    throw new ValidationError('Payment verification failed');
+  // Confirm with Razorpay that this payment belongs to the order and covers the amount.
+  const payment = await getRazorpay().payments.fetch(paymentId);
+  if (
+    payment.order_id !== reg.paymentOrderId ||
+    Number(payment.amount) !== reg.paymentAmount ||
+    (reg.ticketTier && payment.currency !== reg.ticketTier.currency) ||
+    !['authorized', 'captured'].includes(payment.status)
+  ) {
+    throw fail();
   }
 
-  const updated = await prisma.eventRegistration.update({
-    where: { id: reg.id },
+  // Flip to paid atomically so concurrent or replayed calls can't double-count.
+  const { count } = await prisma.eventRegistration.updateMany({
+    where: { id: reg.id, paymentStatus: { not: 'paid' }, status: { not: 'cancelled' } },
     data: {
       status: reg.event.requireApproval ? 'pending' : 'confirmed',
       paymentStatus: 'paid',
-      paymentId: input.razorpay_payment_id,
+      paymentId,
     },
   });
+  const updated = await prisma.eventRegistration.findUniqueOrThrow({ where: { id: reg.id } });
+  if (count === 0) return updated;
 
   if (reg.ticketTier) {
     await prisma.eventTicketTier.update({
@@ -785,6 +837,25 @@ async function resolveSlug(slug?: string, title?: string, excludeId?: number): P
   }
 }
 
+const MAP_EMBED_PREFIXES = ['https://www.google.com/maps/embed', 'https://maps.google.com/maps?'];
+
+// venueMapEmbed is rendered as HTML on the public site (same origin as the
+// admin panel), so never store caller HTML — keep only a vetted Google Maps
+// URL and rebuild the iframe ourselves.
+function normalizeMapEmbed(value: string | null | undefined): string | null | undefined {
+  if (value === undefined) return undefined;
+  const raw = (value ?? '').trim();
+  if (!raw) return null;
+  const src = (/^https?:\/\//i.test(raw) ? raw : /<iframe[^>]*\ssrc\s*=\s*["']([^"']+)["']/i.exec(raw)?.[1] ?? '')
+    .replace(/&amp;/g, '&')
+    .trim();
+  if (!MAP_EMBED_PREFIXES.some((p) => src.startsWith(p))) {
+    throw new ValidationError('Map embed must be a Google Maps embed (<iframe src="https://www.google.com/maps/embed?...">)');
+  }
+  const safeSrc = src.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `<iframe src="${safeSrc}" width="100%" height="350" style="border:0" allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+}
+
 function buildEventData(slug: string, input: Partial<EventInput>) {
   return {
     slug,
@@ -803,7 +874,7 @@ function buildEventData(slug: string, input: Partial<EventInput>) {
     venueCity: input.venueCity,
     venueState: input.venueState,
     venueCountry: input.venueCountry,
-    venueMapEmbed: input.venueMapEmbed,
+    venueMapEmbed: normalizeMapEmbed(input.venueMapEmbed),
     onlineUrl: input.onlineUrl,
     streamUrl: input.streamUrl,
     streamPlatform: input.streamPlatform,

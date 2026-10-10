@@ -92,20 +92,14 @@ async function runBackup(id: number, filename: string, label?: string, opts: { s
     };
     fs.writeFileSync(path.join(tmpDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 
-    // 3. .env snapshot
-    const envPath = path.resolve(process.cwd(), '../../.env');
-    if (fs.existsSync(envPath)) fs.copyFileSync(envPath, path.join(tmpDir, 'app.env'));
-
-    // 4. Pack into tar.gz
+    // 3. Pack into tar.gz. The .env file is deliberately NOT included: backups
+    // can be downloaded or shipped to S3, and must never carry JWT/DB secrets.
     const arc = archiver('tar', { gzip: true, gzipOptions: { level: 6 } });
     const tmpOut = path.join(tmpDir, filename);
     const outStream = createWriteStream(tmpOut);
     arc.pipe(outStream);
     arc.file(dumpPath, { name: 'database.sql' });
     arc.file(path.join(tmpDir, 'manifest.json'), { name: 'manifest.json' });
-    if (fs.existsSync(path.join(tmpDir, 'app.env'))) {
-      arc.file(path.join(tmpDir, 'app.env'), { name: 'app.env' });
-    }
     if (fs.existsSync(uploadDir)) arc.directory(uploadDir, 'uploads');
     await new Promise<void>((res, rej) => {
       outStream.on('close', res);
@@ -384,14 +378,8 @@ async function runRestore(filename: string, scope: RestoreScope) {
       }
     }
 
-    // 5. Restore .env (full restore only)
-    if (scope === 'all') {
-      const envSource = path.join(tmpDir, 'app.env');
-      const envDest = path.resolve(process.cwd(), '../../.env');
-      if (fs.existsSync(envSource) && fs.existsSync(path.dirname(envDest))) {
-        fs.copyFileSync(envSource, envDest);
-      }
-    }
+    // Any app.env inside an (older or uploaded) archive is ignored — a restore
+    // must never be able to overwrite server secrets.
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

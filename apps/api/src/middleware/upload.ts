@@ -35,10 +35,30 @@ export const uploadDir = process.env.UPLOAD_DIR
   : path.join(__dirname, '..', '..', 'uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
 
+// The stored extension comes from the (allowlist-checked) MIME type, never from
+// the client's filename — otherwise "x.html" sent as image/gif is served as HTML.
+const MIME_EXT: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/gif': '.gif',
+  'image/webp': '.webp',
+  'image/avif': '.avif',
+  'image/svg+xml': '.svg',
+  'image/x-icon': '.ico',
+  'image/vnd.microsoft.icon': '.ico',
+  'image/tiff': '.tiff',
+  'application/pdf': '.pdf',
+  'video/mp4': '.mp4',
+  'video/webm': '.webm',
+  'audio/mpeg': '.mp3',
+  'audio/ogg': '.ogg',
+  'audio/wav': '.wav',
+};
+
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase().replace(/[^a-z0-9.]/g, '');
+    const ext = MIME_EXT[file.mimetype.toLowerCase()] ?? '.bin';
     cb(null, `${crypto.randomUUID()}${ext}`);
   },
 });

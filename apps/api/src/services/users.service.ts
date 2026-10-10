@@ -1,8 +1,9 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../config/database';
-import { ValidationError, NotFoundError, ConflictError, ForbiddenError } from '../utils/errors';
+import { ValidationError, NotFoundError, ConflictError } from '../utils/errors';
 import { validateEmail, validateUsername, validatePassword } from '@headtilts/shared';
 import * as notifications from './notifications.service';
+import { assertCanAssignRoles, assertCanManageUser } from './authz.service';
 
 const userInclude = {
   userRoles: {
@@ -113,7 +114,7 @@ interface CreateUserInput {
   roleIds?: number[];
 }
 
-export async function createUser(input: CreateUserInput) {
+export async function createUser(input: CreateUserInput, requestingUserId: string) {
   const emailValidation = validateEmail(input.email);
   if (!emailValidation.valid) {
     throw new ValidationError(emailValidation.error!);
@@ -136,6 +137,8 @@ export async function createUser(input: CreateUserInput) {
   if (existingUser) {
     throw new ConflictError('Email or username already exists');
   }
+
+  if (input.roleIds?.length) await assertCanAssignRoles(requestingUserId, input.roleIds);
 
   const hashedPassword = await bcrypt.hash(input.password, 10);
 
@@ -177,18 +180,10 @@ export async function updateUser(id: string, input: UpdateUserInput, requestingU
     throw new NotFoundError('User not found');
   }
 
-  // Prevent privilege escalation: only a super-admin can assign the super-admin role.
-  if (input.roleIds !== undefined && input.roleIds.length > 0) {
-    const superAdminRole = await prisma.role.findUnique({ where: { name: 'super-admin' } });
-    if (superAdminRole && input.roleIds.includes(superAdminRole.id)) {
-      const requesterIsSuperAdmin = await prisma.userRole.findFirst({
-        where: { userId: requestingUserId, role: { name: 'super-admin' } },
-      });
-      if (!requesterIsSuperAdmin) {
-        throw new ForbiddenError('Only super-admins can assign the super-admin role');
-      }
-    }
-  }
+  // Prevent privilege escalation: the requester may not touch accounts more
+  // powerful than themselves, nor hand out roles beyond their own permissions.
+  await assertCanManageUser(requestingUserId, id);
+  if (input.roleIds !== undefined) await assertCanAssignRoles(requestingUserId, input.roleIds);
 
   if (input.email !== undefined || input.username !== undefined) {
     const conflict = await prisma.user.findFirst({
@@ -294,5 +289,6 @@ export async function deleteUser(id: string, requestingUserId: string) {
     throw new NotFoundError('User not found');
   }
 
+  await assertCanManageUser(requestingUserId, id);
   await prisma.user.delete({ where: { id } });
 }
