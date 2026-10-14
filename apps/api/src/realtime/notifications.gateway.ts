@@ -72,3 +72,8 @@ export function initRealtime(server: HttpServer): SocketIOServer {
 export function pushNotification(userId: string, notification: unknown): void {
   io?.to(`user:${userId}`).emit('notification', notification);
 }
+
+/** Push any named event to all of a user's open admin connections. */
+export function pushToUser(userId: string, event: string, payload: unknown): void {
+  io?.to(`user:${userId}`).emit(event, payload);
+}

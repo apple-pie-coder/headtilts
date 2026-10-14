@@ -1,44 +1,56 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AxiosError } from 'axios';
 import { PERMISSIONS } from '@headtilts/shared';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faReply, faCheck, faBan, faTrash, faTrashCan, faRotateLeft, faComments, faMagnifyingGlass,
+  faHeart, faEyeSlash, faInbox,
+} from '@fortawesome/free-solid-svg-icons';
 import { AdminLayout } from '../components/AdminLayout';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/ToastContext';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faReply, faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
-import { useDensity } from '../hooks/useDensity';
+import {
+  ActiveFilter, ActiveFilters, BulkBar, Button, Card, Checkbox, EmptyState, Field, FilterMenu, Kbd,
+  LoadingBar, PageHeader, Pagination, SearchInput, StatusBadge, Tabs, absoluteTime, relativeTime,
+  useRowSelection,
+} from '../components/ui';
 import { useAuth } from '../hooks/useAuth';
+import { useHotkeys } from '../hooks/useHotkeys';
+import { useUrlState } from '../hooks/useUrlState';
+import { refreshNavBadges } from '../hooks/useNavBadges';
 import { AdminComment, Post } from '../types';
 import { deleteComment, fetchComments, setCommentStatus } from '../services/comments';
 import { fetchPosts } from '../services/posts';
-import postsStyles from './Posts.module.css';
 import styles from './Comments.module.css';
 
-const PAGE_SIZE = 20;
+const STATUS_META: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' }> = {
+  pending: { label: 'Pending', tone: 'warning' },
+  approved: { label: 'Approved', tone: 'success' },
+  spam: { label: 'Spam', tone: 'danger' },
+  trash: { label: 'Trash', tone: 'neutral' },
+};
 
-const STATUS_TABS = [
-  { value: '', label: 'All' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'spam', label: 'Spam' },
-  { value: 'trash', label: 'Trash' },
-];
-
-const STATUS_LABELS: Record<string, string> = {
+const VERB: Record<string, string> = {
   approved: 'Approved',
-  pending: 'Pending',
-  spam: 'Spam',
-  trash: 'Trash',
+  pending: 'Unapproved',
+  spam: 'Marked as spam:',
+  trash: 'Trashed',
 };
 
 function errorMessage(err: unknown, fallback: string): string {
-  return (
-    (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || fallback
-  );
+  return (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || fallback;
 }
 
-function truncate(text: string, maxLen: number = 100): string {
-  return text.length > maxLen ? text.slice(0, maxLen) + '…' : text;
+function initials(name: string): string {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('') || '?';
+}
+
+/** Stable pastel hue per author so repeat commenters are recognisable. */
+function hue(seed: string): number {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 360;
+  return h;
 }
 
 export default function CommentsPage() {
@@ -47,245 +59,363 @@ export default function CommentsPage() {
   const { hasPermission } = useAuth();
   const canModerate = hasPermission(PERMISSIONS.COMMENT_MODERATE);
 
+  const [q, setQ] = useUrlState({
+    status: '',
+    search: '',
+    author: '',
+    post: '',
+    sort: 'createdAt:desc',
+    page: '1',
+    per: '20',
+  });
+  const page = Math.max(1, Number(q.page) || 1);
+  const perPage = Number(q.per) || 20;
+  const [sortBy, sortOrder] = q.sort.split(':') as ['createdAt' | 'updatedAt', 'asc' | 'desc'];
+
   const [items, setItems] = useState<AdminComment[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [status, setStatus] = useState('');
-  const [search, setSearch] = useState('');
-  const [authorId, setAuthorId] = useState('');
-  const [postId, setPostId] = useState('');
-  const [sortBy, setSortBy] = useState<'createdAt' | 'updatedAt'>('createdAt');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [loading, setLoading] = useState(true);
-  const [density, setDensity] = useDensity('commentsDensity');
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [cursor, setCursor] = useState(-1);
+  const reqId = useRef(0);
+  const rowRefs = useRef<(HTMLElement | null)[]>([]);
 
   useEffect(() => {
-    fetchPosts(1, 100, { type: 'post' })
-      .then((r) => setPosts(r.items))
-      .catch(() => {});
+    fetchPosts(1, 100, { type: 'post' }).then((r) => setPosts(r.items)).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [page, status, search, authorId, postId, sortBy, sortOrder]);
-
-  async function load() {
+  const load = useCallback(async () => {
+    const id = ++reqId.current;
     setLoading(true);
     try {
-      const result = await fetchComments(page, PAGE_SIZE, {
-        status,
-        search,
-        authorId: authorId || undefined,
-        postId: postId ? Number(postId) : undefined,
+      const result = await fetchComments(page, perPage, {
+        status: q.status,
+        search: q.search,
+        authorId: q.author || undefined,
+        postId: q.post ? Number(q.post) : undefined,
         sortBy,
         sortOrder,
       });
+      if (id !== reqId.current) return;
       setItems(result.items);
       setStatusCounts(result.statusCounts);
       setTotal(result.pagination.total);
-    } catch (err: unknown) {
-      toast.error(errorMessage(err, 'Failed to load comments'));
+      setLoaded(true);
+    } catch (err) {
+      if (id === reqId.current) toast.error(errorMessage(err, 'Failed to load comments'));
     } finally {
-      setLoading(false);
+      if (id === reqId.current) setLoading(false);
     }
-  }
+  }, [page, perPage, q.status, q.search, q.author, q.post, sortBy, sortOrder]);
 
-  async function changeStatus(comment: AdminComment, newStatus: string) {
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setCursor(-1); }, [q.status, q.search, q.author, q.post, page]);
+
+  const ids = useMemo(() => items.map((c) => c.id), [items]);
+  const sel = useRowSelection(ids);
+
+  /* ── Moderation ────────────────────────────────────────── */
+
+  async function moderate(comments: AdminComment[], status: string) {
+    if (comments.length === 0) return;
+    const prev = comments.map((c) => ({ c, status: c.status }));
+    const moved = new Set(comments.map((c) => c.id));
+
+    // Optimistic: items leave a filtered tab immediately, otherwise update in place.
+    setItems((list) => (q.status && q.status !== status
+      ? list.filter((c) => !moved.has(c.id))
+      : list.map((c) => (moved.has(c.id) ? { ...c, status } : c))));
+    sel.clear();
+
     try {
-      await setCommentStatus(comment.id, newStatus);
-      await load();
-    } catch (err: unknown) {
+      await Promise.all(comments.map((c) => setCommentStatus(c.id, status)));
+      const what = comments.length === 1 ? `comment by ${comments[0].authorName}` : `${comments.length} comments`;
+      toast.success(`${VERB[status] ?? 'Updated'} ${what}`, {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            try {
+              await Promise.all(prev.map(({ c, status: s }) => setCommentStatus(c.id, s)));
+            } catch (err) {
+              toast.error(errorMessage(err, 'Undo failed'));
+            }
+            load();
+            refreshNavBadges();
+          },
+        },
+      });
+    } catch (err) {
       toast.error(errorMessage(err, 'Failed to update comment'));
     }
+    load();
+    refreshNavBadges();
   }
 
-  async function handleDelete(comment: AdminComment) {
-    if (!(await confirm({ title: 'Delete Comment', message: `Permanently delete this comment by "${comment.authorName}"? Replies to it will also be removed.`, confirmLabel: 'Delete Permanently', danger: true }))) {
-      return;
-    }
+  async function remove(comments: AdminComment[]) {
+    const what = comments.length === 1 ? `this comment by ${comments[0].authorName}` : `${comments.length} comments`;
+    if (!(await confirm({
+      title: 'Delete permanently?',
+      message: `Delete ${what}? Replies will also be removed. This cannot be undone.`,
+      confirmLabel: 'Delete permanently',
+      danger: true,
+    }))) return;
+    setBusy(true);
     try {
-      await deleteComment(comment.id);
-      await load();
-    } catch (err: unknown) {
+      await Promise.all(comments.map((c) => deleteComment(c.id)));
+      toast.success(comments.length === 1 ? 'Comment deleted' : `${comments.length} comments deleted`);
+      sel.clear();
+    } catch (err) {
       toast.error(errorMessage(err, 'Failed to delete comment'));
+    } finally {
+      setBusy(false);
+      load();
+      refreshNavBadges();
     }
   }
 
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  /* ── Keyboard moderation: j/k to move, a/u/s/t to act, x to select ── */
+
+  function focusRow(i: number) {
+    const next = Math.max(0, Math.min(items.length - 1, i));
+    setCursor(next);
+    rowRefs.current[next]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  const current = cursor >= 0 ? items[cursor] : undefined;
+  useHotkeys({
+    j: () => focusRow(cursor + 1),
+    k: () => focusRow(cursor - 1),
+    x: () => { if (current) sel.toggle(current.id); },
+    a: () => { if (canModerate && current && current.status !== 'approved') moderate([current], 'approved'); },
+    u: () => { if (canModerate && current && current.status === 'approved') moderate([current], 'pending'); },
+    s: () => { if (canModerate && current && current.status !== 'spam') moderate([current], 'spam'); },
+    t: () => { if (canModerate && current && current.status !== 'trash') moderate([current], 'trash'); },
+  });
+
+  /* ── Filters ───────────────────────────────────────────── */
+
+  const activeFilters: ActiveFilter[] = [];
+  if (q.search) activeFilters.push({ key: 'search', label: `“${q.search}”`, onRemove: () => setQ({ search: '' }) });
+  if (q.author) activeFilters.push({ key: 'author', label: `Author: ${q.author}`, onRemove: () => setQ({ author: '' }) });
+  if (q.post) {
+    const p = posts.find((x) => String(x.id) === q.post);
+    activeFilters.push({ key: 'post', label: `On: ${p?.title ?? `#${q.post}`}`, onRemove: () => setQ({ post: '' }) });
+  }
+  const clearFilters = () => setQ({ search: '', author: '', post: '' });
+
   const allCount = Object.values(statusCounts).reduce((a, b) => a + b, 0);
+  const tabs = [
+    { key: '', label: 'All', count: allCount },
+    { key: 'pending', label: 'Pending', count: statusCounts.pending || 0, highlight: true },
+    { key: 'approved', label: 'Approved', count: statusCounts.approved || 0 },
+    { key: 'spam', label: 'Spam', count: statusCounts.spam || 0 },
+    { key: 'trash', label: 'Trash', count: statusCounts.trash || 0 },
+  ];
+  const selectedItems = items.filter((c) => sel.selected.has(c.id));
+  const pending = statusCounts.pending || 0;
 
   return (
     <AdminLayout>
-      <div className={postsStyles.header}>
-        <h2 className={postsStyles.title}>Comments</h2>
-      </div>
+      <PageHeader
+        title="Comments"
+        subtitle={loaded ? (pending ? `${pending} awaiting moderation` : 'All caught up — nothing awaiting moderation') : ' '}
+        actions={pending > 0 && q.status !== 'pending' && (
+          <Button variant="primary" icon={faInbox} onClick={() => setQ({ status: 'pending' })}>Review pending</Button>
+        )}
+      />
 
-      <div className={postsStyles.tabs}>
-        {STATUS_TABS.map((tab) => {
-          const count = tab.value === '' ? allCount : statusCounts[tab.value] || 0;
-          return (
-            <button
-              key={tab.value}
-              type="button"
-              className={status === tab.value ? postsStyles.tabActive : postsStyles.tab}
-              onClick={() => { setPage(1); setStatus(tab.value); }}
-            >
-              {tab.label} <span className={postsStyles.tabCount}>({count})</span>
-            </button>
-          );
-        })}
-      </div>
+      <Tabs tabs={tabs} value={q.status} onChange={(status) => { setQ({ status }); sel.clear(); }} />
 
-      <div className={postsStyles.toolbar}>
-        <div className={postsStyles.filters}>
-          <div className={postsStyles.filter}>
-            <label>Search</label>
-            <input
-              type="text"
-              placeholder="Search comments, authors, emails..."
-              value={search}
-              autoFocus
-              onChange={(e) => { setPage(1); setSearch(e.target.value); }}
-            />
-          </div>
-          <div className={postsStyles.filter}>
-            <label>Author Email</label>
-            <input
-              type="text"
-              placeholder="Filter by email..."
-              value={authorId}
-              onChange={(e) => { setPage(1); setAuthorId(e.target.value); }}
-            />
-          </div>
-          <div className={postsStyles.filter}>
-            <label>Post</label>
-            <select
-              value={postId}
-              onChange={(e) => { setPage(1); setPostId(e.target.value); }}
-            >
-              <option value="">All posts</option>
-              {posts.map((p) => (
-                <option key={p.id} value={p.id}>{p.title}</option>
-              ))}
+      <div className={styles.toolbar}>
+        <SearchInput value={q.search} onChange={(search) => setQ({ search })} placeholder="Search comments, names, emails" />
+        <FilterMenu activeCount={activeFilters.filter((f) => f.key !== 'search').length}>
+          <Field label="On post">
+            <select value={q.post} onChange={(e) => setQ({ post: e.target.value })}>
+              <option value="">Any post</option>
+              {posts.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
             </select>
-          </div>
-          <div className={postsStyles.filter}>
-            <label>Sort</label>
-            <select
-              value={`${sortBy}:${sortOrder}`}
-              onChange={(e) => {
-                const [field, order] = e.target.value.split(':') as [typeof sortBy, typeof sortOrder];
-                setPage(1); setSortBy(field); setSortOrder(order);
-              }}
-            >
-              <option value="createdAt:desc">Created (newest)</option>
-              <option value="createdAt:asc">Created (oldest)</option>
-              <option value="updatedAt:desc">Updated (newest)</option>
-              <option value="updatedAt:asc">Updated (oldest)</option>
+          </Field>
+          <Field label="Author email">
+            <input
+              type="email"
+              defaultValue={q.author}
+              placeholder="name@example.com"
+              onKeyDown={(e) => { if (e.key === 'Enter') setQ({ author: (e.target as HTMLInputElement).value.trim() }); }}
+              onBlur={(e) => setQ({ author: e.target.value.trim() })}
+            />
+          </Field>
+          <Field label="Sort by">
+            <select value={q.sort} onChange={(e) => setQ({ sort: e.target.value })}>
+              <option value="createdAt:desc">Newest first</option>
+              <option value="createdAt:asc">Oldest first</option>
+              <option value="updatedAt:desc">Recently updated</option>
             </select>
-          </div>
-          <div className={postsStyles.filter}>
-            <label>Density</label>
-            <div className={postsStyles.densitySwitch} role="group" aria-label="List density">
-              <button type="button" className={`${postsStyles.densityOption} ${density === 'compact' ? postsStyles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
-              <button type="button" className={`${postsStyles.densityOption} ${density === 'condensed' ? postsStyles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
-              <button type="button" className={`${postsStyles.densityOption} ${density === 'relaxed' ? postsStyles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className={postsStyles.tableWrapper}>
-        <table className={postsStyles[`density_${density}`]}>
-          <thead>
-            <tr>
-              <th>Author</th>
-              <th>Content</th>
-              <th>On</th>
-              <th>Date</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((comment) => (
-              <tr key={comment.id}>
-                <td>
-                  <div>
-                    <strong>{comment.authorName}</strong>
-                    {comment.authorEmail && (
-                      <div className={styles.itemEmail}>{comment.authorEmail}</div>
-                    )}
-                  </div>
-                </td>
-                <td>
-                  <div>{truncate(comment.content)}</div>
-                  {comment.parent && (
-                    <div className={styles.itemMeta}>
-                      <FontAwesomeIcon icon={faReply} /> reply to {comment.parent.authorName}
-                    </div>
-                  )}
-                </td>
-                <td className={styles.date}>{comment.post.title}</td>
-                <td className={styles.date}>{new Date(comment.createdAt).toLocaleString()}</td>
-                <td>
-                  <span className={`${postsStyles.statusBadge} ${styles[`status_${comment.status}`] || ''}`}>
-                    {STATUS_LABELS[comment.status] || comment.status}
-                  </span>
-                </td>
-                <td className={postsStyles.actions}>
-                  {canModerate ? (
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      {comment.status !== 'approved' && (
-                        <button className={styles.approveButton} onClick={() => changeStatus(comment, 'approved')}>
-                          Approve
-                        </button>
-                      )}
-                      {comment.status === 'approved' && (
-                        <button onClick={() => changeStatus(comment, 'pending')}>
-                          Unapprove
-                        </button>
-                      )}
-                      {comment.status !== 'spam' && (
-                        <button onClick={() => changeStatus(comment, 'spam')}>
-                          Spam
-                        </button>
-                      )}
-                      {comment.status !== 'trash' ? (
-                        <button onClick={() => changeStatus(comment, 'trash')}>
-                          Trash
-                        </button>
-                      ) : (
-                        <button className={styles.deleteButton} onClick={() => handleDelete(comment)}>
-                          Delete
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {!loading && items.length === 0 && (
-          <div className={postsStyles.empty}>No comments found.</div>
+          </Field>
+        </FilterMenu>
+        {canModerate && items.length > 0 && (
+          <span className={styles.kbdHint}>
+            <Kbd>J</Kbd><Kbd>K</Kbd> move · <Kbd>A</Kbd> approve · <Kbd>S</Kbd> spam · <Kbd>T</Kbd> trash
+          </span>
         )}
       </div>
 
-      <div className={postsStyles.pagination}>
-        <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
-          Previous
-        </button>
-        <span>Page {page} of {pages}</span>
-        <button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages}>
-          Next
-        </button>
-      </div>
+      <ActiveFilters filters={activeFilters} onClearAll={clearFilters} />
+
+      <Card>
+        <LoadingBar active={loading && loaded} />
+        {items.length > 0 && (
+          <div className={styles.listHead}>
+            <Checkbox label="Select all comments on this page" checked={sel.allSelected} indeterminate={sel.someSelected} onChange={() => sel.toggleAll()} />
+            <span>{total} comment{total === 1 ? '' : 's'}</span>
+          </div>
+        )}
+
+        {!loaded && (
+          <div className={styles.skeletons}>
+            {Array.from({ length: 5 }, (_, i) => <div key={i} className={styles.skeletonItem} />)}
+          </div>
+        )}
+
+        <ul className={styles.list}>
+          {items.map((c, i) => {
+            const isOpen = expanded.has(c.id);
+            const long = c.content.length > 280;
+            const selected = sel.selected.has(c.id);
+            return (
+              <li
+                key={c.id}
+                ref={(el) => { rowRefs.current[i] = el; }}
+                className={[
+                  styles.item,
+                  c.status === 'pending' && styles.itemPending,
+                  selected && styles.itemSelected,
+                  cursor === i && styles.itemCursor,
+                ].filter(Boolean).join(' ')}
+                onClick={() => setCursor(i)}
+              >
+                <div className={styles.check}>
+                  <Checkbox label={`Select comment by ${c.authorName}`} checked={selected} onChange={(shift) => sel.toggle(c.id, shift)} />
+                </div>
+                <span className={styles.avatar} style={{ '--h': hue(c.authorEmail || c.authorName) } as React.CSSProperties} aria-hidden="true">
+                  {initials(c.authorName)}
+                </span>
+                <div className={styles.body}>
+                  <div className={styles.head}>
+                    <strong className={styles.name}>{c.authorName}</strong>
+                    {c.authorEmail && (
+                      <button type="button" className={styles.email} title="Show all comments from this email" onClick={(e) => { e.stopPropagation(); setQ({ author: c.authorEmail }); }}>
+                        {c.authorEmail}
+                      </button>
+                    )}
+                    <span className={styles.dot}>·</span>
+                    <time className={styles.time} dateTime={c.createdAt} title={absoluteTime(c.createdAt)}>{relativeTime(c.createdAt)}</time>
+                    <StatusBadge tone={STATUS_META[c.status]?.tone ?? 'neutral'}>{STATUS_META[c.status]?.label ?? c.status}</StatusBadge>
+                  </div>
+                  <div className={styles.context}>
+                    {c.parent && <><FontAwesomeIcon icon={faReply} /> Reply to <strong>{c.parent.authorName}</strong> on </>}
+                    {!c.parent && 'On '}
+                    <Link to={`/admin/posts/${c.post.id}/edit`} className={styles.postLink}>{c.post.title}</Link>
+                    <button type="button" className={styles.filterLink} onClick={(e) => { e.stopPropagation(); setQ({ post: String(c.post.id) }); }}>
+                      filter
+                    </button>
+                    {c._count?.reactions > 0 && (
+                      <span className={styles.reactions}><FontAwesomeIcon icon={faHeart} /> {c._count.reactions}</span>
+                    )}
+                  </div>
+                  <p className={`${styles.content} ${long && !isOpen ? styles.clamped : ''}`}>{c.content}</p>
+                  {long && (
+                    <button
+                      type="button"
+                      className={styles.more}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpanded((s) => { const n = new Set(s); if (n.has(c.id)) n.delete(c.id); else n.add(c.id); return n; });
+                      }}
+                    >
+                      {isOpen ? 'Show less' : 'Show more'}
+                    </button>
+                  )}
+                </div>
+                {canModerate && (
+                  <div className={styles.actions} onClick={(e) => e.stopPropagation()}>
+                    {c.status !== 'approved' ? (
+                      <button type="button" className={`${styles.act} ${styles.actApprove}`} onClick={() => moderate([c], 'approved')} title="Approve (A)">
+                        <FontAwesomeIcon icon={faCheck} /> <span>Approve</span>
+                      </button>
+                    ) : (
+                      <button type="button" className={styles.act} onClick={() => moderate([c], 'pending')} title="Unapprove (U)">
+                        <FontAwesomeIcon icon={faEyeSlash} /> <span>Unapprove</span>
+                      </button>
+                    )}
+                    {c.status !== 'spam' && (
+                      <button type="button" className={styles.act} onClick={() => moderate([c], 'spam')} title="Mark as spam (S)">
+                        <FontAwesomeIcon icon={faBan} /> <span>Spam</span>
+                      </button>
+                    )}
+                    {c.status === 'trash' || c.status === 'spam' ? (
+                      <button type="button" className={`${styles.act} ${styles.actDanger}`} onClick={() => remove([c])} title="Delete permanently">
+                        <FontAwesomeIcon icon={faTrashCan} /> <span>Delete</span>
+                      </button>
+                    ) : (
+                      <button type="button" className={`${styles.act} ${styles.actDanger}`} onClick={() => moderate([c], 'trash')} title="Move to trash (T)">
+                        <FontAwesomeIcon icon={faTrash} /> <span>Trash</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+
+        {loaded && items.length === 0 && (
+          activeFilters.length > 0 ? (
+            <EmptyState
+              icon={faMagnifyingGlass}
+              title="No comments match your filters"
+              action={<Button onClick={clearFilters}>Clear filters</Button>}
+            />
+          ) : q.status === 'pending' ? (
+            <EmptyState icon={faCheck} title="All caught up" description="There are no comments waiting for moderation." />
+          ) : (
+            <EmptyState
+              icon={faComments}
+              title={q.status ? `No ${STATUS_META[q.status]?.label.toLowerCase()} comments` : 'No comments yet'}
+              description={q.status ? undefined : 'Comments from readers will appear here for moderation.'}
+            />
+          )
+        )}
+      </Card>
+
+      {loaded && total > 0 && (
+        <Pagination
+          page={page}
+          pageSize={perPage}
+          total={total}
+          onPage={(p) => setQ({ page: String(p) })}
+          onPageSize={(n) => setQ({ per: String(n) })}
+        />
+      )}
+
+      {canModerate && (
+        <BulkBar count={sel.selected.size} noun="comment" onClear={sel.clear}>
+          {q.status !== 'approved' && <Button size="sm" icon={faCheck} disabled={busy} onClick={() => moderate(selectedItems, 'approved')}>Approve</Button>}
+          {q.status === 'approved' && <Button size="sm" icon={faEyeSlash} disabled={busy} onClick={() => moderate(selectedItems, 'pending')}>Unapprove</Button>}
+          {q.status !== 'spam' && <Button size="sm" icon={faBan} disabled={busy} onClick={() => moderate(selectedItems, 'spam')}>Spam</Button>}
+          {(q.status === 'trash' || q.status === 'spam') ? (
+            <>
+              <Button size="sm" icon={faRotateLeft} disabled={busy} onClick={() => moderate(selectedItems, 'pending')}>Restore</Button>
+              <Button size="sm" variant="danger" icon={faTrashCan} disabled={busy} onClick={() => remove(selectedItems)}>Delete</Button>
+            </>
+          ) : (
+            <Button size="sm" variant="danger" icon={faTrash} disabled={busy} onClick={() => moderate(selectedItems, 'trash')}>Trash</Button>
+          )}
+        </BulkBar>
+      )}
     </AdminLayout>
   );
 }

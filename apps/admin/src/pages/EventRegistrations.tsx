@@ -1,28 +1,41 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { AxiosError } from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faDownload, faCheck, faBan, faQrcode, faSearch } from '@fortawesome/free-solid-svg-icons';
+import {
+  faArrowLeft, faDownload, faCheck, faBan, faUserCheck, faEnvelope, faCopy, faUsers, faMagnifyingGlass,
+} from '@fortawesome/free-solid-svg-icons';
 import { AdminLayout } from '../components/AdminLayout';
 import { useToast } from '../components/ToastContext';
 import { useConfirm } from '../components/ConfirmDialog';
+import {
+  BulkBar, Button, Card, Checkbox, EmptyState, LoadingBar, MenuItem, PageHeader, Pagination, RowMenu, SearchInput,
+  StatusBadge, TableSkeleton, Tabs, absoluteTime, relativeTime, useRowSelection,
+} from '../components/ui';
+import t from '../components/ui/table.module.css';
+import { useUrlState } from '../hooks/useUrlState';
 import { fetchEvent, fetchRegistrations, patchRegistration, exportRegistrationsUrl, Registration, EventSummary } from '../services/events';
-import styles from './Events.module.css';
+import styles from './EventRegistrations.module.css';
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending', confirmed: 'Confirmed', waitlisted: 'Waitlisted', cancelled: 'Cancelled',
-};
-const STATUS_CLASS: Record<string, string> = {
-  confirmed: styles.statusPublished, pending: styles.statusPostponed,
-  waitlisted: styles.statusDraft, cancelled: styles.statusCancelled,
+const STATUS_META: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' | 'info' }> = {
+  pending: { label: 'Pending', tone: 'warning' },
+  confirmed: { label: 'Confirmed', tone: 'success' },
+  waitlisted: { label: 'Waitlisted', tone: 'info' },
+  cancelled: { label: 'Cancelled', tone: 'neutral' },
 };
 const PAY_LABELS: Record<string, string> = {
-  free: 'Free', pending: 'Pending', paid: 'Paid', refunded: 'Refunded',
+  free: 'Free', pending: 'Payment pending', paid: 'Paid', refunded: 'Refunded',
 };
+type Action = 'approve' | 'cancel' | 'check-in';
+const ACTION_DONE: Record<Action, string> = { approve: 'Approved', cancel: 'Cancelled', 'check-in': 'Checked in' };
 
-const LIMIT = 50;
+/** The API only confirms free or paid orders that aren't cancelled. */
+function canApprove(r: Registration): boolean {
+  return (r.status === 'pending' || r.status === 'waitlisted') && (r.paymentStatus === 'free' || r.paymentStatus === 'paid');
+}
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+function errorMessage(err: unknown, fallback: string): string {
+  return (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || fallback;
 }
 
 export default function EventRegistrationsPage() {
@@ -31,171 +44,210 @@ export default function EventRegistrationsPage() {
   const toast = useToast();
   const confirm = useConfirm();
 
-  const [event, setEvent]           = useState<EventSummary | null>(null);
-  const [regs, setRegs]             = useState<Registration[]>([]);
-  const [total, setTotal]           = useState(0);
-  const [page, setPage]             = useState(1);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [search, setSearch]         = useState('');
-  const [loading, setLoading]       = useState(true);
+  const [q, setQ] = useUrlState({ status: '', search: '', page: '1' });
+  const page = Math.max(1, Number(q.page) || 1);
+  const LIMIT = 50;
 
-  useEffect(() => { loadEvent(); }, []);
-  useEffect(() => { loadRegs(); }, [page, statusFilter, search]);
+  const [event, setEvent] = useState<EventSummary | null>(null);
+  const [regs, setRegs] = useState<Registration[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const reqId = useRef(0);
 
-  async function loadEvent() {
-    try {
-      const ev = await fetchEvent(eventId);
-      setEvent(ev as unknown as EventSummary);
-    } catch { /* ignore */ }
-  }
+  useEffect(() => {
+    fetchEvent(eventId).then((ev) => setEvent(ev as unknown as EventSummary)).catch(() => {});
+  }, [eventId]);
 
-  async function loadRegs() {
+  const load = useCallback(async () => {
+    const rid = ++reqId.current;
     setLoading(true);
     try {
-      const data = await fetchRegistrations(eventId, { page, limit: LIMIT, status: statusFilter || undefined, search: search || undefined });
+      const data = await fetchRegistrations(eventId, { page, limit: LIMIT, status: q.status || undefined, search: q.search || undefined });
+      if (rid !== reqId.current) return;
       setRegs(data.items);
       setTotal(data.pagination.total);
-    } catch {
-      toast.error('Failed to load registrations');
+      setLoaded(true);
+    } catch (err) {
+      if (rid === reqId.current) toast.error(errorMessage(err, 'Failed to load registrations'));
     } finally {
-      setLoading(false);
+      if (rid === reqId.current) setLoading(false);
     }
-  }
+  }, [eventId, page, q.status, q.search]);
 
-  async function handleAction(reg: Registration, action: 'approve' | 'cancel' | 'check-in') {
-    const labels: Record<string, string> = { approve: 'Approve', cancel: 'Cancel', 'check-in': 'Check In' };
-    if (action === 'cancel') {
-      const yes = await confirm({ title: 'Cancel registration?', message: `Cancel registration for ${reg.name}?`, confirmLabel: 'Yes, cancel', danger: true });
-      if (!yes) return;
+  useEffect(() => { load(); }, [load]);
+
+  const ids = useMemo(() => regs.map((r) => r.id), [regs]);
+  const sel = useRowSelection(ids);
+
+  async function act(targets: Registration[], action: Action) {
+    if (targets.length === 0) {
+      toast.info('None of the selected registrations can do that');
+      return;
     }
+    if (action === 'cancel' && !(await confirm({
+      title: targets.length === 1 ? `Cancel ${targets[0].name}'s registration?` : `Cancel ${targets.length} registrations?`,
+      message: 'Their spot will be released. This cannot be undone from here.',
+      confirmLabel: 'Cancel registration',
+      cancelLabel: 'Keep',
+      danger: true,
+    }))) return;
+    setBusy(true);
     try {
-      await patchRegistration(eventId, reg.id, action);
-      toast.success(`${labels[action]} applied`);
-      loadRegs();
-    } catch {
-      toast.error(`Failed to ${labels[action].toLowerCase()} registration`);
+      const updated = await Promise.all(targets.map((r) => patchRegistration(eventId, r.id, action)));
+      const byId = new Map(updated.map((u) => [u.id, u]));
+      setRegs((list) => list.map((r) => byId.get(r.id) ?? r));
+      toast.success(targets.length === 1 ? `${ACTION_DONE[action]}: ${targets[0].name}` : `${ACTION_DONE[action]} ${targets.length} attendees`);
+      sel.clear();
+    } catch (err) {
+      toast.error(errorMessage(err, 'Action failed'));
+    } finally {
+      setBusy(false);
+      load();
     }
   }
 
-  const pages = Math.ceil(total / LIMIT);
-  const exportUrl = exportRegistrationsUrl(eventId);
+  function menu(r: Registration): MenuItem[] {
+    return [
+      { label: 'Approve', icon: faCheck, onClick: () => act([r], 'approve'), hidden: !canApprove(r) },
+      { label: 'Check in', icon: faUserCheck, onClick: () => act([r], 'check-in'), hidden: r.status !== 'confirmed' || !!r.checkInAt },
+      { label: 'Email attendee', icon: faEnvelope, onClick: () => { window.location.href = `mailto:${r.email}?subject=${encodeURIComponent(event?.title ?? 'Your registration')}`; } },
+      {
+        label: 'Copy ticket code',
+        icon: faCopy,
+        onClick: () => navigator.clipboard.writeText(r.ticketCode).then(() => toast.success('Ticket code copied'), () => toast.error('Could not copy')),
+      },
+      { label: 'Cancel registration', icon: faBan, onClick: () => act([r], 'cancel'), danger: true, hidden: r.status === 'cancelled', divider: true },
+    ];
+  }
+
+  const selected = regs.filter((r) => sel.selected.has(r.id));
+  const checkedInOnPage = regs.filter((r) => r.checkInAt).length;
+  const seats = regs.filter((r) => r.status === 'confirmed').reduce((n, r) => n + r.quantity, 0);
 
   return (
     <AdminLayout>
-      <div className={styles.header}>
-        <div>
-          <Link to="/admin/events" className={styles.regLink} style={{ marginBottom: '0.5rem', display: 'inline-flex' }}>
-            <FontAwesomeIcon icon={faArrowLeft} />&nbsp;Events
-          </Link>
-          <h1 className={styles.title}>{event ? `${event.title} — Registrations` : 'Registrations'}</h1>
-          <p className={styles.subtitle}>{total} registration{total !== 1 ? 's' : ''}</p>
+      <Link to="/admin/events" className={styles.back}><FontAwesomeIcon icon={faArrowLeft} /> All events</Link>
+      <PageHeader
+        title={event ? event.title : 'Registrations'}
+        subtitle={event
+          ? `${new Date(event.startAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} · ${total} registration${total === 1 ? '' : 's'}${event.maxAttendees ? ` · capacity ${event.maxAttendees}` : ''}`
+          : `${total} registration${total === 1 ? '' : 's'}`}
+        actions={
+          <a href={exportRegistrationsUrl(eventId)} download className={styles.exportBtn}>
+            <FontAwesomeIcon icon={faDownload} /> Export CSV
+          </a>
+        }
+      />
+
+      {loaded && regs.length > 0 && (
+        <div className={styles.stats}>
+          <div><strong>{seats}</strong><span>seats confirmed{q.page !== '1' || total > LIMIT ? ' (this page)' : ''}</span></div>
+          <div><strong>{checkedInOnPage}</strong><span>checked in</span></div>
+          {event?.maxAttendees ? (
+            <div className={styles.capWrap}>
+              <span className={styles.cap}><span style={{ width: `${Math.min(100, (seats / event.maxAttendees) * 100)}%` }} /></span>
+              <span>{Math.round((seats / event.maxAttendees) * 100)}% full</span>
+            </div>
+          ) : null}
         </div>
-        <a href={exportUrl} download className={styles.addButton} style={{ background: 'var(--ghost)', color: 'var(--t1)', border: '1px solid var(--sep)' }}>
-          <FontAwesomeIcon icon={faDownload} /> Export CSV
-        </a>
+      )}
+
+      <Tabs
+        tabs={[{ key: '', label: 'All' }, ...Object.entries(STATUS_META).map(([key, m]) => ({ key, label: m.label }))]}
+        value={q.status}
+        onChange={(status) => { setQ({ status }); sel.clear(); }}
+      />
+
+      <div className={t.toolbar}>
+        <SearchInput value={q.search} onChange={(search) => setQ({ search })} placeholder="Search name, email or ticket code" />
       </div>
 
-      <div className={styles.filters}>
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-          <FontAwesomeIcon icon={faSearch} style={{ position: 'absolute', left: '0.625rem', color: 'var(--t3)', fontSize: '0.8rem' }} />
-          <input
-            className={styles.searchInput}
-            style={{ paddingLeft: '2rem' }}
-            type="search"
-            placeholder="Search name or email…"
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          />
-        </div>
-        <select className={styles.filterSelect} value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
-          <option value="">All statuses</option>
-          <option value="pending">Pending</option>
-          <option value="confirmed">Confirmed</option>
-          <option value="waitlisted">Waitlisted</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-      </div>
-
-      {loading ? (
-        <p style={{ color: 'var(--t3)', textAlign: 'center', padding: '3rem 0' }}>Loading…</p>
-      ) : regs.length === 0 ? (
-        <div className={styles.emptyState}>
-          <p>No registrations yet.</p>
-        </div>
-      ) : (
-        <div className={styles.tableWrap}>
-          <table className={styles.table} aria-label="Registrations">
+      <Card>
+        <LoadingBar active={loading && loaded} />
+        <div className={t.scroll}>
+          <table className={t.table} aria-label="Registrations">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Ticket</th>
-                <th>Qty</th>
+                <th className={t.checkCol}>
+                  <Checkbox label="Select all on this page" checked={sel.allSelected} indeterminate={sel.someSelected} onChange={() => sel.toggleAll()} />
+                </th>
+                <th>Attendee</th>
+                <th className={t.hideMd}>Ticket</th>
                 <th>Status</th>
-                <th>Payment</th>
-                <th>Checked In</th>
-                <th>Registered</th>
-                <th>Actions</th>
+                <th className={t.hideSm}>Registered</th>
+                <th>Check-in</th>
+                <th className={t.actionsCol}><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
-              {regs.map((reg) => (
-                <tr key={reg.id}>
-                  <td>
-                    <strong>{reg.name}</strong>
-                    {reg.phone && <div style={{ color: 'var(--t3)', fontSize: '0.8rem' }}>{reg.phone}</div>}
+              {!loaded && <TableSkeleton rows={6} cols={7} />}
+              {regs.map((r) => (
+                <tr key={r.id} className={[sel.selected.has(r.id) && t.rowSelected, r.status === 'cancelled' && t.rowDim].filter(Boolean).join(' ') || undefined}>
+                  <td className={t.checkCol}>
+                    <Checkbox label={`Select ${r.name}`} checked={sel.selected.has(r.id)} onChange={(shift) => sel.toggle(r.id, shift)} />
                   </td>
-                  <td style={{ fontSize: '0.875rem' }}>{reg.email}</td>
-                  <td style={{ fontSize: '0.875rem' }}>{reg.ticketTier?.name ?? 'General'}</td>
-                  <td style={{ textAlign: 'center' }}>{reg.quantity}</td>
-                  <td>
-                    <span className={`${styles.statusBadge} ${STATUS_CLASS[reg.status] ?? ''}`}>
-                      {STATUS_LABELS[reg.status] ?? reg.status}
-                    </span>
-                  </td>
-                  <td>
-                    <span style={{ fontSize: '0.8125rem', color: reg.paymentStatus === 'paid' ? 'var(--success-t)' : 'var(--t3)' }}>
-                      {PAY_LABELS[reg.paymentStatus] ?? reg.paymentStatus}
-                      {reg.paymentAmount ? ` ₹${(reg.paymentAmount / 100).toFixed(0)}` : ''}
-                    </span>
-                  </td>
-                  <td style={{ fontSize: '0.8125rem', color: reg.checkInAt ? 'var(--success-t)' : 'var(--t3)' }}>
-                    {reg.checkInAt ? formatDate(reg.checkInAt) : '—'}
-                  </td>
-                  <td style={{ fontSize: '0.8125rem', color: 'var(--t2)' }}>{formatDate(reg.registeredAt)}</td>
-                  <td>
-                    <div className={styles.actions}>
-                      {reg.status === 'pending' && (
-                        <button className={styles.actionBtn} title="Approve" onClick={() => handleAction(reg, 'approve')}>
-                          <FontAwesomeIcon icon={faCheck} />
-                        </button>
-                      )}
-                      {!reg.checkInAt && reg.status === 'confirmed' && (
-                        <button className={styles.actionBtn} title="Check In" onClick={() => handleAction(reg, 'check-in')}>
-                          <FontAwesomeIcon icon={faQrcode} />
-                        </button>
-                      )}
-                      {reg.status !== 'cancelled' && (
-                        <button className={`${styles.actionBtn} ${styles.danger}`} title="Cancel" onClick={() => handleAction(reg, 'cancel')}>
-                          <FontAwesomeIcon icon={faBan} />
-                        </button>
-                      )}
+                  <td className={t.primaryCell}>
+                    <div className={t.stack}>
+                      <span className={t.primary}>{r.name}{r.quantity > 1 && <span className={t.faint}> ×{r.quantity}</span>}</span>
+                      <span className={t.secondary}>
+                        <a href={`mailto:${r.email}`} className={styles.email}>{r.email}</a>
+                        {r.phone && <span>· {r.phone}</span>}
+                      </span>
                     </div>
+                  </td>
+                  <td className={t.hideMd}>
+                    <div className={t.stack}>
+                      <span>{r.ticketTier?.name ?? 'General'}</span>
+                      <span className={t.secondary}>
+                        <span className={t.mono}>{r.ticketCode}</span>
+                        <span className={r.paymentStatus === 'paid' ? styles.paid : undefined}>
+                          · {PAY_LABELS[r.paymentStatus] ?? r.paymentStatus}
+                          {r.paymentAmount ? ` ₹${(r.paymentAmount / 100).toFixed(0)}` : ''}
+                        </span>
+                      </span>
+                    </div>
+                  </td>
+                  <td><StatusBadge tone={STATUS_META[r.status]?.tone ?? 'neutral'}>{STATUS_META[r.status]?.label ?? r.status}</StatusBadge></td>
+                  <td className={`${t.muted} ${t.hideSm} ${t.nowrap}`} title={absoluteTime(r.registeredAt)}>{relativeTime(r.registeredAt)}</td>
+                  <td>
+                    {r.checkInAt ? (
+                      <span className={styles.checkedIn} title={absoluteTime(r.checkInAt)}><FontAwesomeIcon icon={faUserCheck} /> {relativeTime(r.checkInAt)}</span>
+                    ) : r.status === 'confirmed' ? (
+                      <Button size="sm" icon={faUserCheck} disabled={busy} onClick={() => act([r], 'check-in')}>Check in</Button>
+                    ) : canApprove(r) ? (
+                      <Button size="sm" icon={faCheck} disabled={busy} onClick={() => act([r], 'approve')}>Approve</Button>
+                    ) : r.status === 'pending' ? (
+                      <span className={t.faint}>Awaiting payment</span>
+                    ) : <span className={t.faint}>—</span>}
+                  </td>
+                  <td className={t.actionsCol}>
+                    <RowMenu items={menu(r)} label={`Actions for ${r.name}`} />
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        {loaded && regs.length === 0 && (
+          q.search || q.status ? (
+            <EmptyState icon={faMagnifyingGlass} title="No registrations match" action={<Button onClick={() => setQ({ search: '', status: '' })}>Clear filters</Button>} />
+          ) : (
+            <EmptyState icon={faUsers} title="No registrations yet" description="People who sign up for this event will appear here." />
+          )
+        )}
+      </Card>
+
+      {loaded && total > LIMIT && (
+        <Pagination page={page} pageSize={LIMIT} total={total} onPage={(p) => setQ({ page: String(p) })} />
       )}
 
-      {pages > 1 && (
-        <div className={styles.pagination}>
-          <button disabled={page <= 1} onClick={() => setPage(page - 1)}>← Prev</button>
-          <span>Page {page} of {pages}</span>
-          <button disabled={page >= pages} onClick={() => setPage(page + 1)}>Next →</button>
-        </div>
-      )}
+      <BulkBar count={sel.selected.size} noun="registration" onClear={sel.clear}>
+        <Button size="sm" icon={faCheck} disabled={busy} onClick={() => act(selected.filter(canApprove), 'approve')}>Approve</Button>
+        <Button size="sm" icon={faUserCheck} disabled={busy} onClick={() => act(selected.filter((r) => r.status === 'confirmed' && !r.checkInAt), 'check-in')}>Check in</Button>
+        <Button size="sm" variant="danger" icon={faBan} disabled={busy} onClick={() => act(selected.filter((r) => r.status !== 'cancelled'), 'cancel')}>Cancel</Button>
+      </BulkBar>
     </AdminLayout>
   );
 }

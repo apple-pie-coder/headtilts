@@ -1,172 +1,265 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AxiosError } from 'axios';
+import { PERMISSIONS } from '@headtilts/shared';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPen, faTrashCan, faCakeCandles, faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
 import { AdminLayout } from '../components/AdminLayout';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/ToastContext';
 import { CelebrationForm } from '../components/CelebrationForm';
-import { Celebration } from '../types';
-import { deleteCelebration, fetchCelebrations } from '../services/celebrations';
-import { resolveMediaUrl } from '../services/media';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
+import {
+  Button, Card, DensityToggle, EmptyState, LoadingBar, MenuItem, PageHeader, Pagination, RowMenu, SearchInput,
+  StatusBadge, Switch, TableSkeleton, Tabs,
+} from '../components/ui';
+import t from '../components/ui/table.module.css';
+import { useAuth } from '../hooks/useAuth';
 import { useDensity } from '../hooks/useDensity';
+import { useUrlState } from '../hooks/useUrlState';
+import { Celebration } from '../types';
+import { deleteCelebration, fetchCelebrations, updateCelebration } from '../services/celebrations';
+import { resolveMediaUrl } from '../services/media';
 import styles from './Celebrations.module.css';
 
-const PAGE_SIZE = 10;
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function errorMessage(err: unknown, fallback: string): string {
+  return (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || fallback;
+}
+
+/** Next occurrence of month/day: days away (0 = today) and the year it falls in. */
+function nextOccurrence(month: number, day: number): { days: number; year: number } {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let next = new Date(now.getFullYear(), month - 1, day);
+  if (next < today) next = new Date(now.getFullYear() + 1, month - 1, day);
+  return { days: Math.round((next.getTime() - today.getTime()) / 86_400_000), year: next.getFullYear() };
+}
+
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
+}
+
+function whenLabel(days: number): string {
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Tomorrow';
+  if (days < 31) return `In ${days} days`;
+  return `In ${Math.round(days / 30)} months`;
+}
 
 export default function CelebrationsPage() {
   const confirm = useConfirm();
   const toast = useToast();
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission(PERMISSIONS.CELEBRATION_EDIT) || hasPermission(PERMISSIONS.CELEBRATION_CREATE);
+  const canDelete = hasPermission(PERMISSIONS.CELEBRATION_DELETE);
+
+  const [q, setQ] = useUrlState({ type: '', search: '', page: '1', per: '20' });
+  const page = Math.max(1, Number(q.page) || 1);
+  const perPage = Number(q.per) || 20;
+
   const [items, setItems] = useState<Celebration[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState<Celebration | null>(null);
   const [formKey, setFormKey] = useState(0);
   const [density, setDensity] = useDensity('celebrationsDensity');
+  const formRef = useRef<HTMLDivElement>(null);
+  const reqId = useRef(0);
 
-  useEffect(() => {
-    load();
-  }, [page, search, typeFilter]);
-
-  async function load() {
+  const load = useCallback(async () => {
+    const id = ++reqId.current;
     setLoading(true);
     try {
-      const result = await fetchCelebrations(page, PAGE_SIZE, search, typeFilter);
+      const result = await fetchCelebrations(page, perPage, q.search, q.type);
+      if (id !== reqId.current) return;
       setItems(result.items);
       setTotal(result.pagination.total);
-    } catch (err: unknown) {
-      toast.error(
-        (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message ||
-          'Failed to load celebrations'
-      );
+      setLoaded(true);
+    } catch (err) {
+      if (id === reqId.current) toast.error(errorMessage(err, 'Failed to load celebrations'));
     } finally {
-      setLoading(false);
+      if (id === reqId.current) setLoading(false);
+    }
+  }, [page, perPage, q.search, q.type]);
+
+  useEffect(() => { load(); }, [load]);
+
+  function edit(c: Celebration) {
+    setEditing(c);
+    requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      formRef.current?.querySelector<HTMLInputElement>('input')?.focus();
+    });
+  }
+
+  async function toggleActive(c: Celebration, isActive: boolean) {
+    setItems((list) => list.map((x) => (x.id === c.id ? { ...x, isActive } : x)));
+    try {
+      await updateCelebration(c.id, { isActive });
+      toast.success(isActive ? `${c.name} will be shown on the site` : `${c.name} is now hidden`);
+    } catch (err) {
+      setItems((list) => list.map((x) => (x.id === c.id ? { ...x, isActive: !isActive } : x)));
+      toast.error(errorMessage(err, 'Failed to update'));
     }
   }
 
   async function handleDelete(c: Celebration) {
-    if (!(await confirm({ title: 'Delete Celebration', message: `Remove "${c.name}"? This cannot be undone.`, confirmLabel: 'Delete', danger: true }))) {
-      return;
-    }
+    if (!(await confirm({
+      title: `Remove ${c.name}?`,
+      message: 'Tip: switch it off instead to hide it without losing the details. This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    }))) return;
     try {
       await deleteCelebration(c.id);
       if (editing?.id === c.id) setEditing(null);
-      await load();
-    } catch (err: unknown) {
-      toast.error(
-        (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message ||
-          'Failed to delete celebration'
-      );
+      toast.success(`Removed ${c.name}`);
+      load();
+    } catch (err) {
+      toast.error(errorMessage(err, 'Failed to delete celebration'));
     }
   }
 
-  function handleSaved() {
-    setEditing(null);
-    setFormKey((k) => k + 1);
-    load();
+  function menu(c: Celebration): MenuItem[] {
+    return [
+      { label: 'Edit', icon: faPen, onClick: () => edit(c), hidden: !canEdit },
+      { label: 'Delete', icon: faTrashCan, onClick: () => handleDelete(c), danger: true, hidden: !canDelete, divider: true },
+    ];
   }
-
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <AdminLayout>
-      <h2 className={styles.title}>Celebrations</h2>
-      <p className={styles.intro}>
-        Artist birthdays and remembrances. On a matching day, the public site greets visitors
-        with an animated spotlight.
-      </p>
+      <PageHeader
+        title="Celebrations"
+        subtitle="Artist birthdays and remembrances. On the day, the public site greets visitors with an animated spotlight."
+      />
 
-      <div className={styles.layout}>
-        <div className={styles.formColumn}>
-          <CelebrationForm
-            key={`${editing?.id ?? 'new'}-${formKey}`}
-            celebration={editing}
-            onSaved={handleSaved}
-            onCancel={() => setEditing(null)}
-          />
+      <div className={t.split}>
+        <div className={t.splitAside} ref={formRef}>
+          {canEdit && (
+            <CelebrationForm
+              key={`${editing?.id ?? 'new'}-${formKey}`}
+              celebration={editing}
+              onSaved={() => { setEditing(null); setFormKey((k) => k + 1); load(); }}
+              onCancel={() => setEditing(null)}
+            />
+          )}
         </div>
 
-        <div className={styles.listColumn}>
-          <div className={styles.toolbar}>
-            <select
-              className={styles.filter}
-              value={typeFilter}
-              onChange={(e) => { setPage(1); setTypeFilter(e.target.value); }}
-            >
-              <option value="">All types</option>
-              <option value="birthday">Birthdays</option>
-              <option value="remembrance">Remembrances</option>
-            </select>
-            <div className={styles.search}>
-              <input
-                type="text"
-                placeholder="Search by name…"
-                value={search}
-                onChange={(e) => { setPage(1); setSearch(e.target.value); }}
-              />
-            </div>
-            <div className={styles.densitySwitch} role="group" aria-label="List density">
-              <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
-              <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
-              <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
-            </div>
+        <div className={t.splitMain}>
+          <Tabs
+            tabs={[
+              { key: '', label: 'All' },
+              { key: 'birthday', label: 'Birthdays' },
+              { key: 'remembrance', label: 'Remembrances' },
+            ]}
+            value={q.type}
+            onChange={(type) => setQ({ type })}
+          />
+          <div className={t.toolbar}>
+            <SearchInput value={q.search} onChange={(search) => setQ({ search })} placeholder="Search by name" />
+            <div className={t.spacer} />
+            <DensityToggle value={density} onChange={setDensity} />
           </div>
 
-          <div className={styles.tableWrapper}>
-            <table className={styles[`density_${density}`]}>
-              <thead>
-                <tr>
-                  <th></th>
-                  <th>Name</th>
-                  <th>Type</th>
-                  <th>Date</th>
-                  <th>Year</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      {c.photo
-                        ? <img className={styles.thumb} src={resolveMediaUrl(c.photo)} alt="" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
-                        : <span className={`${styles.thumb} ${styles.thumbEmpty}`}>{c.type === 'birthday' ? '🎂' : '🕯️'}</span>}
-                    </td>
-                    <td>{c.name}</td>
-                    <td>
-                      <span className={`${styles.badge} ${c.type === 'birthday' ? styles.badgeBirthday : styles.badgeRemembrance}`}>
-                        {c.type === 'birthday' ? 'Birthday' : 'Remembrance'}
-                      </span>
-                    </td>
-                    <td>{MONTHS_SHORT[c.month - 1]} {c.day}</td>
-                    <td>{c.year || '—'}</td>
-                    <td>
-                      <span className={c.isActive ? styles.statusActive : styles.statusInactive}>
-                        {c.isActive ? 'Active' : 'Hidden'}
-                      </span>
-                    </td>
-                    <td className={styles.actions}>
-                      <button onClick={() => setEditing(c)}>Edit</button>
-                      <button className={styles.deleteButton} onClick={() => handleDelete(c)}>Delete</button>
-                    </td>
+          <Card>
+            <LoadingBar active={loading && loaded} />
+            <div className={t.scroll}>
+              <table className={`${t.table} ${t[`d_${density}`]}`}>
+                <thead>
+                  <tr>
+                    <th>Person</th>
+                    <th>Date</th>
+                    <th className={t.center}>Shown</th>
+                    <th className={t.actionsCol}><span className="sr-only">Actions</span></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {!loaded && <TableSkeleton rows={5} cols={4} />}
+                  {items.map((c) => {
+                    const { days, year } = nextOccurrence(c.month, c.day);
+                    const turning = c.year ? year - c.year : null;
+                    return (
+                      <tr key={c.id} className={[editing?.id === c.id && t.rowSelected, !c.isActive && t.rowDim].filter(Boolean).join(' ') || undefined}>
+                        <td className={t.primaryCell}>
+                          <div className={t.primaryWrap}>
+                            <span className={styles.photo}>
+                              {c.photo
+                                ? <img src={resolveMediaUrl(c.photo)} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
+                                : <span aria-hidden="true">{c.type === 'birthday' ? '🎂' : '🕯️'}</span>}
+                            </span>
+                            <div className={t.stack}>
+                              {canEdit
+                                ? <button type="button" className={t.primary} onClick={() => edit(c)}>{c.name}</button>
+                                : <span className={t.primary}>{c.name}</span>}
+                              <span className={t.secondary}>
+                                <span className={c.type === 'birthday' ? styles.birthday : styles.remembrance}>
+                                  {c.type === 'birthday' ? 'Birthday' : 'Remembrance'}
+                                </span>
+                                {c.year && <span>{c.year}</span>}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <div className={t.stack}>
+                            <span className={t.nowrap}>{MONTHS_SHORT[c.month - 1]} {c.day}</span>
+                            <span className={t.secondary}>
+                              {days === 0
+                                ? <StatusBadge tone="success">Today</StatusBadge>
+                                : whenLabel(days)}
+                              {turning !== null && turning > 0 && (
+                                <span>· {c.type === 'birthday' ? `${ordinal(turning)} birthday` : `${ordinal(turning)} anniversary`}</span>
+                              )}
+                            </span>
+                          </div>
+                        </td>
+                        <td className={t.center}>
+                          <Switch
+                            checked={c.isActive}
+                            disabled={!canEdit}
+                            label={c.isActive ? `Hide ${c.name} on the site` : `Show ${c.name} on the site`}
+                            onChange={(next) => toggleActive(c, next)}
+                          />
+                        </td>
+                        <td className={t.actionsCol}>
+                          <div className={t.rowActions}>
+                            {canEdit && (
+                              <button type="button" className={t.quickAction} onClick={() => edit(c)} title="Edit" aria-label={`Edit ${c.name}`}>
+                                <FontAwesomeIcon icon={faPen} />
+                              </button>
+                            )}
+                            <RowMenu items={menu(c)} label={`Actions for ${c.name}`} />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-            {!loading && items.length === 0 && <div className={styles.empty}>No celebrations yet.</div>}
-          </div>
+            {loaded && items.length === 0 && (
+              q.search ? (
+                <EmptyState icon={faMagnifyingGlass} title={`No one matches “${q.search}”`} action={<Button onClick={() => setQ({ search: '' })}>Clear search</Button>} />
+              ) : (
+                <EmptyState icon={faCakeCandles} title="No celebrations yet" description="Use the form to add a birthday or remembrance." />
+              )
+            )}
+          </Card>
 
-          <div className={styles.pagination}>
-            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>Previous</button>
-            <span>Page {page} of {pages}</span>
-            <button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages}>Next</button>
-          </div>
+          {loaded && total > 0 && (
+            <Pagination
+              page={page}
+              pageSize={perPage}
+              total={total}
+              onPage={(p) => setQ({ page: String(p) })}
+              onPageSize={(n) => setQ({ per: String(n) })}
+            />
+          )}
         </div>
       </div>
     </AdminLayout>

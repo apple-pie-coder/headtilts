@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faFilter, faRotateRight, faTrash, faChevronDown, faChevronRight,
-  faDownload, faXmark,
+  faDownload, faXmark, faTowerBroadcast,
 } from '@fortawesome/free-solid-svg-icons';
+import { ActiveFilter, ActiveFilters, Button, PageHeader, Pagination, SearchInput, Tabs } from '../components/ui';
+import { useUrlState } from '../hooks/useUrlState';
 import { AdminLayout } from '../components/AdminLayout';
 import { useToast } from '../components/ToastContext';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -72,31 +74,47 @@ const DEFAULT_FILTERS: FilterState = {
   method: '', actorEmail: '', ip: '', from: '', to: '', statusRange: '0',
 };
 
+const DATE_PRESETS: { label: string; hours: number }[] = [
+  { label: 'Last hour', hours: 1 },
+  { label: '24 hours', hours: 24 },
+  { label: '7 days', hours: 24 * 7 },
+  { label: '30 days', hours: 24 * 30 },
+];
+
 export default function LogsPage() {
   const toast = useToast();
   const confirm = useConfirm();
   const { hasPermission } = useAuth();
   const canDelete = hasPermission(PERMISSIONS.LOG_DELETE);
 
+  // Filters live in the URL so an investigation can be shared or bookmarked.
+  const [q, setQ, resetQ] = useUrlState({ ...DEFAULT_FILTERS, page: '1' });
+  const filters: FilterState = q;
+  const page = Math.max(1, Number(q.page) || 1);
+
   const [logs,    setLogs]    = useState<ActivityLog[]>([]);
   const [total,   setTotal]   = useState(0);
-  const [page,    setPage]    = useState(1);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
-  const [pending, setPending] = useState<FilterState>(DEFAULT_FILTERS);
+  const [pending, setPending] = useState<FilterState>(filters);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [purgeOpen, setPurgeOpen] = useState(false);
   const [purgeDate, setPurgeDate] = useState('');
+  const [live, setLive] = useState(false);
+  const [sinceHours, setSinceHours] = useState<number | null>(null);
+  const reqId = useRef(0);
 
-  useEffect(() => { load(1, filters); }, [filters]);
+  const filterKey = JSON.stringify(filters);
+  // Keep the advanced form in step with URL changes (chips, row clicks, back button).
+  useEffect(() => { setPending(filters); }, [filterKey]);
 
-  async function load(p: number, f: FilterState) {
-    setLoading(true);
-    setPage(p);
+  const load = useCallback(async (quiet = false) => {
+    const id = ++reqId.current;
+    if (!quiet) setLoading(true);
+    const f = filters;
     const sr = STATUS_RANGES[parseInt(f.statusRange)];
     const params: LogFilters = {
-      page: p, limit: LIMIT,
+      page, limit: LIMIT,
       search: f.search || undefined,
       site: f.site || undefined,
       level: f.level || undefined,
@@ -105,33 +123,56 @@ export default function LogsPage() {
       method: f.method || undefined,
       actorEmail: f.actorEmail || undefined,
       ip: f.ip || undefined,
-      from: f.from || undefined,
+      from: sinceHours ? new Date(Date.now() - sinceHours * 3_600_000).toISOString() : f.from || undefined,
       to: f.to ? f.to + 'T23:59:59' : undefined,
       statusMin: sr?.min,
       statusMax: sr?.max,
     };
     try {
       const data = await fetchLogs(params);
+      if (id !== reqId.current) return;
       setLogs(data.items);
       setTotal(data.pagination.total);
     } catch {
-      toast.error('Failed to load logs');
+      if (id === reqId.current && !quiet) toast.error('Failed to load logs');
     } finally {
-      setLoading(false);
+      if (id === reqId.current) setLoading(false);
     }
-  }
+  }, [filterKey, page, sinceHours]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Live mode: quietly refresh page 1 every 10 seconds.
+  useEffect(() => {
+    if (!live) return;
+    const t = setInterval(() => load(true), 10_000);
+    return () => clearInterval(t);
+  }, [live, load]);
 
   function applyFilters() {
-    setFilters({ ...pending });
+    setSinceHours(null);
+    setQ({ ...pending, page: '1' });
   }
 
   function resetFilters() {
-    setPending(DEFAULT_FILTERS);
-    setFilters(DEFAULT_FILTERS);
+    setSinceHours(null);
+    resetQ();
   }
 
   function setPendingField(key: keyof FilterState, value: string) {
     setPending((p) => ({ ...p, [key]: value }));
+  }
+
+  /** Click-to-filter from a table cell. */
+  function filterBy(key: keyof FilterState, value: string | null | undefined) {
+    if (!value) return;
+    setQ({ [key]: value } as Partial<FilterState>);
+    toast.info(`Filtered by ${key === 'actorEmail' ? 'actor' : key}: ${value}`);
+  }
+
+  function setPreset(hours: number | null) {
+    setSinceHours(hours);
+    setQ({ from: '', to: '' });
   }
 
   function toggleExpand(id: number) {
@@ -153,7 +194,7 @@ export default function LogsPage() {
       toast.success(`Deleted ${deleted} log${deleted !== 1 ? 's' : ''}`);
       setPurgeOpen(false);
       setPurgeDate('');
-      load(1, filters);
+      load();
     } catch {
       toast.error('Failed to purge logs');
     }
@@ -162,7 +203,7 @@ export default function LogsPage() {
   function exportCSV() {
     const header = ['id','timestamp','site','level','category','action','actorEmail','targetType','targetTitle','method','path','statusCode','duration','ip'];
     const rows = logs.map((l) => header.map((k) => {
-      const v = (l as any)[k];
+      const v = (l as unknown as Record<string, unknown>)[k];
       if (v == null) return '';
       const s = String(v).replace(/"/g, '""');
       return `"${s}"`;
@@ -175,27 +216,69 @@ export default function LogsPage() {
     URL.revokeObjectURL(url);
   }
 
-  const pages = Math.max(1, Math.ceil(total / LIMIT));
-  const activeFilterCount = Object.entries(filters).filter(([k, v]) => k !== 'statusRange' ? !!v : v !== '0').length;
+  const FILTER_LABELS: Partial<Record<keyof FilterState, string>> = {
+    search: 'Search', site: 'Site', category: 'Category', action: 'Action', method: 'Method',
+    actorEmail: 'Actor', ip: 'IP', from: 'From', to: 'To',
+  };
+  const activeFilters: ActiveFilter[] = (Object.keys(FILTER_LABELS) as (keyof FilterState)[])
+    .filter((k) => filters[k])
+    .map((k) => ({ key: k, label: `${FILTER_LABELS[k]}: ${filters[k]}`, onRemove: () => setQ({ [k]: '' } as Partial<FilterState>) }));
+  if (filters.statusRange !== '0') {
+    activeFilters.push({ key: 'status', label: STATUS_RANGES[parseInt(filters.statusRange)]?.label ?? 'Status', onRemove: () => setQ({ statusRange: '0' }) });
+  }
+  if (sinceHours) {
+    activeFilters.push({ key: 'since', label: DATE_PRESETS.find((d) => d.hours === sinceHours)?.label ?? 'Recent', onRemove: () => setSinceHours(null) });
+  }
+
+  // Fields that live only in the advanced panel (search and level have their own controls).
+  const ADVANCED: (keyof FilterState)[] = ['site', 'category', 'action', 'method', 'actorEmail', 'ip', 'from', 'to'];
+  const activeFilterCount = ADVANCED.filter((k) => filters[k]).length + (filters.statusRange !== '0' ? 1 : 0);
 
   return (
     <AdminLayout>
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Activity Logs</h1>
-          <p className={styles.subtitle}>{total.toLocaleString()} event{total !== 1 ? 's' : ''}</p>
-        </div>
-        <div className={styles.headerActions}>
-          <button className={styles.iconBtn} onClick={exportCSV} title="Export current page as CSV">
-            <FontAwesomeIcon icon={faDownload} /> Export CSV
-          </button>
-          {canDelete && (
-            <button className={`${styles.iconBtn} ${styles.danger}`} onClick={() => setPurgeOpen(true)}>
-              <FontAwesomeIcon icon={faTrash} /> Purge
+      <PageHeader
+        title="Activity logs"
+        subtitle={`${total.toLocaleString()} event${total !== 1 ? 's' : ''}${live ? ' · live' : ''}`}
+        actions={
+          <>
+            <Button variant={live ? 'primary' : 'secondary'} icon={faTowerBroadcast} onClick={() => setLive((l) => !l)} aria-pressed={live} title="Refresh automatically every 10 seconds">
+              {live ? 'Live' : 'Go live'}
+            </Button>
+            <Button icon={faDownload} onClick={exportCSV} title="Export the current page as CSV">Export</Button>
+            {canDelete && <Button variant="danger" icon={faTrash} onClick={() => setPurgeOpen(true)}>Purge</Button>}
+          </>
+        }
+      />
+
+      <Tabs
+        tabs={[
+          { key: '', label: 'All levels' },
+          { key: 'info', label: 'Info' },
+          { key: 'warn', label: 'Warnings' },
+          { key: 'error', label: 'Errors' },
+        ]}
+        value={filters.level}
+        onChange={(level) => setQ({ level })}
+      />
+
+      <div className={styles.quickBar}>
+        <SearchInput value={filters.search} onChange={(search) => setQ({ search })} placeholder="Search action, path, actor, IP" />
+        <div className={styles.presets} role="group" aria-label="Time range">
+          {DATE_PRESETS.map((d) => (
+            <button
+              key={d.hours}
+              type="button"
+              className={`${styles.preset} ${sinceHours === d.hours ? styles.presetOn : ''}`}
+              aria-pressed={sinceHours === d.hours}
+              onClick={() => setPreset(sinceHours === d.hours ? null : d.hours)}
+            >
+              {d.label}
             </button>
-          )}
+          ))}
         </div>
       </div>
+
+      <ActiveFilters filters={activeFilters} onClearAll={resetFilters} />
 
       {/* Filter panel */}
       <div className={styles.filterPanel}>
@@ -204,8 +287,9 @@ export default function LogsPage() {
           onClick={() => setFiltersOpen((o) => !o)}
         >
           <FontAwesomeIcon icon={faFilter} />
-          Filters
+          Advanced filters
           {activeFilterCount > 0 && <span className={styles.filterCount}>{activeFilterCount}</span>}
+          <span className={styles.filterToggleHint}>dates, method, status code, IP…</span>
           <FontAwesomeIcon icon={filtersOpen ? faChevronDown : faChevronRight} className={styles.chevron} />
         </button>
 
@@ -328,7 +412,7 @@ export default function LogsPage() {
         <span className={styles.resultCount}>
           {loading ? 'Loading…' : `${total.toLocaleString()} result${total !== 1 ? 's' : ''}`}
         </span>
-        <button className={styles.refreshBtn} onClick={() => load(page, filters)} disabled={loading}>
+        <button className={styles.refreshBtn} onClick={() => load()} disabled={loading}>
           <FontAwesomeIcon icon={faRotateRight} spin={loading} /> Refresh
         </button>
       </div>
@@ -361,8 +445,11 @@ export default function LogsPage() {
               const isExpanded = expanded.has(log.id);
               const hasMeta = log.meta && Object.keys(log.meta).length > 0;
               return (
-                <>
-                  <tr key={log.id} className={`${styles.row} ${isExpanded ? styles.rowExpanded : ''}`}>
+                <Fragment key={log.id}>
+                  <tr
+                    className={`${styles.row} ${isExpanded ? styles.rowExpanded : ''} ${hasMeta ? styles.rowClickable : ''}`}
+                    onClick={(e) => { if (hasMeta && !(e.target as HTMLElement).closest('button, a')) toggleExpand(log.id); }}
+                  >
                     <td className={styles.colTime}>
                       <span className={styles.timeDate}>{date}</span>
                       <span className={styles.timeTime}>{time}</span>
@@ -374,7 +461,7 @@ export default function LogsPage() {
                       <span className={`${styles.siteBadge} ${SITE_CLASS[log.site] ?? ''}`}>{log.site}</span>
                     </td>
                     <td className={styles.colCat}>
-                      <span className={styles.catChip}>{log.category}</span>
+                      <button type="button" className={`${styles.catChip} ${styles.cellFilter}`} onClick={() => filterBy('category', log.category)} title="Filter by this category">{log.category}</button>
                     </td>
                     <td className={styles.colAction}>
                       <code className={styles.action}>{log.action}</code>
@@ -384,7 +471,7 @@ export default function LogsPage() {
                     </td>
                     <td className={styles.colActor}>
                       {log.actorEmail ? (
-                        <span className={styles.actor}>{log.actorEmail}</span>
+                        <button type="button" className={`${styles.actor} ${styles.cellFilter}`} onClick={() => filterBy('actorEmail', log.actorEmail)} title="Filter by this actor">{log.actorEmail}</button>
                       ) : (
                         <span className={styles.anon}>—</span>
                       )}
@@ -406,7 +493,9 @@ export default function LogsPage() {
                     </td>
                     <td className={styles.colDur}>{fmtDuration(log.duration)}</td>
                     <td className={styles.colIP}>
-                      <span className={styles.ipText}>{log.ip ?? '—'}</span>
+                      {log.ip
+                        ? <button type="button" className={`${styles.ipText} ${styles.cellFilter}`} onClick={() => filterBy('ip', log.ip)} title="Filter by this IP">{log.ip}</button>
+                        : <span className={styles.ipText}>—</span>}
                     </td>
                     <td className={styles.colMeta}>
                       {hasMeta && (
@@ -414,6 +503,7 @@ export default function LogsPage() {
                           className={styles.expandBtn}
                           onClick={() => toggleExpand(log.id)}
                           title={isExpanded ? 'Collapse' : 'Expand details'}
+                          aria-expanded={isExpanded}
                         >
                           <FontAwesomeIcon icon={isExpanded ? faChevronDown : faChevronRight} />
                         </button>
@@ -421,7 +511,7 @@ export default function LogsPage() {
                     </td>
                   </tr>
                   {isExpanded && (
-                    <tr key={`${log.id}-meta`} className={styles.metaRow}>
+                    <tr className={styles.metaRow}>
                       <td colSpan={11} className={styles.metaCell}>
                         <div className={styles.metaGrid}>
                           {log.userAgent && (
@@ -446,28 +536,24 @@ export default function LogsPage() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               );
             })}
           </tbody>
         </table>
       </div>
 
-      {pages > 1 && (
-        <div className={styles.pagination}>
-          <button disabled={page <= 1} onClick={() => load(page - 1, filters)}>← Prev</button>
-          <span>Page {page} of {pages}</span>
-          <button disabled={page >= pages} onClick={() => load(page + 1, filters)}>Next →</button>
-        </div>
+      {total > 0 && (
+        <Pagination page={page} pageSize={LIMIT} total={total} onPage={(p) => setQ({ page: String(p) })} />
       )}
 
       {/* Purge modal */}
       {purgeOpen && (
-        <div className={styles.overlay}>
-          <div className={styles.purgeModal}>
+        <div className={styles.overlay} onMouseDown={(e) => { if (e.target === e.currentTarget) setPurgeOpen(false); }}>
+          <div className={styles.purgeModal} role="dialog" aria-modal="true" aria-label="Purge activity logs">
             <div className={styles.purgeHeader}>
               <h2>Purge Activity Logs</h2>
-              <button className={styles.purgeClose} onClick={() => setPurgeOpen(false)}>
+              <button className={styles.purgeClose} onClick={() => setPurgeOpen(false)} aria-label="Close">
                 <FontAwesomeIcon icon={faXmark} />
               </button>
             </div>

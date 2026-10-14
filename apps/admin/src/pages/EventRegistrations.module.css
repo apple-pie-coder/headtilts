@@ -1,0 +1,43 @@
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+  color: var(--t2);
+  font-size: 0.85rem;
+}
+.back:hover { color: var(--accent); }
+
+.exportBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 2.25rem;
+  padding: 0 0.9rem;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--t1);
+  font-size: 0.875rem;
+  font-weight: 550;
+}
+.exportBtn:hover { background: var(--ghost-h); }
+
+.stats {
+  display: flex;
+  align-items: center;
+  gap: 1.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.stats > div { display: flex; align-items: baseline; gap: 0.4rem; font-size: 0.85rem; color: var(--t2); }
+.stats strong { font-size: 1.35rem; color: var(--t1); font-variant-numeric: tabular-nums; }
+.capWrap { align-items: center !important; }
+.cap { display: inline-block; width: 8rem; height: 6px; border-radius: 3px; background: var(--ghost-h); overflow: hidden; }
+.cap > span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+
+.email { color: inherit; }
+.email:hover { color: var(--accent); text-decoration: underline; }
+.paid { color: var(--success-t); font-weight: 600; }
+
+.checkedIn { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--success-t); font-size: 0.8125rem; font-weight: 600; white-space: nowrap; }

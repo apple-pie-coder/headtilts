@@ -661,6 +661,8 @@ export async function listRegistrations(
       OR: [
         { name: { contains: opts.search } },
         { email: { contains: opts.search } },
+        // Lets the check-in desk type or scan a ticket code.
+        { ticketCode: { contains: opts.search.trim() } },
       ],
     } : {}),
   };

@@ -22,6 +22,10 @@ import { fetchCategories, createCategory } from '../services/categories';
 import { fetchPolls, Poll } from '../services/polls';
 import { resolveMediaUrl } from '../services/media';
 import { createPost, fetchPost, fetchPosts, fetchPreviewLink, updatePost, fetchAuthorList, PostInput, AuthorListItem } from '../services/posts';
+import { usePostLock } from '../hooks/usePostLock';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
+import { PostLockDialog, LockVisitors } from '../components/PostLockDialog';
+import type { LockUser } from '../services/postLocks';
 import styles from './PostEditor.module.css';
 
 const turndown = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced', hr: '---', bulletListMarker: '-' });
@@ -254,6 +258,32 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
 
   const listPath = isPage ? '/admin/pages' : '/admin/posts';
 
+  // Edit lock: only one person edits a post at a time (like WordPress).
+  const editingId = isEditing ? Number(id) : null;
+  const lock = usePostLock(editingId, {
+    onRegained: () => { if (editingId) loadPost(editingId); },
+    onVisitor: (u) => toast.info(`${u.name} is trying to open this ${isPage ? 'page' : 'post'}`),
+  });
+  const lockBlockedRef = useRef(false);
+  lockBlockedRef.current = lock.blocked;
+  const markLostRef = useRef(lock.markLost);
+  markLostRef.current = lock.markLost;
+
+  // ── Unsaved-changes tracking ──
+  // Body edits are flagged as the user types (Quill also fires changes when it
+  // normalises loaded HTML, which must not count); other fields are compared
+  // against a snapshot of the last saved values.
+  const contentDirtyRef = useRef(false);
+  const savedFieldsRef = useRef('');
+  const allowLeaveRef = useRef(false);
+  const fieldsKey = (input: PostInput) => JSON.stringify({ ...input, content: undefined });
+
+  /** A save refused with 423 means someone else took the lock. */
+  function lockHolderFrom(err: unknown): LockUser | null {
+    const res = (err as AxiosError<{ error?: { details?: { lock?: { user: LockUser } } } }>).response;
+    return res?.status === 423 ? res.data?.error?.details?.lock?.user ?? { id: '', name: 'Someone else', avatar: null } : null;
+  }
+
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(isEditing);
   const [loadError, setLoadError] = useState('');
@@ -321,18 +351,22 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   savingRef.current = saving;
 
   const scheduleAutosave = useCallback(() => {
-    if (!isEditing || !postRef.current) return;
+    if (!isEditing || !postRef.current || lockBlockedRef.current) return;
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     autosaveTimer.current = setTimeout(async () => {
-      if (!postRef.current || savingRef.current || !buildInputRef.current) return;
+      if (!postRef.current || savingRef.current || !buildInputRef.current || lockBlockedRef.current) return;
       setAutosaveStatus('saving');
       try {
         const input = buildInputRef.current(postRef.current.status);
-        await updatePost(postRef.current.id, input);
+        await updatePost(postRef.current.id, input, { fromEditor: true });
+        contentDirtyRef.current = false;
+        savedFieldsRef.current = fieldsKey(input);
         setAutosaveStatus('saved');
         setTimeout(() => setAutosaveStatus('idle'), 3000);
-      } catch {
+      } catch (err) {
         setAutosaveStatus('idle');
+        const holder = lockHolderFrom(err);
+        if (holder) markLostRef.current(holder);
       }
     }, 5000);
   }, [isEditing]);
@@ -545,6 +579,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   }
 
   function handleMarkdownChange(value: string) {
+    contentDirtyRef.current = true;
     setMarkdownSource(value);
     setContent(mdToHtml(value));
   }
@@ -622,6 +657,20 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   // Keep buildInputRef current on every render so the autosave timer has latest state
   buildInputRef.current = buildInput;
 
+  // Snapshot the saved state whenever a post is loaded or saved.
+  useEffect(() => {
+    savedFieldsRef.current = fieldsKey(buildInput(status));
+    contentDirtyRef.current = false;
+  }, [post]);
+
+  useUnsavedChanges(() => {
+    if (allowLeaveRef.current || saving) return false;
+    // While someone else holds the lock there's nothing of ours to save.
+    if (lock.state.kind === 'locked' || lock.state.kind === 'lost') return false;
+    const changed = contentDirtyRef.current || fieldsKey(buildInput(status)) !== savedFieldsRef.current;
+    return isEditing ? changed : changed && (title.trim() !== '' || contentDirtyRef.current);
+  });
+
   function buildInput(targetStatus: string): PostInput {
     const tagNames = tagsInput
       .split(',')
@@ -669,13 +718,18 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
       return null;
     }
 
+    if (isEditing && lock.blocked) {
+      toast.error(`Someone else is editing this ${isPage ? 'page' : 'post'} right now.`);
+      return null;
+    }
+
     setSaving(true);
 
     const input = buildInput(targetStatus);
 
     try {
       if (isEditing && post) {
-        const updated = await updatePost(post.id, input);
+        const updated = await updatePost(post.id, input, { fromEditor: true });
         applyPost(updated);
         toast.success(successText);
         loadRevisions(updated.id).catch(() => {});
@@ -683,10 +737,16 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
       }
       const created = await createPost(input);
       toast.success(successText);
+      allowLeaveRef.current = true;
       navigate(`${listPath}/${created.id}/edit`, { replace: true });
       // Revisions will load once the navigated-to edit page mounts
       return created;
     } catch (err: unknown) {
+      const holder = lockHolderFrom(err);
+      if (holder) {
+        lock.markLost(holder);
+        return null;
+      }
       toast.error(errorMessage(err, `Failed to save ${isPage ? 'page' : 'post'}`));
       return null;
     } finally {
@@ -709,6 +769,42 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
     } catch (err: unknown) {
       previewWindow?.close();
       toast.error(errorMessage(err, 'Failed to create a preview link'));
+    }
+  }
+
+  /** Preview the saved version without saving (used while someone else is editing). */
+  async function previewSaved() {
+    if (!post) return;
+    if (post.status === 'published' && post.publicUrl) {
+      window.open(post.publicUrl, '_blank', 'noopener');
+      return;
+    }
+    const w = window.open('about:blank', '_blank');
+    try {
+      const { url } = await fetchPreviewLink(post.id);
+      if (w) w.location.href = url;
+    } catch (err: unknown) {
+      w?.close();
+      toast.error(errorMessage(err, 'Failed to create a preview link'));
+    }
+  }
+
+  /** After being taken over: copy what's in the editor so nothing is lost. */
+  async function copyMyText() {
+    const html = `<h1>${title.replace(/</g, '&lt;')}</h1>${content}`;
+    const text = `${title}\n\n${new DOMParser().parseFromString(content, 'text/html').body.innerText}`;
+    try {
+      if ('ClipboardItem' in window) {
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([text], { type: 'text/plain' }),
+        })]);
+      } else {
+        await navigator.clipboard.writeText(text);
+      }
+      toast.success('Your title and text are on the clipboard');
+    } catch {
+      toast.error('Couldn’t copy — select the text in the editor and copy it manually');
     }
   }
 
@@ -757,6 +853,19 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
 
   return (
     <AdminLayout>
+      <PostLockDialog
+        state={lock.state}
+        noun={isPage ? 'page' : 'post'}
+        title={title}
+        onBack={() => navigate(listPath)}
+        onPreview={post ? previewSaved : undefined}
+        onTakeOver={lock.takeOver}
+        onStartEditing={lock.startEditing}
+        onCopyMine={copyMyText}
+      />
+      {lock.state.kind === 'mine' && (
+        <LockVisitors visitors={lock.visitors} noun={isPage ? 'page' : 'post'} onDismiss={lock.dismissVisitor} />
+      )}
       <div className={styles.header}>
         <h2 className={styles.title}>{isEditing ? `Edit ${noun}` : `Add New ${noun}`}</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -815,7 +924,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
 
           {editorMode === 'visual' ? (
             <div className={styles.editorWrapper}>
-              <ReactQuill ref={quillRef} theme="snow" value={content} onChange={(v) => { setContent(v); scheduleAutosave(); }} modules={QUILL_MODULES} formats={QUILL_FORMATS} />
+              <ReactQuill ref={quillRef} theme="snow" value={content} onChange={(v, _delta, source) => { setContent(v); if (source === 'user') contentDirtyRef.current = true; scheduleAutosave(); }} modules={QUILL_MODULES} formats={QUILL_FORMATS} />
             </div>
           ) : (
             <div className={styles.markdownPane}>

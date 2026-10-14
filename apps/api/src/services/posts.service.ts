@@ -167,6 +167,8 @@ interface PostInput {
   parentId?: number | null;
   status?: string;
   scheduledFor?: string | null;
+  /** Original publish date for published posts (e.g. when importing). Create only. */
+  publishedAt?: string | null;
   featuredImage?: string;
   template?: string | null;
   isFeatured?: boolean;
@@ -210,6 +212,16 @@ function resolveStatusForCreate(input: PostInput): ResolvedStatus {
   }
 
   if (status === 'published') {
+    // Keeping an original date lets imported content sit in the right place in
+    // the archive; future dates belong to scheduling instead.
+    if (input.publishedAt) {
+      const original = new Date(input.publishedAt);
+      if (Number.isNaN(original.getTime())) throw new ValidationError('publishedAt must be a valid date');
+      if (original.getTime() > Date.now() + 60_000) {
+        throw new ValidationError('A publish date in the future needs the scheduled status');
+      }
+      return { status, publishedAt: original, scheduledFor: null };
+    }
     return { status, publishedAt: new Date(), scheduledFor: null };
   }
 

@@ -1,16 +1,20 @@
-import { FormEvent, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { AxiosError } from 'axios';
 import { PERMISSIONS } from '@headtilts/shared';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPen, faTrashCan, faBars, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { AdminLayout } from '../components/AdminLayout';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/ToastContext';
+import {
+  Button, Card, EmptyState, Field, FieldHint, MenuItem, PageHeader, Panel, RowMenu, TableSkeleton, relativeTime, absoluteTime,
+} from '../components/ui';
+import t from '../components/ui/table.module.css';
 import { useAuth } from '../hooks/useAuth';
+import { useHotkeys } from '../hooks/useHotkeys';
 import { MenuSummary } from '../types';
 import { createMenu, deleteMenu, fetchMenus } from '../services/menus';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
-import { useDensity } from '../hooks/useDensity';
 import styles from './Menus.module.css';
 
 function errorMsg(err: unknown, fallback: string) {
@@ -24,37 +28,43 @@ export default function MenusPage() {
   const toast = useToast();
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
+  const canCreate = hasPermission(PERMISSIONS.MENU_CREATE);
+  const canEdit = hasPermission(PERMISSIONS.MENU_EDIT);
+  const canDelete = hasPermission(PERMISSIONS.MENU_DELETE);
 
   const [menus, setMenus] = useState<MenuSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [density, setDensity] = useDensity('menusDensity');
-
-  const [showCreate, setShowCreate] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newLocation, setNewLocation] = useState('primary');
+  const [newLocation, setNewLocation] = useState('');
   const [creating, setCreating] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { load(); }, []);
 
+  useHotkeys({ n: () => nameRef.current?.focus() });
+
   async function load() {
-    setLoading(true);
     try {
       setMenus(await fetchMenus());
+      setLoaded(true);
     } catch (err) {
       toast.error(errorMsg(err, 'Failed to load menus'));
-    } finally {
-      setLoading(false);
     }
   }
 
+  const location = newLocation.trim().toLowerCase();
+  const taken = menus.find((m) => m.location === location);
+  // Default to the first unused suggestion so creating a menu is one field.
+  const suggested = LOCATION_SUGGESTIONS.find((l) => !menus.some((m) => m.location === l)) ?? '';
+  const effectiveLocation = location || suggested;
+
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
+    if (!newName.trim() || !effectiveLocation || taken) return;
     setCreating(true);
     try {
-      const menu = await createMenu({ name: newName.trim(), location: newLocation.trim() });
-      setNewName('');
-      setNewLocation('primary');
-      setShowCreate(false);
+      const menu = await createMenu({ name: newName.trim(), location: effectiveLocation });
+      toast.success(`Created “${menu.name}” — now add some links`);
       navigate(`/admin/menus/${menu.id}`);
     } catch (err) {
       toast.error(errorMsg(err, 'Failed to create menu'));
@@ -64,119 +74,146 @@ export default function MenusPage() {
   }
 
   async function handleDelete(menu: MenuSummary) {
-    if (!(await confirm({ title: 'Delete Menu', message: `Delete menu "${menu.name}"? All its items will be removed.`, confirmLabel: 'Delete', danger: true }))) return;
+    if (!(await confirm({
+      title: `Delete “${menu.name}”?`,
+      message: `Its ${menu._count.items} item${menu._count.items === 1 ? '' : 's'} will be removed and the “${menu.location}” spot on your site will be empty.`,
+      confirmLabel: 'Delete menu',
+      danger: true,
+    }))) return;
     try {
       await deleteMenu(menu.id);
-      await load();
+      toast.success('Menu deleted');
+      load();
     } catch (err) {
       toast.error(errorMsg(err, 'Failed to delete menu'));
     }
   }
 
-  const canCreate = hasPermission(PERMISSIONS.MENU_CREATE);
-  const canDelete = hasPermission(PERMISSIONS.MENU_DELETE);
+  function menuItems(menu: MenuSummary): MenuItem[] {
+    return [
+      { label: 'Edit items', icon: faPen, onClick: () => navigate(`/admin/menus/${menu.id}`), hidden: !canEdit },
+      { label: 'Delete', icon: faTrashCan, onClick: () => handleDelete(menu), danger: true, hidden: !canDelete, divider: true },
+    ];
+  }
 
   return (
     <AdminLayout>
-      <div className={styles.header}>
-        <h2 className={styles.title}>Menus</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div className={styles.densitySwitch} role="group" aria-label="List density">
-            <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
-            <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
-            <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
-          </div>
+      <PageHeader title="Menus" subtitle="Navigation shown in your site's header, footer and other theme locations." />
+
+      <div className={t.split}>
+        <div className={t.splitAside}>
           {canCreate && (
-            <button className={styles.addButton} onClick={() => setShowCreate(true)}>
-              Create Menu
-            </button>
+            <Panel title="Create a menu">
+              <form onSubmit={handleCreate}>
+                <Field label="Name">
+                  <input
+                    ref={nameRef}
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="e.g. Main navigation"
+                    required
+                    disabled={creating}
+                  />
+                </Field>
+                <Field label="Location" group>
+                  <div className={styles.locations}>
+                    {LOCATION_SUGGESTIONS.map((l) => {
+                      const used = menus.some((m) => m.location === l);
+                      return (
+                        <button
+                          key={l}
+                          type="button"
+                          className={`${styles.loc} ${effectiveLocation === l ? styles.locOn : ''}`}
+                          onClick={() => setNewLocation(l)}
+                          disabled={used}
+                          title={used ? 'Already has a menu' : undefined}
+                        >
+                          {l}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <input
+                    type="text"
+                    value={newLocation}
+                    onChange={(e) => setNewLocation(e.target.value)}
+                    placeholder={suggested ? `${suggested} (or type a custom one)` : 'custom-location'}
+                    aria-label="Custom location"
+                    aria-invalid={!!taken}
+                    disabled={creating}
+                  />
+                  {taken
+                    ? <FieldHint tone="danger">“{taken.name}” already uses this location.</FieldHint>
+                    : <FieldHint>Your theme decides where each location appears.</FieldHint>}
+                </Field>
+                <div>
+                  <Button type="submit" variant="primary" icon={faPlus} disabled={creating || !newName.trim() || !effectiveLocation || !!taken}>
+                    {creating ? 'Creating…' : 'Create and add items'}
+                  </Button>
+                </div>
+              </form>
+            </Panel>
           )}
         </div>
-      </div>
 
-      {showCreate && (
-        <div className={styles.createPanel}>
-          <h3>Create a New Menu</h3>
-          <form onSubmit={handleCreate} className={styles.createForm}>
-            <div className={styles.formRow}>
-              <div className={styles.formGroup}>
-                <label>Menu Name</label>
-                <input
-                  type="text"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="e.g. Main Navigation"
-                  required
-                  disabled={creating}
-                  autoFocus
-                />
-              </div>
-              <div className={styles.formGroup}>
-                <label>Location</label>
-                <input
-                  type="text"
-                  list="location-suggestions"
-                  value={newLocation}
-                  onChange={(e) => setNewLocation(e.target.value)}
-                  placeholder="e.g. primary"
-                  required
-                  disabled={creating}
-                />
-                <datalist id="location-suggestions">
-                  {LOCATION_SUGGESTIONS.map((l) => <option key={l} value={l} />)}
-                </datalist>
-                <span className={styles.hint}>Unique identifier used by your theme (e.g. primary, footer)</span>
-              </div>
+        <div className={t.splitMain}>
+          <Card>
+            <div className={t.scroll}>
+              <table className={t.table}>
+                <thead>
+                  <tr>
+                    <th>Menu</th>
+                    <th>Location</th>
+                    <th className={t.num}>Items</th>
+                    <th className={t.hideSm}>Updated</th>
+                    <th className={t.actionsCol}><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!loaded && <TableSkeleton rows={3} cols={5} />}
+                  {menus.map((menu) => (
+                    <tr key={menu.id}>
+                      <td className={t.primaryCell}>
+                        <div className={t.stack}>
+                          {canEdit
+                            ? <Link to={`/admin/menus/${menu.id}`} className={t.primary}>{menu.name}</Link>
+                            : <span className={t.primary}>{menu.name}</span>}
+                          {menu.description && <span className={t.secondary}>{menu.description}</span>}
+                        </div>
+                      </td>
+                      <td><span className={`${t.chip} ${t.chipAccent}`}>{menu.location}</span></td>
+                      <td className={t.num}>
+                        {menu._count.items === 0
+                          ? <span className={styles.emptyWarn} title="This menu has no links yet">0 · empty</span>
+                          : menu._count.items}
+                      </td>
+                      <td className={`${t.muted} ${t.hideSm}`} title={absoluteTime(menu.updatedAt)}>{relativeTime(menu.updatedAt)}</td>
+                      <td className={t.actionsCol}>
+                        <div className={t.rowActions}>
+                          {canEdit && (
+                            <Link to={`/admin/menus/${menu.id}`} className={t.quickAction} title="Edit items" aria-label={`Edit ${menu.name}`}>
+                              <FontAwesomeIcon icon={faPen} />
+                            </Link>
+                          )}
+                          <RowMenu items={menuItems(menu)} label={`Actions for ${menu.name}`} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div className={styles.formActions}>
-              <button type="button" className={styles.cancelBtn} onClick={() => setShowCreate(false)} disabled={creating}>
-                Cancel
-              </button>
-              <button type="submit" className={styles.createBtn} disabled={creating || !newName.trim() || !newLocation.trim()}>
-                {creating ? 'Creating…' : 'Create Menu'}
-              </button>
-            </div>
-          </form>
+            {loaded && menus.length === 0 && (
+              <EmptyState
+                icon={faBars}
+                title="No menus yet"
+                description="Create a menu, then add links to pages, posts, categories or any URL."
+                action={canCreate && <Button variant="primary" icon={faPlus} onClick={() => nameRef.current?.focus()}>Create a menu</Button>}
+              />
+            )}
+          </Card>
         </div>
-      )}
-
-      <div className={styles.tableWrapper}>
-        <table className={styles[`density_${density}`]}>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Location</th>
-              <th>Items</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {menus.map((menu) => (
-              <tr key={menu.id}>
-                <td>
-                  <button className={styles.nameLink} onClick={() => navigate(`/admin/menus/${menu.id}`)}>
-                    {menu.name}
-                  </button>
-                </td>
-                <td><span className={styles.locationChip}>{menu.location}</span></td>
-                <td className={styles.count}>{menu._count.items}</td>
-                <td className={styles.actions}>
-                  <button onClick={() => navigate(`/admin/menus/${menu.id}`)}>Edit</button>
-                  {canDelete && (
-                    <button className={styles.deleteButton} onClick={() => handleDelete(menu)}>
-                      Delete
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!loading && menus.length === 0 && (
-          <div className={styles.empty}>
-            No menus yet.{canCreate && <> <button className={styles.emptyLink} onClick={() => setShowCreate(true)}>Create your first menu.</button></>}
-          </div>
-        )}
       </div>
     </AdminLayout>
   );

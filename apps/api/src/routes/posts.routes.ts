@@ -10,6 +10,7 @@ const router: IRouter = Router();
 router.use(authenticate);
 
 router.get('/', requirePermission(PERMISSIONS.POST_READ), asyncHandler(postsController.list));
+router.get('/locks', requirePermission(PERMISSIONS.POST_READ), asyncHandler(postsController.locks));
 router.get('/author-list', requirePermission(PERMISSIONS.POST_EDIT), asyncHandler(postsController.authorList));
 router.get('/:id', requirePermission(PERMISSIONS.POST_READ), asyncHandler(postsController.getOne));
 // Preview links expose unpublished content publicly — only for people who can edit posts.
@@ -21,6 +22,8 @@ router.post('/bulk', requirePermission(PERMISSIONS.POST_EDIT), asyncHandler(post
 router.post('/', requirePermission(PERMISSIONS.POST_CREATE), asyncHandler(postsController.create));
 router.post('/:id/duplicate', requirePermission(PERMISSIONS.POST_CREATE), asyncHandler(postsController.duplicate));
 router.put('/:id', requirePermission(PERMISSIONS.POST_EDIT), asyncHandler(postsController.update));
+router.post('/:id/lock', requirePermission(PERMISSIONS.POST_EDIT), asyncHandler(postsController.acquireLock));
+router.delete('/:id/lock', requirePermission(PERMISSIONS.POST_EDIT), asyncHandler(postsController.releaseLock));
 router.delete('/:id', requirePermission(PERMISSIONS.POST_DELETE), asyncHandler(postsController.remove));
 
 export default router;

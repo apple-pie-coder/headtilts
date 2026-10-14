@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronRight } from '@fortawesome/free-solid-svg-icons';
+import { sectionForPath } from '../nav';
 import styles from './Breadcrumb.module.css';
 
 const LABELS: Record<string, string> = {
@@ -28,6 +29,7 @@ const LABELS: Record<string, string> = {
   logs: 'Logs',
   health: 'Health',
   profile: 'Profile',
+  import: 'Import',
 };
 
 const SINGULAR: Record<string, string> = {
@@ -46,12 +48,6 @@ const SINGULAR: Record<string, string> = {
   celebrations: 'Celebration',
 };
 
-// These live inside the Settings nav group
-const SETTINGS_CHILDREN = new Set([
-  'api-keys', 'users', 'roles', 'menus', 'widgets',
-  'sitemap', 'redirects', 'api-analytics', 'backups', 'logs',
-]);
-
 function isNumericId(seg: string) { return /^\d+$/.test(seg); }
 
 interface Crumb { label: string; to: string | null; }
@@ -63,9 +59,9 @@ function buildCrumbs(pathname: string): Crumb[] {
   const [seg0, seg1, seg2] = parts;
   const crumbs: Crumb[] = [];
 
-  if (SETTINGS_CHILDREN.has(seg0)) {
-    crumbs.push({ label: 'Settings', to: '/admin/settings' });
-  }
+  // Nav section (e.g. "Content", "System") as a non-link context label.
+  const owner = sectionForPath(`/admin/${seg0}`);
+  if (owner) crumbs.push({ label: owner.section.label, to: null });
 
   if (seg0 in LABELS) {
     crumbs.push({ label: LABELS[seg0], to: seg1 ? `/admin/${seg0}` : null });

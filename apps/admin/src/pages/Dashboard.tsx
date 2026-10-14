@@ -344,7 +344,7 @@ export default function DashboardPage() {
       return <Link to="/admin/media" className={styles.panelAction}>View all</Link>;
     }
     if (id === 'comments') {
-      return <Link to="/admin/comments" className={styles.panelAction}>Moderate</Link>;
+      return <Link to="/admin/comments?status=pending" className={styles.panelAction}>Moderate</Link>;
     }
     if (id === 'recentUsers') {
       return <Link to="/admin/users" className={styles.panelAction}>View all</Link>;

@@ -26,6 +26,8 @@ interface NotificationContextValue {
   markManyRead: (ids: number[]) => void;
   markManyUnread: (ids: number[]) => void;
   markAllRead: () => void;
+  /** Listen for a realtime socket event; returns an unsubscribe function. */
+  subscribe: (event: string, fn: (payload: unknown) => void) => () => void;
 }
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
@@ -37,6 +39,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [nextCursor, setNextCursor] = useState<number | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  // Other features (e.g. post locks) subscribe to socket events through this.
+  const listenersRef = useRef(new Map<string, Set<(payload: unknown) => void>>());
 
   // Keep a live ref to items so callbacks can inspect current state without
   // re-subscribing (avoids stale-closure double counting).
@@ -73,6 +77,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       transports: ['websocket', 'polling'],
     });
     socketRef.current = socket;
+
+    socket.onAny((event: string, payload: unknown) => {
+      listenersRef.current.get(event)?.forEach((fn) => fn(payload));
+    });
 
     socket.on('notification', (n: AppNotification) => {
       setItems((prev) => (prev.some((p) => p.id === n.id) ? prev : [n, ...prev]));
@@ -125,6 +133,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const markManyRead = useCallback((ids: number[]) => setReadState(ids, true), [setReadState]);
   const markManyUnread = useCallback((ids: number[]) => setReadState(ids, false), [setReadState]);
 
+  const subscribe = useCallback((event: string, fn: (payload: unknown) => void) => {
+    const map = listenersRef.current;
+    if (!map.has(event)) map.set(event, new Set());
+    map.get(event)!.add(fn);
+    return () => { map.get(event)?.delete(fn); };
+  }, []);
+
   const markAllRead = useCallback(() => {
     setItems((prev) => prev.map((n) => (n.readAt ? n : { ...n, readAt: new Date().toISOString() })));
     setUnreadCount(0);
@@ -133,7 +148,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   return (
     <NotificationContext.Provider
-      value={{ items, unreadCount, loading, hasMore: nextCursor != null, loadMore, markRead, markUnread, markManyRead, markManyUnread, markAllRead }}
+      value={{ items, unreadCount, loading, hasMore: nextCursor != null, loadMore, markRead, markUnread, markManyRead, markManyUnread, markAllRead, subscribe }}
     >
       {children}
     </NotificationContext.Provider>
@@ -144,4 +159,12 @@ export function useNotifications(): NotificationContextValue {
   const ctx = useContext(NotificationContext);
   if (!ctx) throw new Error('useNotifications must be used within NotificationProvider');
   return ctx;
+}
+
+/** Run `handler` whenever the server pushes `event` over the admin socket. */
+export function useSocketEvent<T = unknown>(event: string, handler: (payload: T) => void): void {
+  const { subscribe } = useNotifications();
+  const ref = useRef(handler);
+  ref.current = handler;
+  useEffect(() => subscribe(event, (p) => ref.current(p as T)), [subscribe, event]);
 }

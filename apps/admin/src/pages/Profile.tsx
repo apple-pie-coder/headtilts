@@ -7,6 +7,7 @@ import { fetchMe, updateMe } from '../services/profile';
 import { getMfaStatus, setupMfa, enableMfa, disableMfa } from '../services/mfa';
 import { MediaPickerInput } from '../components/MediaPickerInput';
 import { User } from '../types';
+import { PageHeader } from '../components/ui';
 import styles from './Profile.module.css';
 
 function errMsg(err: unknown, fallback: string) {
@@ -205,7 +206,7 @@ export default function ProfilePage() {
 
   return (
     <AdminLayout>
-      <h2 className={styles.title}>Your Profile</h2>
+      <PageHeader title="Your profile" subtitle="Your details, password and two-factor authentication." />
 
       <div className={styles.grid}>
         {/* Info card */}

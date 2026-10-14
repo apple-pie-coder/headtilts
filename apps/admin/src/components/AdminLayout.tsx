@@ -1,110 +1,68 @@
-import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
-  faGaugeHigh, faPenToSquare, faFileLines, faImages, faComments, faLayerGroup,
-  faTags, faBars, faPuzzlePiece, faUsers, faUserShield, faSitemap, faEnvelope,
-  faGear, faSliders, faChevronDown, faFeather, faRightFromBracket, faSun, faMoon, faDesktop,
-  faCakeCandles, faChartBar, faKey, faArrowRight, faChartLine, faChartPie, faBoxArchive, faClipboardList,
-  faPalette, faCalendarAlt, faMagnifyingGlass,
+  faBars, faChevronDown, faFeather, faRightFromBracket, faSun, faMoon, faDesktop,
+  faMagnifyingGlass, faPlus, faArrowUpRightFromSquare, faAnglesLeft, faAnglesRight,
+  faUser, faKeyboard, faPalette,
 } from '@fortawesome/free-solid-svg-icons';
 import { useSpotlight } from '../context/SpotlightContext';
 import type { ThemeMode, AccentColor, AccentPreset } from '../context/ThemeContext';
-import { ACCENT_PRESETS } from '../context/ThemeContext';
+import { ACCENT_PRESETS, useTheme } from '../context/ThemeContext';
 import { useAuth } from '../hooks/useAuth';
-import { useTheme } from '../context/ThemeContext';
-import { Link } from 'react-router-dom';
+import { useHotkeys } from '../hooks/useHotkeys';
+import { useNavBadges } from '../hooks/useNavBadges';
+import { useOutsideClose } from '../hooks/useOutsideClose';
+import { NAV_SECTIONS, DASHBOARD_ITEM, CREATE_ACTIONS, NavItem } from '../nav';
 import { NotificationBell } from './NotificationBell';
 import { Breadcrumb } from './Breadcrumb';
+import { ShortcutsDialog } from './ShortcutsDialog';
 import { fetchPublicSettings } from '../services/settings';
 import { resolveMediaUrl } from '../services/media';
 import { apiClient } from '../services/api';
 import styles from './AdminLayout.module.css';
 
-interface NavItem {
-  label: string;
-  to: string;
-  icon: IconDefinition;
-  permission?: string;
+const COLLAPSED_KEY = 'htilts:sidebar:collapsed';
+const SECTIONS_KEY = 'htilts:sidebar:closedSections';
+
+function readJson<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', to: '/admin', icon: faGaugeHigh },
-  { label: 'Posts', to: '/admin/posts', icon: faPenToSquare },
-  { label: 'Pages', to: '/admin/pages', icon: faFileLines },
-  { label: 'Media', to: '/admin/media', icon: faImages },
-  { label: 'Comments', to: '/admin/comments', icon: faComments },
-  { label: 'Categories', to: '/admin/categories', icon: faLayerGroup },
-  { label: 'Tags', to: '/admin/tags', icon: faTags },
-  { label: 'Celebrations', to: '/admin/celebrations', icon: faCakeCandles },
-  { label: 'Polls', to: '/admin/polls', icon: faChartBar },
-  { label: 'Events', to: '/admin/events', icon: faCalendarAlt },
-  { label: 'Contact', to: '/admin/contact', icon: faEnvelope },
-  { label: 'Analytics', to: '/admin/analytics', icon: faChartPie },
-];
-
-// Grouped under the collapsible "Settings" section.
-const SETTINGS_ITEMS = [
-  { label: 'General', to: '/admin/settings', icon: faSliders },
-  { label: 'API Keys', to: '/admin/api-keys', icon: faKey },
-  { label: 'Users', to: '/admin/users', icon: faUsers },
-  { label: 'Roles', to: '/admin/roles', icon: faUserShield },
-  { label: 'Menus', to: '/admin/menus', icon: faBars },
-  { label: 'Widgets', to: '/admin/widgets', icon: faPuzzlePiece },
-  { label: 'Sitemap', to: '/admin/sitemap', icon: faSitemap },
-  { label: 'Redirects', to: '/admin/redirects', icon: faArrowRight },
-  { label: 'API Analytics', to: '/admin/api-analytics', icon: faChartLine },
-  { label: 'Backups', to: '/admin/backups', icon: faBoxArchive },
-  { label: 'Logs', to: '/admin/logs', icon: faClipboardList },
-];
+function writeJson(key: string, value: unknown) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage unavailable */ }
+}
 
 interface AdminLayoutProps {
   children: ReactNode;
 }
 
 export function AdminLayout({ children }: AdminLayoutProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const { mode, setMode, theme, accent, setAccent } = useTheme();
   const { open: openSpotlight } = useSpotlight();
-  const [appearanceOpen, setAppearanceOpen] = useState(false);
-  const appearanceRef = useRef<HTMLDivElement>(null);
-  const [healthStatus, setHealthStatus] = useState<'ok' | 'degraded' | 'down' | 'unknown'>('unknown');
-
-  const checkHealth = useCallback(async () => {
-    try {
-      const res = await apiClient.get('/health');
-      setHealthStatus(res.data.data?.status ?? 'ok');
-    } catch {
-      setHealthStatus('down');
-    }
-  }, []);
-
-  useEffect(() => {
-    checkHealth();
-    const id = setInterval(checkHealth, 60_000);
-    return () => clearInterval(id);
-  }, [checkHealth]);
-
-  useEffect(() => {
-    if (!appearanceOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (appearanceRef.current && !appearanceRef.current.contains(e.target as Node)) {
-        setAppearanceOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [appearanceOpen]);
   const navigate = useNavigate();
   const location = useLocation();
+  const badges = useNavBadges(hasPermission);
 
-  const inSettings =
-    SETTINGS_ITEMS.some((item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)) ||
-    location.pathname.startsWith('/admin/api-keys');
-  const [settingsOpen, setSettingsOpen] = useState(inSettings);
-  // Mobile off-canvas sidebar
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [healthStatus, setHealthStatus] = useState<'ok' | 'degraded' | 'down' | 'unknown'>('unknown');
+  const [collapsed, setCollapsed] = useState<boolean>(() => readJson(COLLAPSED_KEY, false));
+  const [closedSections, setClosedSections] = useState<string[]>(() => readJson(SECTIONS_KEY, []));
+  const [sidebarOpen, setSidebarOpen] = useState(false); // mobile drawer
+  const [menu, setMenu] = useState<'create' | 'user' | null>(null);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  const createRef = useRef<HTMLDivElement>(null);
+  const userRef = useRef<HTMLDivElement>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
+  useOutsideClose(createRef, menu === 'create', closeMenu);
+  useOutsideClose(userRef, menu === 'user', closeMenu);
+
   // Branding (logo + title) — from the public settings subset
   const [logo, setLogo] = useState('');
   const [logoDark, setLogoDark] = useState('');
@@ -124,111 +82,158 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       .catch(() => {});
   }, []);
 
-  const activeLogo = (theme === 'dark' && logoDark) ? logoDark : logo;
+  const checkHealth = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/health');
+      setHealthStatus(res.data.data?.status ?? 'ok');
+    } catch {
+      setHealthStatus('down');
+    }
+  }, []);
 
-  // Auto-expand the Settings group whenever the active route is inside it.
   useEffect(() => {
-    if (inSettings) setSettingsOpen(true);
-  }, [inSettings]);
+    checkHealth();
+    const id = setInterval(checkHealth, 60_000);
+    return () => clearInterval(id);
+  }, [checkHealth]);
 
-  // Close the mobile drawer whenever the route changes.
+  useEffect(() => { writeJson(COLLAPSED_KEY, collapsed); }, [collapsed]);
+  useEffect(() => { writeJson(SECTIONS_KEY, closedSections); }, [closedSections]);
+
+  // Close drawers and menus whenever the route changes.
   useEffect(() => {
     setSidebarOpen(false);
+    setMenu(null);
   }, [location.pathname]);
 
+  // Only show what this user can actually open — no dead-end links.
+  const sections = useMemo(
+    () => NAV_SECTIONS
+      .map((s) => ({ ...s, items: s.items.filter((i) => !i.permission || hasPermission(i.permission)) }))
+      .filter((s) => s.items.length > 0),
+    [hasPermission],
+  );
+  const createActions = CREATE_ACTIONS.filter((a) => hasPermission(a.permission));
+
+  const isActive = (to: string) => location.pathname === to || location.pathname.startsWith(`${to}/`);
+
+  function toggleSection(id: string) {
+    setClosedSections((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
+  }
+
+  const gotoKeys = useMemo(() => {
+    const map: Record<string, () => void> = {};
+    for (const item of [DASHBOARD_ITEM, ...sections.flatMap((s) => s.items)]) {
+      if (item.hotkey) map[`g ${item.hotkey}`] = () => navigate(item.to);
+    }
+    return map;
+  }, [sections, navigate]);
+
+  useHotkeys({
+    ...gotoKeys,
+    '?': () => setShowShortcuts(true),
+    '[': () => setCollapsed((c) => !c),
+  });
+
+  const activeLogo = (theme === 'dark' && logoDark) ? logoDark : logo;
   const initials = user
     ? (user.firstName?.[0] ?? user.username?.[0] ?? '?').toUpperCase()
     : '?';
+  const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.username;
+
+  function renderLink(item: NavItem, end = false) {
+    const count = item.badge ? badges[item.badge] ?? 0 : 0;
+    return (
+      <li key={item.to}>
+        <NavLink
+          to={item.to}
+          end={end}
+          title={collapsed ? (count ? `${item.label} (${count})` : item.label) : undefined}
+          className={({ isActive: active }) => `${styles.navLink} ${active ? styles.navActive : ''}`}
+        >
+          <span className={styles.navIcon}>
+            <FontAwesomeIcon icon={item.icon} fixedWidth />
+            {count > 0 && <span className={styles.navDot} aria-hidden="true" />}
+          </span>
+          <span className={styles.navLabel}>{item.label}</span>
+          {count > 0 && (
+            <span className={styles.navBadge} aria-label={`${count} need attention`}>
+              {count > 99 ? '99+' : count}
+            </span>
+          )}
+        </NavLink>
+      </li>
+    );
+  }
 
   return (
-    <div className={styles.layout}>
+    <div className={`${styles.layout} ${collapsed ? styles.layoutCollapsed : ''}`}>
+      <a href="#main-content" className={styles.skipLink}>Skip to content</a>
+
       {/* Mobile drawer backdrop */}
       {sidebarOpen && <div className={styles.overlay} onClick={() => setSidebarOpen(false)} />}
 
       {/* Sidebar */}
-      <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
+      <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`} aria-label="Main navigation">
         <div className={styles.brand}>
-          {activeLogo ? (
-            <img className={styles.brandLogo} src={resolveMediaUrl(activeLogo)} alt={siteTitle || 'Logo'}
-              style={adminLogoHeight ? { maxHeight: `${adminLogoHeight}px` } : undefined} />
-          ) : (
-            <>
-              <span className={styles.brandIcon}><FontAwesomeIcon icon={faFeather} /></span>
-              <span className={styles.brandName}>{siteTitle || 'Headtilts'}</span>
-            </>
-          )}
+          <Link to="/admin" className={styles.brandLink} title={siteTitle || 'Headtilts'}>
+            {activeLogo && !collapsed ? (
+              <img className={styles.brandLogo} src={resolveMediaUrl(activeLogo)} alt={siteTitle || 'Logo'}
+                style={adminLogoHeight ? { maxHeight: `${adminLogoHeight}px` } : undefined} />
+            ) : (
+              <>
+                <span className={styles.brandIcon}><FontAwesomeIcon icon={faFeather} /></span>
+                <span className={styles.brandName}>{siteTitle || 'Headtilts'}</span>
+              </>
+            )}
+          </Link>
         </div>
 
         <nav className={styles.nav}>
-          <ul>
-            {NAV_ITEMS.map((item) => (
-              <li key={item.label}>
-                <NavLink
-                  to={item.to}
-                  end={item.to === '/admin'}
-                  className={({ isActive }) =>
-                    `${styles.navLink} ${isActive ? styles.navActive : ''}`
-                  }
-                >
-                  <span className={styles.navIcon}><FontAwesomeIcon icon={item.icon} fixedWidth /></span>
-                  {item.label}
-                </NavLink>
-              </li>
-            ))}
+          <ul>{renderLink(DASHBOARD_ITEM, true)}</ul>
 
-            {/* Settings group */}
-            <li>
-              <button
-                type="button"
-                className={`${styles.navLink} ${styles.navGroupHeader} ${inSettings ? styles.navGroupActive : ''}`}
-                onClick={() => setSettingsOpen((open) => !open)}
-                aria-expanded={settingsOpen}
-              >
-                <span className={styles.navIcon}><FontAwesomeIcon icon={faGear} fixedWidth /></span>
-                Settings
-                <FontAwesomeIcon
-                  icon={faChevronDown}
-                  className={`${styles.navChevron} ${settingsOpen ? styles.navChevronOpen : ''}`}
-                />
-              </button>
-              {settingsOpen && (
-                <ul className={styles.subNav}>
-                  {SETTINGS_ITEMS.map((item) => (
-                    <li key={item.label}>
-                      <NavLink
-                        to={item.to}
-                        className={({ isActive }) =>
-                          `${styles.navLink} ${styles.subNavLink} ${isActive ? styles.navActive : ''}`
-                        }
-                      >
-                        <span className={styles.navIcon}><FontAwesomeIcon icon={item.icon} fixedWidth /></span>
-                        {item.label}
-                      </NavLink>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </li>
-          </ul>
+          {sections.map((section) => {
+            const containsActive = section.items.some((i) => isActive(i.to));
+            // A section holding the current page is always open.
+            const open = collapsed || containsActive || !closedSections.includes(section.id);
+            const sectionBadge = section.items.reduce((n, i) => n + (i.badge ? badges[i.badge] ?? 0 : 0), 0);
+            return (
+              <div key={section.id} className={styles.section}>
+                <button
+                  type="button"
+                  className={styles.sectionHeader}
+                  onClick={() => toggleSection(section.id)}
+                  aria-expanded={open}
+                  disabled={containsActive}
+                >
+                  <span>{section.label}</span>
+                  {!open && sectionBadge > 0 && <span className={styles.sectionDot} />}
+                  {!containsActive && (
+                    <FontAwesomeIcon icon={faChevronDown} className={`${styles.navChevron} ${open ? '' : styles.navChevronClosed}`} />
+                  )}
+                </button>
+                {open && <ul>{section.items.map((item) => renderLink(item))}</ul>}
+              </div>
+            );
+          })}
         </nav>
 
         <div className={styles.sidebarFooter}>
-          <button className={styles.userChip} onClick={() => navigate('/admin/profile')} title="Your profile">
-            <div className={styles.avatar}>
-              {user?.avatar
-                ? <img src={user.avatar} alt={initials} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                : initials}
-            </div>
-            <span className={styles.userName}>{user?.firstName || user?.username}</span>
-          </button>
-          <button className={styles.logoutBtn} onClick={() => logout()} title="Log out">
-            <FontAwesomeIcon icon={faRightFromBracket} />
+          <button
+            type="button"
+            className={styles.collapseBtn}
+            onClick={() => setCollapsed((c) => !c)}
+            title={collapsed ? 'Expand sidebar ( [ )' : 'Collapse sidebar ( [ )'}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <FontAwesomeIcon icon={collapsed ? faAnglesRight : faAnglesLeft} />
+            <span className={styles.navLabel}>Collapse</span>
           </button>
         </div>
       </aside>
 
       {/* Main */}
-      <main className={styles.main}>
+      <main className={styles.main} id="main-content" tabIndex={-1}>
         <header className={styles.topHeader}>
           <button
             className={styles.hamburger}
@@ -238,57 +243,102 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           >
             <FontAwesomeIcon icon={faBars} />
           </button>
+
+          <button
+            type="button"
+            className={styles.searchTrigger}
+            onClick={openSpotlight}
+            aria-label="Search (⌘K)"
+          >
+            <FontAwesomeIcon icon={faMagnifyingGlass} className={styles.searchTriggerIcon} />
+            <span className={styles.searchTriggerLabel}>Search posts, pages, settings…</span>
+            <kbd className={styles.searchTriggerKbd}>⌘K</kbd>
+          </button>
+
           <div className={styles.topHeaderActions}>
-            <button
-              type="button"
-              className={styles.searchTrigger}
-              onClick={openSpotlight}
-              title="Quick search"
-              aria-label="Open search (⌘K)"
-            >
-              <FontAwesomeIcon icon={faMagnifyingGlass} className={styles.searchTriggerIcon} />
-              <span className={styles.searchTriggerLabel}>Search…</span>
-              <kbd className={styles.searchTriggerKbd}>⌘K</kbd>
-            </button>
+            {createActions.length > 0 && (
+              <div className={styles.menuWrap} ref={createRef}>
+                <button
+                  type="button"
+                  className={styles.createBtn}
+                  onClick={() => setMenu((m) => (m === 'create' ? null : 'create'))}
+                  aria-haspopup="menu"
+                  aria-expanded={menu === 'create'}
+                >
+                  <FontAwesomeIcon icon={faPlus} />
+                  <span className={styles.createLabel}>New</span>
+                </button>
+                {menu === 'create' && (
+                  <div className={styles.dropdown} role="menu">
+                    <p className={styles.dropdownLabel}>Create new</p>
+                    {createActions.map((a) => (
+                      <button key={a.to + a.label} type="button" role="menuitem" className={styles.dropdownItem} onClick={() => navigate(a.to)}>
+                        <FontAwesomeIcon icon={a.icon} fixedWidth className={styles.dropdownIcon} />
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <a href="/" target="_blank" rel="noopener noreferrer" className={styles.iconLink} title="View site" aria-label="View site in a new tab">
+              <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
+            </a>
+
             <NotificationBell />
-            <div className={styles.appearanceWrap} ref={appearanceRef}>
+
+            <div className={styles.menuWrap} ref={userRef}>
               <button
                 type="button"
-                className={`${styles.themeOption} ${appearanceOpen ? styles.themeOptionActive : ''}`}
-                onClick={() => setAppearanceOpen((o) => !o)}
-                title="Appearance"
-                aria-label="Appearance settings"
-                aria-expanded={appearanceOpen}
+                className={styles.avatarBtn}
+                onClick={() => setMenu((m) => (m === 'user' ? null : 'user'))}
+                aria-haspopup="menu"
+                aria-expanded={menu === 'user'}
+                aria-label="Account menu"
               >
-                <FontAwesomeIcon icon={faPalette} />
+                <span className={styles.avatar}>
+                  {user?.avatar
+                    ? <img src={user.avatar} alt="" />
+                    : initials}
+                </span>
               </button>
-
-              {appearanceOpen && (
-                <div className={styles.appearancePopover} role="dialog" aria-label="Appearance settings">
-                  <p className={styles.appearanceLabel}>Mode</p>
+              {menu === 'user' && (
+                <div className={`${styles.dropdown} ${styles.userDropdown}`} role="menu">
+                  <div className={styles.userHead}>
+                    <span className={styles.avatar}>{user?.avatar ? <img src={user.avatar} alt="" /> : initials}</span>
+                    <div className={styles.userHeadText}>
+                      <strong>{displayName}</strong>
+                      <span>{user?.email}</span>
+                    </div>
+                  </div>
+                  <hr className={styles.dropdownSep} />
+                  <button type="button" role="menuitem" className={styles.dropdownItem} onClick={() => navigate('/admin/profile')}>
+                    <FontAwesomeIcon icon={faUser} fixedWidth className={styles.dropdownIcon} /> Your profile
+                  </button>
+                  <button type="button" role="menuitem" className={styles.dropdownItem} onClick={() => { setMenu(null); setShowShortcuts(true); }}>
+                    <FontAwesomeIcon icon={faKeyboard} fixedWidth className={styles.dropdownIcon} /> Keyboard shortcuts
+                    <kbd className={styles.searchTriggerKbd} style={{ marginLeft: 'auto' }}>?</kbd>
+                  </button>
+                  <hr className={styles.dropdownSep} />
+                  <p className={styles.dropdownLabel}><FontAwesomeIcon icon={faPalette} /> Appearance</p>
                   <div className={styles.themeSwitch} role="group" aria-label="Color mode">
                     {([
-                      { value: 'light',  icon: faSun,     label: 'Light'  },
-                      { value: 'system', icon: faDesktop,  label: 'System' },
-                      { value: 'dark',   icon: faMoon,    label: 'Dark'   },
+                      { value: 'light', icon: faSun, label: 'Light' },
+                      { value: 'system', icon: faDesktop, label: 'Auto' },
+                      { value: 'dark', icon: faMoon, label: 'Dark' },
                     ] as { value: ThemeMode; icon: typeof faSun; label: string }[]).map((opt) => (
                       <button
                         key={opt.value}
                         type="button"
                         className={`${styles.themeOption} ${mode === opt.value ? styles.themeOptionActive : ''}`}
                         onClick={() => setMode(opt.value)}
-                        title={opt.label}
-                        aria-label={`${opt.label} mode`}
                         aria-pressed={mode === opt.value}
                       >
-                        <FontAwesomeIcon icon={opt.icon} />
+                        <FontAwesomeIcon icon={opt.icon} /> {opt.label}
                       </button>
                     ))}
                   </div>
-
-                  <hr className={styles.appearanceSep} />
-
-                  <p className={styles.appearanceLabel}>Accent</p>
                   <div className={styles.swatchRow}>
                     {(Object.entries(ACCENT_PRESETS) as [AccentColor, AccentPreset][]).map(([key, preset]) => (
                       <button
@@ -303,6 +353,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                       />
                     ))}
                   </div>
+                  <hr className={styles.dropdownSep} />
+                  <button type="button" role="menuitem" className={`${styles.dropdownItem} ${styles.dropdownDanger}`} onClick={() => logout()}>
+                    <FontAwesomeIcon icon={faRightFromBracket} fixedWidth className={styles.dropdownIcon} /> Log out
+                  </button>
                 </div>
               )}
             </div>
@@ -315,6 +369,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       <footer className={styles.adminFooter}>
         <span className={styles.footerLeft}>
           Headtilts v1.0.0 &nbsp;·&nbsp; © {new Date().getFullYear()}
+          <button type="button" className={styles.footerHint} onClick={() => setShowShortcuts(true)}>
+            Press <kbd className={styles.searchTriggerKbd}>?</kbd> for shortcuts
+          </button>
         </span>
         <div className={styles.footerRight}>
           <Link
@@ -334,6 +391,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           </Link>
         </div>
       </footer>
+
+      {showShortcuts && <ShortcutsDialog onClose={() => setShowShortcuts(false)} />}
     </div>
   );
 }

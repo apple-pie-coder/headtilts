@@ -144,7 +144,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(THEME_KEY, mode);
     // Re-apply accent tokens since dark/light values differ.
     applyAccentTokens(accent, resolved);
-  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   // While following the system, react to live OS changes.
   useEffect(() => {

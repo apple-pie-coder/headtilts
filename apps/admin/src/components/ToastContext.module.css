@@ -84,3 +84,16 @@
   from { opacity: 1; transform: translateX(0) scale(1); }
   to   { opacity: 0; transform: translateX(20px) scale(0.98); }
 }
+
+.action {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--r-xs);
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  transition: background var(--ease);
+}
+.action:hover { background: var(--nav-active); filter: brightness(1.1); }

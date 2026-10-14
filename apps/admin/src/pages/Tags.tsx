@@ -1,157 +1,182 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AxiosError } from 'axios';
+import { PERMISSIONS } from '@headtilts/shared';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPen, faTrashCan, faTags, faMagnifyingGlass, faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons';
 import { AdminLayout } from '../components/AdminLayout';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/ToastContext';
 import { TagForm } from '../components/TagForm';
+import {
+  Button, Card, DensityToggle, EmptyState, LoadingBar, MenuItem, PageHeader, Pagination, RowMenu, SearchInput, TableSkeleton,
+} from '../components/ui';
+import t from '../components/ui/table.module.css';
+import { useAuth } from '../hooks/useAuth';
+import { useDensity } from '../hooks/useDensity';
+import { useUrlState } from '../hooks/useUrlState';
 import { Tag } from '../types';
 import { deleteTag, fetchTags } from '../services/tags';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
-import { useDensity } from '../hooks/useDensity';
-import styles from './Tags.module.css';
 
-const PAGE_SIZE = 10;
+function errorMessage(err: unknown, fallback: string): string {
+  return (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || fallback;
+}
 
 export default function TagsPage() {
   const confirm = useConfirm();
   const toast = useToast();
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission(PERMISSIONS.TAG_EDIT) || hasPermission(PERMISSIONS.TAG_CREATE);
+  const canDelete = hasPermission(PERMISSIONS.TAG_DELETE);
+
+  const [q, setQ] = useUrlState({ search: '', page: '1', per: '20' });
+  const page = Math.max(1, Number(q.page) || 1);
+  const perPage = Number(q.per) || 20;
+
   const [tags, setTags] = useState<Tag[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const [editingTag, setEditingTag] = useState<Tag | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [editing, setEditing] = useState<Tag | null>(null);
   const [formKey, setFormKey] = useState(0);
   const [density, setDensity] = useDensity('tagsDensity');
+  const formRef = useRef<HTMLDivElement>(null);
+  const reqId = useRef(0);
 
-  useEffect(() => {
-    loadTags();
-  }, [page, search]);
-
-  async function loadTags() {
+  const load = useCallback(async () => {
+    const id = ++reqId.current;
     setLoading(true);
     try {
-      const result = await fetchTags(page, PAGE_SIZE, search);
+      const result = await fetchTags(page, perPage, q.search);
+      if (id !== reqId.current) return;
       setTags(result.items);
       setTotal(result.pagination.total);
-    } catch (err: unknown) {
-      toast.error(
-        (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message ||
-          'Failed to load tags'
-      );
+      setLoaded(true);
+    } catch (err) {
+      if (id === reqId.current) toast.error(errorMessage(err, 'Failed to load tags'));
     } finally {
-      setLoading(false);
+      if (id === reqId.current) setLoading(false);
     }
+  }, [page, perPage, q.search]);
+
+  useEffect(() => { load(); }, [load]);
+
+  function edit(tag: Tag) {
+    setEditing(tag);
+    requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      formRef.current?.querySelector<HTMLInputElement>('input')?.focus();
+    });
   }
 
   async function handleDelete(tag: Tag) {
-    if (!(await confirm({ title: 'Delete Tag', message: `Delete tag "${tag.name}"? This cannot be undone.`, confirmLabel: 'Delete', danger: true }))) {
-      return;
-    }
-
+    const posts = tag._count?.posts ?? 0;
+    if (!(await confirm({
+      title: `Delete “${tag.name}”?`,
+      message: `${posts ? `It will be removed from ${posts} post${posts === 1 ? '' : 's'}. ` : ''}This cannot be undone.`,
+      confirmLabel: 'Delete tag',
+      danger: true,
+    }))) return;
     try {
       await deleteTag(tag.id);
-      if (editingTag?.id === tag.id) {
-        setEditingTag(null);
-      }
-      await loadTags();
-    } catch (err: unknown) {
-      toast.error(
-        (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message ||
-          'Failed to delete tag'
-      );
+      if (editing?.id === tag.id) setEditing(null);
+      toast.success(`Deleted “${tag.name}”`);
+      load();
+    } catch (err) {
+      toast.error(errorMessage(err, 'Failed to delete tag'));
     }
   }
 
-  function handleSaved() {
-    setEditingTag(null);
-    setFormKey((k) => k + 1);
-    loadTags();
+  function menu(tag: Tag): MenuItem[] {
+    return [
+      { label: 'Edit', icon: faPen, onClick: () => edit(tag), hidden: !canEdit },
+      { label: 'View on site', icon: faArrowUpRightFromSquare, onClick: () => window.open(`/tags/${tag.slug}`, '_blank', 'noopener') },
+      { label: 'Delete', icon: faTrashCan, onClick: () => handleDelete(tag), danger: true, hidden: !canDelete, divider: true },
+    ];
   }
-
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <AdminLayout>
-      <h2 className={styles.title}>Tags</h2>
+      <PageHeader title="Tags" subtitle={loaded ? `${total} tag${total === 1 ? '' : 's'}` : ' '} />
 
-      <div className={styles.layout}>
-        <div className={styles.formColumn}>
-          <TagForm
-            key={`${editingTag?.id ?? 'new'}-${formKey}`}
-            tag={editingTag}
-            onSaved={handleSaved}
-            onCancel={() => setEditingTag(null)}
-          />
+      <div className={t.split}>
+        <div className={t.splitAside} ref={formRef}>
+          {canEdit && (
+            <TagForm
+              key={`${editing?.id ?? 'new'}-${formKey}`}
+              tag={editing}
+              onSaved={() => { setEditing(null); setFormKey((k) => k + 1); load(); }}
+              onCancel={() => setEditing(null)}
+            />
+          )}
         </div>
 
-        <div className={styles.listColumn}>
-          <div className={styles.toolbar}>
-            <div className={styles.search}>
-              <input
-                type="text"
-                placeholder="Search tags..."
-                value={search}
-                onChange={(e) => {
-                  setPage(1);
-                  setSearch(e.target.value);
-                }}
-              />
-            </div>
-            <div className={styles.densitySwitch} role="group" aria-label="List density">
-              <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
-              <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
-              <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
-            </div>
+        <div className={t.splitMain}>
+          <div className={t.toolbar}>
+            <SearchInput value={q.search} onChange={(search) => setQ({ search })} placeholder="Search tags" />
+            <div className={t.spacer} />
+            <DensityToggle value={density} onChange={setDensity} />
           </div>
 
-
-          <div className={styles.tableWrapper}>
-            <table className={styles[`density_${density}`]}>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Slug</th>
-                  <th>Description</th>
-                  <th className={styles.countCell}>Posts</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tags.map((tag) => (
-                  <tr key={tag.id}>
-                    <td>{tag.name}</td>
-                    <td>
-                      <code className={styles.slug}>{tag.slug}</code>
-                    </td>
-                    <td className={styles.description}>{tag.description || '—'}</td>
-                    <td className={styles.countCell}>{tag._count?.posts ?? '—'}</td>
-                    <td className={styles.actions}>
-                      <button onClick={() => setEditingTag(tag)}>Edit</button>
-                      <button className={styles.deleteButton} onClick={() => handleDelete(tag)}>
-                        Delete
-                      </button>
-                    </td>
+          <Card>
+            <LoadingBar active={loading && loaded} />
+            <div className={t.scroll}>
+              <table className={`${t.table} ${t[`d_${density}`]}`}>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th className={t.hideMd}>Description</th>
+                    <th className={t.num}>Posts</th>
+                    <th className={t.actionsCol}><span className="sr-only">Actions</span></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {!loaded && <TableSkeleton rows={6} cols={4} />}
+                  {tags.map((tag) => (
+                    <tr key={tag.id} className={editing?.id === tag.id ? t.rowSelected : undefined}>
+                      <td className={t.primaryCell}>
+                        <div className={t.stack}>
+                          {canEdit
+                            ? <button type="button" className={t.primary} onClick={() => edit(tag)}>{tag.name}</button>
+                            : <span className={t.primary}>{tag.name}</span>}
+                          <span className={t.secondary}><span className={t.mono}>/{tag.slug}</span></span>
+                        </div>
+                      </td>
+                      <td className={`${t.muted} ${t.hideMd}`}><span className={t.clamp2}>{tag.description || <span className={t.faint}>—</span>}</span></td>
+                      <td className={t.num}>{tag._count?.posts ?? 0}</td>
+                      <td className={t.actionsCol}>
+                        <div className={t.rowActions}>
+                          {canEdit && (
+                            <button type="button" className={t.quickAction} onClick={() => edit(tag)} title="Edit" aria-label={`Edit ${tag.name}`}>
+                              <FontAwesomeIcon icon={faPen} />
+                            </button>
+                          )}
+                          <RowMenu items={menu(tag)} label={`Actions for ${tag.name}`} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-            {!loading && tags.length === 0 && <div className={styles.empty}>No tags found.</div>}
-          </div>
+            {loaded && tags.length === 0 && (
+              q.search ? (
+                <EmptyState icon={faMagnifyingGlass} title={`No tags match “${q.search}”`} action={<Button onClick={() => setQ({ search: '' })}>Clear search</Button>} />
+              ) : (
+                <EmptyState icon={faTags} title="No tags yet" description="Tags are created here or straight from the post editor." />
+              )
+            )}
+          </Card>
 
-          <div className={styles.pagination}>
-            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
-              Previous
-            </button>
-            <span>
-              Page {page} of {pages}
-            </span>
-            <button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages}>
-              Next
-            </button>
-          </div>
+          {loaded && total > 0 && (
+            <Pagination
+              page={page}
+              pageSize={perPage}
+              total={total}
+              onPage={(p) => setQ({ page: String(p) })}
+              onPageSize={(n) => setQ({ per: String(n) })}
+            />
+          )}
         </div>
       </div>
     </AdminLayout>

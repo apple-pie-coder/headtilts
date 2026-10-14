@@ -8,7 +8,7 @@ import {
   faTags, faBars, faPuzzlePiece, faUsers, faUserShield, faSitemap, faEnvelope,
   faSliders, faKey, faArrowRight, faChartLine, faChartPie, faBoxArchive, faClipboardList,
   faCakeCandles, faChartBar, faCalendarAlt, faMagnifyingGlass, faPlus, faUser,
-  faXmark, faHeartPulse, faUpload,
+  faXmark, faHeartPulse, faUpload, faFileImport,
 } from '@fortawesome/free-solid-svg-icons';
 import { useSpotlight } from '../context/SpotlightContext';
 import { fetchPosts } from '../services/posts';
@@ -54,6 +54,7 @@ const STATIC_ITEMS: StaticItem[] = [
   // Quick Actions
   { group: 'Quick Actions', icon: faPlus, title: 'New Post', to: '/admin/posts/new', badge: 'Create' },
   { group: 'Quick Actions', icon: faPlus, title: 'New Page', to: '/admin/pages/new', badge: 'Create' },
+  { group: 'Quick Actions', icon: faFileImport, title: 'Import posts from Word', subtitle: 'Bulk-create posts from a .docx template', to: '/admin/posts/import', badge: 'Import' },
   { group: 'Quick Actions', icon: faPlus, title: 'New Poll', to: '/admin/polls/new', badge: 'Create' },
   { group: 'Quick Actions', icon: faPlus, title: 'New Event', to: '/admin/events/new', badge: 'Create' },
   { group: 'Quick Actions', icon: faUpload, title: 'Upload Media', to: '/admin/media', badge: 'Media' },

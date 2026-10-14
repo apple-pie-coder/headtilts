@@ -5,7 +5,7 @@ import { AdminLayout } from '../components/AdminLayout';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/ToastContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faXmark, faArrowUpRightFromSquare, faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
+import { faXmark, faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons';
 import { useDensity } from '../hooks/useDensity';
 import { useAuth } from '../hooks/useAuth';
 import { SitemapEntry } from '../types';
@@ -15,6 +15,7 @@ import {
   updateSitemapEntry,
   deleteSitemapEntry,
 } from '../services/sitemap';
+import { Button, DensityToggle, PageHeader } from '../components/ui';
 import styles from './Sitemap.module.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
@@ -116,22 +117,19 @@ export default function SitemapPage() {
 
   return (
     <AdminLayout>
-      <div className={styles.header}>
-        <h2 className={styles.title}>Sitemap</h2>
-        <div className={styles.headerActions}>
-          <div className={styles.densitySwitch} role="group" aria-label="List density">
-            <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
-            <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
-            <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
-          </div>
-          <a href={xmlUrl} target="_blank" rel="noreferrer" className={styles.xmlBtn}>
-            View XML <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
-          </a>
-          {canManage && (
-            <button className={styles.addButton} onClick={openCreate}>Add Entry</button>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title="Sitemap"
+        subtitle="Helps search engines find every page. Published posts and pages are included automatically."
+        actions={
+          <>
+            <DensityToggle value={density} onChange={setDensity} />
+            <a href={xmlUrl} target="_blank" rel="noreferrer" className={styles.xmlBtn}>
+              View XML <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
+            </a>
+            {canManage && <Button variant="primary" onClick={openCreate}>Add entry</Button>}
+          </>
+        }
+      />
 
       <div className={styles.notice}>
         The sitemap XML is auto-generated from all published posts and pages, plus any manual entries you add here.

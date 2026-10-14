@@ -6,17 +6,24 @@ import styles from './ToastContext.module.css';
 
 type ToastVariant = 'success' | 'error' | 'info';
 
+export interface ToastOptions {
+  /** Inline action button, e.g. { label: 'Undo', onClick: restore } */
+  action?: { label: string; onClick: () => void };
+  duration?: number;
+}
+
 interface Toast {
   id: number;
   message: string;
   variant: ToastVariant;
   leaving: boolean;
+  action?: ToastOptions['action'];
 }
 
 interface ToastApi {
-  success: (message: string) => void;
-  error: (message: string) => void;
-  info: (message: string) => void;
+  success: (message: string, options?: ToastOptions) => void;
+  error: (message: string, options?: ToastOptions) => void;
+  info: (message: string, options?: ToastOptions) => void;
 }
 
 const ToastContext = createContext<ToastApi>({
@@ -51,17 +58,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setTimeout(() => remove(id), 220);
   }, [remove]);
 
-  const push = useCallback((message: string, variant: ToastVariant) => {
+  const push = useCallback((message: string, variant: ToastVariant, options?: ToastOptions) => {
     if (!message) return;
     const id = nextId.current++;
-    setToasts((prev) => [...prev, { id, message, variant, leaving: false }]);
-    setTimeout(() => dismiss(id), AUTO_DISMISS[variant]);
+    setToasts((prev) => [...prev, { id, message, variant, leaving: false, action: options?.action }]);
+    // Toasts carrying an action stay up longer so there is time to use it.
+    const duration = options?.duration ?? (options?.action ? 7000 : AUTO_DISMISS[variant]);
+    setTimeout(() => dismiss(id), duration);
   }, [dismiss]);
 
   const api = useMemo<ToastApi>(() => ({
-    success: (m: string) => push(m, 'success'),
-    error: (m: string) => push(m, 'error'),
-    info: (m: string) => push(m, 'info'),
+    success: (m: string, o?: ToastOptions) => push(m, 'success', o),
+    error: (m: string, o?: ToastOptions) => push(m, 'error', o),
+    info: (m: string, o?: ToastOptions) => push(m, 'info', o),
   }), [push]);
 
   return (
@@ -76,6 +85,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           >
             <span className={styles.icon} aria-hidden="true"><FontAwesomeIcon icon={ICON[t.variant]} /></span>
             <span className={styles.message}>{t.message}</span>
+            {t.action && (
+              <button
+                type="button"
+                className={styles.action}
+                onClick={() => { t.action!.onClick(); dismiss(t.id); }}
+              >
+                {t.action.label}
+              </button>
+            )}
             <button type="button" className={styles.close} onClick={() => dismiss(t.id)} aria-label="Dismiss">
               <FontAwesomeIcon icon={faXmark} />
             </button>

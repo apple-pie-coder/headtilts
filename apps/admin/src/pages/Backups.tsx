@@ -14,6 +14,7 @@ import {
   faCircleNotch, faCheckCircle, faTimesCircle, faShieldHalved,
   faGear, faChevronDown, faChevronUp,
 } from '@fortawesome/free-solid-svg-icons';
+import { PageHeader } from '../components/ui';
 import styles from './Backups.module.css';
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
@@ -420,14 +421,17 @@ export default function BackupsPage() {
         />
       )}
 
-      <div className={styles.header}>
-        <h2 className={styles.title}>Backups</h2>
-        <button className={styles.settingsToggle} onClick={() => setShowSettings((s) => !s)}>
-          <FontAwesomeIcon icon={faGear} />
-          Settings
-          <FontAwesomeIcon icon={showSettings ? faChevronUp : faChevronDown} className={styles.chevron} />
-        </button>
-      </div>
+      <PageHeader
+        title="Backups"
+        subtitle="Snapshots of your database and uploads that you can download or restore."
+        actions={
+          <button className={styles.settingsToggle} onClick={() => setShowSettings((s) => !s)} aria-expanded={showSettings}>
+            <FontAwesomeIcon icon={faGear} />
+            Schedule & retention
+            <FontAwesomeIcon icon={showSettings ? faChevronUp : faChevronDown} className={styles.chevron} />
+          </button>
+        }
+      />
 
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
 

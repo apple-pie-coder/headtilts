@@ -10,6 +10,9 @@ import {
   NotificationPreference, NotificationChannel,
 } from '../services/notifications';
 import { Post, Setting } from '../types';
+import { PageHeader } from '../components/ui';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
+import { SettingsSearch, revealSetting } from './SettingsSearch';
 import styles from './Settings.module.css';
 
 // ---------------------------------------------------------------------------
@@ -523,6 +526,18 @@ export default function SettingsPage() {
   const isDirty = (cur: Record<string, string>, saved: Record<string, string>) =>
     Object.entries(cur).some(([k, v]) => saved[k] !== v);
 
+  // Unsaved changes per tab: shown as a dot on the tab, and guarded on leave.
+  const tabDirty: Partial<Record<Tab, boolean>> = loading ? {} : {
+    General: isDirty(curGeneral, savedGeneral),
+    Reading: isDirty(curReading, savedReading),
+    Discussion: isDirty(curDiscussion, savedDiscussion),
+    Media: isDirty(curMedia, savedMedia),
+    Email: isDirty(curEmail, savedEmail),
+    Permalinks: structure !== savedStructure,
+  };
+  useUnsavedChanges(() => Object.values(tabDirty).some(Boolean),
+    'Some settings haven’t been saved (tabs with a dot). If you leave now those changes will be lost.');
+
   const isCustomDate = !DATE_FORMAT_PRESETS.includes(dateFormat);
   const isCustomTime = !TIME_FORMAT_PRESETS.includes(timeFormat);
   const isCustomPermalink = !PERMALINK_PRESETS.some((p) => p.structure === structure);
@@ -537,7 +552,11 @@ export default function SettingsPage() {
 
   return (
     <AdminLayout>
-      <h2 className={styles.pageTitle}>Settings</h2>
+      <PageHeader
+        title="Settings"
+        subtitle="Site identity, reading, writing, SEO, email and more."
+        actions={<SettingsSearch onPick={(entry) => { switchTab(entry.tab); revealSetting(entry); }} />}
+      />
 
       <div className={styles.layout}>
         <nav className={styles.tabs}>
@@ -549,6 +568,7 @@ export default function SettingsPage() {
               onClick={() => switchTab(t)}
             >
               {t}
+              {tabDirty[t] && <span className={styles.tabDot} title="Unsaved changes" aria-label="(unsaved changes)" />}
             </button>
           ))}
         </nav>

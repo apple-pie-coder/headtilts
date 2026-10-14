@@ -75,6 +75,22 @@
 
   /* — Transition — */
   --ease: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* — Legacy aliases — older page styles used these names; map them onto the
+       real tokens so they follow the theme instead of silently falling back. */
+  --text-primary: var(--t1);
+  --text-secondary: var(--t2);
+  --t4: var(--t3);
+  --surface1: var(--surface);
+  --surface2: var(--surface-raised);
+  --surface3: var(--surface-overlay);
+  --surface-alt: var(--ghost);
+  --surface-hover: var(--nav-hover);
+  --border-light: var(--sep);
+  --border-subtle: var(--sep);
+  --error: var(--danger);
+  --r-md: var(--r-sm);
+  --accent-glow: var(--accent-bg);
 }
 
 [data-theme='dark'] {
@@ -248,4 +264,27 @@ select {
   background: var(--input-bg);
   border-color: var(--input-border);
   color: var(--t1);
+}
+
+/* ═══════════════════════════════════════════
+   ACCESSIBILITY HELPERS
+   ═══════════════════════════════════════════ */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

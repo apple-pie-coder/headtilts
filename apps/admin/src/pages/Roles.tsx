@@ -5,7 +5,7 @@ import { AdminLayout } from '../components/AdminLayout';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/ToastContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faXmark, faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
+import { faXmark, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { useDensity } from '../hooks/useDensity';
 import { useAuth } from '../hooks/useAuth';
 import { Role } from '../types';
@@ -18,6 +18,7 @@ import {
   deleteRole,
   PermissionEntry,
 } from '../services/roles';
+import { Button, DensityToggle, PageHeader } from '../components/ui';
 import styles from './Roles.module.css';
 
 function errMsg(err: unknown, fallback: string) {
@@ -144,21 +145,16 @@ export default function RolesPage() {
 
   return (
     <AdminLayout>
-      <div className={styles.header}>
-        <h2 className={styles.title}>Roles & Permissions</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div className={styles.densitySwitch} role="group" aria-label="List density">
-            <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
-            <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
-            <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
-          </div>
-          {canCreate && (
-            <button className={styles.addButton} onClick={openCreate}>
-              Create Role
-            </button>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title="Roles & permissions"
+        subtitle="Control what each group of users can see and do."
+        actions={
+          <>
+            <DensityToggle value={density} onChange={setDensity} />
+            {canCreate && <Button variant="primary" icon={faPlus} onClick={openCreate}>New role</Button>}
+          </>
+        }
+      />
 
 
       <div className={styles.tableWrapper}>

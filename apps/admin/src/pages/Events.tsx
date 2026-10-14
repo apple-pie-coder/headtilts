@@ -1,14 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { AxiosError } from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faCalendarAlt, faUsers, faCompress, faGripVertical, faExpand, faGear } from '@fortawesome/free-solid-svg-icons';
+import {
+  faPlus, faCalendarAlt, faUsers, faGear, faPen, faTrashCan, faArrowUpRightFromSquare, faMagnifyingGlass,
+  faRepeat, faStar, faLocationDot, faVideo, faLink,
+} from '@fortawesome/free-solid-svg-icons';
 import { AdminLayout } from '../components/AdminLayout';
 import { useToast } from '../components/ToastContext';
 import { useConfirm } from '../components/ConfirmDialog';
+import {
+  ActiveFilter, ActiveFilters, Button, Card, DensityToggle, EmptyState, Field, FilterMenu, LoadingBar, MenuItem,
+  PageHeader, Pagination, RowMenu, SearchInput, StatusBadge, TableSkeleton, Tabs, relativeTime,
+} from '../components/ui';
+import t from '../components/ui/table.module.css';
 import { fetchEvents, deleteEvent, EventSummary } from '../services/events';
 import { fetchSettings, updateSettings } from '../services/settings';
+import { resolveMediaUrl } from '../services/media';
 import { PERMISSIONS } from '@headtilts/shared';
 import { useAuth } from '../hooks/useAuth';
+import { useDensity } from '../hooks/useDensity';
+import { useHotkeys } from '../hooks/useHotkeys';
+import { useUrlState } from '../hooks/useUrlState';
 import styles from './Events.module.css';
 
 // ── Carousel Settings Modal ──────────────────────────────────────────────────
@@ -39,7 +52,7 @@ function CarouselSettingsModal({ onClose }: { onClose: () => void }) {
       })
       .catch(() => toast.error('Failed to load settings'))
       .finally(() => setLoading(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   function get(key: string, def = ''): string {
     return cfg[`event_carousel_${key}`] ?? def;
@@ -163,19 +176,28 @@ function CarouselSettingsModal({ onClose }: { onClose: () => void }) {
 
 // ── Main page ────────────────────────────────────────────────────────────────
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Draft', published: 'Published', cancelled: 'Cancelled', postponed: 'Postponed',
+const STATUS_META: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' }> = {
+  draft: { label: 'Draft', tone: 'neutral' },
+  published: { label: 'Published', tone: 'success' },
+  cancelled: { label: 'Cancelled', tone: 'danger' },
+  postponed: { label: 'Postponed', tone: 'warning' },
 };
 const TYPE_LABELS: Record<string, string> = {
-  in_person: 'In Person', online: 'Online', hybrid: 'Hybrid',
+  in_person: 'In person', online: 'Online', hybrid: 'Hybrid',
 };
-const LIMIT = 20;
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
-    year: 'numeric', month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
+function errorMessage(err: unknown, fallback: string): string {
+  return (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || fallback;
+}
+
+function timeRange(ev: EventSummary): string {
+  const start = new Date(ev.startAt);
+  const end = new Date(ev.endAt);
+  const time = (d: Date) => d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const day = (d: Date) => d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  return start.toDateString() === end.toDateString()
+    ? `${day(start)} · ${time(start)}–${time(end)}`
+    : `${day(start)} ${time(start)} → ${day(end)} ${time(end)}`;
 }
 
 export default function EventsPage() {
@@ -184,245 +206,248 @@ export default function EventsPage() {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const canCreate = hasPermission(PERMISSIONS.EVENT_CREATE);
-  const canEdit   = hasPermission(PERMISSIONS.EVENT_EDIT);
+  const canEdit = hasPermission(PERMISSIONS.EVENT_EDIT);
   const canDelete = hasPermission(PERMISSIONS.EVENT_DELETE);
+  const canRegs = hasPermission(PERMISSIONS.EVENT_MANAGE_REGISTRATIONS);
 
-  const [events, setEvents]     = useState<EventSummary[]>([]);
-  const [total, setTotal]       = useState(0);
-  const [page, setPage]         = useState(1);
-  const [search, setSearch]     = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [timeframe, setTimeframe] = useState('');
-  const [loading, setLoading]   = useState(true);
-  const [density, setDensity]   = useState<'compact' | 'condensed' | 'relaxed'>('compact');
+  const [q, setQ] = useUrlState({ when: 'upcoming', search: '', status: '', type: '', page: '1', per: '20' });
+  const page = Math.max(1, Number(q.page) || 1);
+  const perPage = Number(q.per) || 20;
+
+  const [events, setEvents] = useState<EventSummary[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [density, setDensity] = useDensity('eventsDensity');
   const [showCarouselSettings, setShowCarouselSettings] = useState(false);
+  const reqId = useRef(0);
 
-  useEffect(() => {
-    try {
-      const v = localStorage.getItem('eventsDensity');
-      if (v === 'compact' || v === 'condensed' || v === 'relaxed') setDensity(v);
-    } catch { /* ignore */ }
-  }, []);
-
-  useEffect(() => {
-    try { localStorage.setItem('eventsDensity', density); } catch { /* ignore */ }
-  }, [density]);
-
-  useEffect(() => { load(); }, [page, search, statusFilter, typeFilter, timeframe]);
-
-  async function load() {
+  const load = useCallback(async () => {
+    const id = ++reqId.current;
     setLoading(true);
     try {
       const data = await fetchEvents({
-        page, limit: LIMIT,
-        search: search || undefined,
-        status: statusFilter || undefined,
-        type: typeFilter || undefined,
-        timeframe: timeframe || undefined,
+        page,
+        limit: perPage,
+        search: q.search || undefined,
+        status: q.status || undefined,
+        type: q.type || undefined,
+        timeframe: q.when === 'all' ? undefined : q.when,
       });
+      if (id !== reqId.current) return;
       setEvents(data.items);
       setTotal(data.pagination.total);
-    } catch {
-      toast.error('Failed to load events');
+      setLoaded(true);
+    } catch (err) {
+      if (id === reqId.current) toast.error(errorMessage(err, 'Failed to load events'));
     } finally {
-      setLoading(false);
+      if (id === reqId.current) setLoading(false);
     }
-  }
+  }, [page, perPage, q.search, q.status, q.type, q.when]);
+
+  useEffect(() => { load(); }, [load]);
+
+  useHotkeys({ n: () => { if (canCreate) navigate('/admin/events/new'); } });
 
   async function handleDelete(ev: EventSummary) {
-    const yes = await confirm({
-      title: 'Delete event?',
-      message: `"${ev.title}" and all its registrations will be permanently deleted.`,
-      confirmLabel: 'Delete',
+    const regs = ev._count.registrations;
+    if (!(await confirm({
+      title: `Delete “${ev.title}”?`,
+      message: `${regs ? `Its ${regs} registration${regs === 1 ? '' : 's'} will be deleted too. ` : ''}This cannot be undone.`,
+      confirmLabel: 'Delete event',
       danger: true,
-    });
-    if (!yes) return;
+    }))) return;
     try {
       await deleteEvent(ev.id);
       toast.success('Event deleted');
       load();
-    } catch {
-      toast.error('Failed to delete event');
+    } catch (err) {
+      toast.error(errorMessage(err, 'Failed to delete event'));
     }
   }
 
-  const pages = Math.ceil(total / LIMIT);
+  function menu(ev: EventSummary): MenuItem[] {
+    return [
+      { label: 'Edit', icon: faPen, onClick: () => navigate(`/admin/events/${ev.id}/edit`), hidden: !canEdit },
+      { label: 'Registrations', icon: faUsers, onClick: () => navigate(`/admin/events/${ev.id}/registrations`), hidden: !canRegs },
+      { label: 'View on site', icon: faArrowUpRightFromSquare, onClick: () => window.open(`/events/${ev.slug}`, '_blank', 'noopener'), hidden: ev.status === 'draft' },
+      {
+        label: 'Copy link',
+        icon: faLink,
+        onClick: () => navigator.clipboard.writeText(new URL(`/events/${ev.slug}`, window.location.origin).href).then(() => toast.success('Link copied'), () => toast.error('Could not copy')),
+        hidden: ev.status === 'draft',
+      },
+      { label: 'Delete', icon: faTrashCan, onClick: () => handleDelete(ev), danger: true, hidden: !canDelete, divider: true },
+    ];
+  }
+
+  const activeFilters: ActiveFilter[] = [];
+  if (q.search) activeFilters.push({ key: 'search', label: `“${q.search}”`, onRemove: () => setQ({ search: '' }) });
+  if (q.status) activeFilters.push({ key: 'status', label: `Status: ${STATUS_META[q.status]?.label ?? q.status}`, onRemove: () => setQ({ status: '' }) });
+  if (q.type) activeFilters.push({ key: 'type', label: `Type: ${TYPE_LABELS[q.type] ?? q.type}`, onRemove: () => setQ({ type: '' }) });
+  const clearFilters = () => setQ({ search: '', status: '', type: '' });
 
   return (
     <AdminLayout>
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Events</h1>
-          <p className={styles.subtitle}>{total} event{total !== 1 ? 's' : ''} total</p>
-        </div>
-        <div className={styles.headerActions}>
-          <button
-            className={styles.gearButton}
-            onClick={() => setShowCarouselSettings(true)}
-            title="Carousel settings"
-            aria-label="Carousel settings"
-          >
-            <FontAwesomeIcon icon={faGear} />
-          </button>
-          {canCreate && (
-            <Link to="/admin/events/new" className={styles.addButton}>
-              <FontAwesomeIcon icon={faPlus} /> New Event
-            </Link>
-          )}
-        </div>
+      <PageHeader
+        title="Events"
+        subtitle={loaded ? `${total} ${q.when === 'all' ? '' : `${q.when} `}event${total === 1 ? '' : 's'}` : ' '}
+        actions={
+          <>
+            <Button variant="ghost" icon={faGear} onClick={() => setShowCarouselSettings(true)}>Carousel</Button>
+            {canCreate && <Button variant="primary" icon={faPlus} kbd="N" onClick={() => navigate('/admin/events/new')}>New event</Button>}
+          </>
+        }
+      />
+
+      <Tabs
+        tabs={[
+          { key: 'upcoming', label: 'Upcoming' },
+          { key: 'past', label: 'Past' },
+          { key: 'all', label: 'All' },
+        ]}
+        value={q.when}
+        onChange={(when) => setQ({ when })}
+      />
+
+      <div className={t.toolbar}>
+        <SearchInput value={q.search} onChange={(search) => setQ({ search })} placeholder="Search events" />
+        <FilterMenu activeCount={activeFilters.filter((f) => f.key !== 'search').length}>
+          <Field label="Status">
+            <select value={q.status} onChange={(e) => setQ({ status: e.target.value })}>
+              <option value="">Any status</option>
+              {Object.entries(STATUS_META).map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
+            </select>
+          </Field>
+          <Field label="Type">
+            <select value={q.type} onChange={(e) => setQ({ type: e.target.value })}>
+              <option value="">Any type</option>
+              {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </Field>
+        </FilterMenu>
+        <div className={t.spacer} />
+        <DensityToggle value={density} onChange={setDensity} />
       </div>
 
-      <div className={styles.toolbar}>
-        <div className={styles.filters}>
-          <div className={styles.filter}>
-            <label>Search</label>
-            <input
-              type="search"
-              placeholder="Search events…"
-              value={search}
-              autoFocus
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            />
-          </div>
-          <div className={styles.filter}>
-            <label>Status</label>
-            <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
-              <option value="">All statuses</option>
-              <option value="draft">Draft</option>
-              <option value="published">Published</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="postponed">Postponed</option>
-            </select>
-          </div>
-          <div className={styles.filter}>
-            <label>Type</label>
-            <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}>
-              <option value="">All types</option>
-              <option value="in_person">In Person</option>
-              <option value="online">Online</option>
-              <option value="hybrid">Hybrid</option>
-            </select>
-          </div>
-          <div className={styles.filter}>
-            <label>Timeframe</label>
-            <select value={timeframe} onChange={(e) => { setTimeframe(e.target.value); setPage(1); }}>
-              <option value="">All time</option>
-              <option value="upcoming">Upcoming</option>
-              <option value="past">Past</option>
-            </select>
-          </div>
-          <div className={styles.filter}>
-            <label>Density</label>
-            <div className={styles.densitySwitch} role="group" aria-label="List density">
-              <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}>
-                <FontAwesomeIcon icon={faCompress} />
-              </button>
-              <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}>
-                <FontAwesomeIcon icon={faGripVertical} />
-              </button>
-              <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}>
-                <FontAwesomeIcon icon={faExpand} />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ActiveFilters filters={activeFilters} onClearAll={clearFilters} />
 
-      {loading ? (
-        <p className={styles.empty}>Loading…</p>
-      ) : events.length === 0 ? (
-        <div className={styles.emptyState}>
-          <FontAwesomeIcon icon={faCalendarAlt} className={styles.emptyIcon} />
-          <p>No events found.</p>
-          {canCreate && (
-            <Link to="/admin/events/new" className={styles.addButton}>
-              <FontAwesomeIcon icon={faPlus} /> Create First Event
-            </Link>
-          )}
-        </div>
-      ) : (
-        <div className={styles.tableWrapper}>
-          <table className={styles[`density_${density}`]} aria-label="Events">
+      <Card>
+        <LoadingBar active={loading && loaded} />
+        <div className={t.scroll}>
+          <table className={`${t.table} ${t[`d_${density}`]}`} aria-label="Events">
             <thead>
               <tr>
-                <th>Title</th>
-                <th>Featured</th>
-                <th>Type</th>
-                <th>Date</th>
-                <th>Location</th>
+                <th>Event</th>
+                <th className={t.hideSm}>When</th>
+                <th className={t.hideMd}>Where</th>
                 <th>Status</th>
-                <th>Registrations</th>
-                <th>Actions</th>
+                <th className={t.num}>Registrations</th>
+                <th className={t.actionsCol}><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
-              {events.map((ev) => (
-                <tr key={ev.id}>
-                  <td>
-                    <button
-                      className={styles.titleLink}
-                      onClick={() => navigate(`/admin/events/${ev.id}/edit`)}
-                    >
-                      {ev.title}
-                    </button>
-                    <div className={styles.titleMeta}>
-                      {ev.isRecurring && <span className={styles.recurrenceBadge}>↻ Recurring</span>}
-                      {ev.parentEventId && <span className={styles.recurrenceBadge}>↻ Occurrence</span>}
-                    </div>
-                  </td>
-                  <td>
-                    {ev.isFeatured ? <span className={styles.featuredBadge}>Featured</span> : '—'}
-                  </td>
-                  <td>
-                    <span className={styles.typeBadge}>{TYPE_LABELS[ev.type] ?? ev.type}</span>
-                  </td>
-                  <td>
-                    <div className={styles.date}>{formatDate(ev.startAt)}</div>
-                    <div className={styles.dateSub}>→ {formatDate(ev.endAt)}</div>
-                  </td>
-                  <td>
-                    {[ev.venueName, ev.venueCity].filter(Boolean).join(', ') || (ev.type === 'online' ? 'Online' : '—')}
-                  </td>
-                  <td>
-                    <span className={`${styles.statusBadge} ${styles[`status_${ev.status}`] ?? ''}`}>
-                      {STATUS_LABELS[ev.status] ?? ev.status}
-                    </span>
-                  </td>
-                  <td>
-                    <Link to={`/admin/events/${ev.id}/registrations`} className={styles.regLink}>
-                      <FontAwesomeIcon icon={faUsers} />
-                      {ev._count.registrations}
-                      {ev.maxAttendees ? ` / ${ev.maxAttendees}` : ''}
-                    </Link>
-                  </td>
-                  <td>
-                    <div className={styles.actions}>
-                      {canEdit && (
-                        <button onClick={() => navigate(`/admin/events/${ev.id}/edit`)}>Edit</button>
+              {!loaded && <TableSkeleton rows={6} cols={6} />}
+              {events.map((ev) => {
+                const start = new Date(ev.startAt);
+                const regs = ev._count.registrations;
+                const pct = ev.maxAttendees ? Math.min(100, Math.round((regs / ev.maxAttendees) * 100)) : null;
+                const img = ev.featuredImage || ev.bannerImage;
+                return (
+                  <tr key={ev.id}>
+                    <td className={t.primaryCell}>
+                      <div className={t.primaryWrap}>
+                        <span className={styles.dateTile} aria-hidden="true">
+                          {img && density !== 'compact' && <img src={resolveMediaUrl(img)} alt="" loading="lazy" />}
+                          <span className={styles.dateMonth}>{start.toLocaleDateString(undefined, { month: 'short' })}</span>
+                          <span className={styles.dateDay}>{start.getDate()}</span>
+                        </span>
+                        <div className={t.stack}>
+                          {canEdit
+                            ? <Link to={`/admin/events/${ev.id}/edit`} className={t.primary}>{ev.title}</Link>
+                            : <span className={t.primary}>{ev.title}</span>}
+                          <span className={t.secondary}>
+                            <span>{TYPE_LABELS[ev.type] ?? ev.type}</span>
+                            {ev.isFeatured && <span className={styles.tagFeatured}><FontAwesomeIcon icon={faStar} /> Featured</span>}
+                            {(ev.isRecurring || ev.parentEventId) && (
+                              <span className={t.chip}><FontAwesomeIcon icon={faRepeat} /> {ev.isRecurring ? 'Recurring' : 'Occurrence'}</span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className={t.hideSm}>
+                      <div className={t.stack}>
+                        <span className={t.nowrap}>{timeRange(ev)}</span>
+                        <span className={t.secondary}>{relativeTime(ev.startAt)}</span>
+                      </div>
+                    </td>
+                    <td className={`${t.muted} ${t.hideMd}`}>
+                      {ev.type === 'online'
+                        ? <><FontAwesomeIcon icon={faVideo} /> Online</>
+                        : [ev.venueName, ev.venueCity].filter(Boolean).join(', ')
+                          ? <><FontAwesomeIcon icon={faLocationDot} /> {[ev.venueName, ev.venueCity].filter(Boolean).join(', ')}</>
+                          : <span className={t.faint}>—</span>}
+                    </td>
+                    <td><StatusBadge tone={STATUS_META[ev.status]?.tone ?? 'neutral'}>{STATUS_META[ev.status]?.label ?? ev.status}</StatusBadge></td>
+                    <td className={t.num}>
+                      {canRegs ? (
+                        <Link to={`/admin/events/${ev.id}/registrations`} className={styles.regs} title="Manage registrations">
+                          <span>{regs}{ev.maxAttendees ? ` / ${ev.maxAttendees}` : ''}</span>
+                          {pct !== null && (
+                            <span className={styles.capacity} aria-label={`${pct}% full`}>
+                              <span style={{ width: `${pct}%` }} className={pct >= 100 ? styles.full : pct >= 80 ? styles.near : undefined} />
+                            </span>
+                          )}
+                        </Link>
+                      ) : (
+                        <span>{regs}{ev.maxAttendees ? ` / ${ev.maxAttendees}` : ''}</span>
                       )}
-                      {canDelete && (
-                        <button className={styles.deleteButton} onClick={() => handleDelete(ev)}>Delete</button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className={t.actionsCol}>
+                      <div className={t.rowActions}>
+                        {canEdit && (
+                          <Link to={`/admin/events/${ev.id}/edit`} className={t.quickAction} title="Edit" aria-label={`Edit ${ev.title}`}>
+                            <FontAwesomeIcon icon={faPen} />
+                          </Link>
+                        )}
+                        <RowMenu items={menu(ev)} label={`Actions for ${ev.title}`} />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
+
+        {loaded && events.length === 0 && (
+          activeFilters.length > 0 ? (
+            <EmptyState icon={faMagnifyingGlass} title="No events match your filters" action={<Button onClick={clearFilters}>Clear filters</Button>} />
+          ) : (
+            <EmptyState
+              icon={faCalendarAlt}
+              title={q.when === 'upcoming' ? 'Nothing scheduled' : q.when === 'past' ? 'No past events' : 'No events yet'}
+              description={q.when === 'upcoming' ? 'Upcoming events will appear here.' : undefined}
+              action={canCreate && q.when !== 'past' && (
+                <Button variant="primary" icon={faPlus} onClick={() => navigate('/admin/events/new')}>New event</Button>
+              )}
+            />
+          )
+        )}
+      </Card>
+
+      {loaded && total > 0 && (
+        <Pagination
+          page={page}
+          pageSize={perPage}
+          total={total}
+          onPage={(p) => setQ({ page: String(p) })}
+          onPageSize={(n) => setQ({ per: String(n) })}
+        />
       )}
 
-      {pages > 1 && (
-        <div className={styles.pagination}>
-          <button disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button>
-          <span>Page {page} of {pages}</span>
-          <button disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button>
-        </div>
-      )}
-      {showCarouselSettings && (
-        <CarouselSettingsModal onClose={() => setShowCarouselSettings(false)} />
-      )}
+      {showCarouselSettings && <CarouselSettingsModal onClose={() => setShowCarouselSettings(false)} />}
     </AdminLayout>
   );
 }

@@ -1,39 +1,57 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { AxiosError } from 'axios';
+import { PERMISSIONS } from '@headtilts/shared';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPen, faTrashCan, faLayerGroup, faMagnifyingGlass, faArrowUpRightFromSquare, faList } from '@fortawesome/free-solid-svg-icons';
 import { AdminLayout } from '../components/AdminLayout';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/ToastContext';
 import { CategoryForm } from '../components/CategoryForm';
+import {
+  Button, Card, DensityToggle, EmptyState, LoadingBar, MenuItem, PageHeader, RowMenu, SearchInput, TableSkeleton,
+} from '../components/ui';
+import t from '../components/ui/table.module.css';
+import { useAuth } from '../hooks/useAuth';
+import { useDensity } from '../hooks/useDensity';
+import { useUrlState } from '../hooks/useUrlState';
 import { Category } from '../types';
 import { deleteCategory, fetchCategories } from '../services/categories';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
-import { useDensity } from '../hooks/useDensity';
-import styles from './Categories.module.css';
 
 /** Re-order a flat list so each parent is immediately followed by its children. */
-function toTreeOrder(cats: Category[]): Category[] {
+function toTreeOrder(cats: Category[]): { cat: Category; depth: number }[] {
   const byParent = new Map<number | null, Category[]>();
   for (const c of cats) {
     const key = c.parentId ?? null;
     if (!byParent.has(key)) byParent.set(key, []);
     byParent.get(key)!.push(c);
   }
-  function walk(parentId: number | null): Category[] {
-    return (byParent.get(parentId) ?? []).flatMap((c) => [c, ...walk(c.id)]);
+  function walk(parentId: number | null, depth: number): { cat: Category; depth: number }[] {
+    return (byParent.get(parentId) ?? []).flatMap((c) => [{ cat: c, depth }, ...walk(c.id, depth + 1)]);
   }
-  return walk(null);
+  return walk(null, 0);
+}
+
+function errorMessage(err: unknown, fallback: string): string {
+  return (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || fallback;
 }
 
 export default function CategoriesPage() {
   const confirm = useConfirm();
   const toast = useToast();
-  const [allCategories, setAllCategories] = useState<Category[]>([]);
-  const [search, setSearch] = useState('');
+  const navigate = useNavigate();
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission(PERMISSIONS.CATEGORY_EDIT) || hasPermission(PERMISSIONS.CATEGORY_CREATE);
+  const canDelete = hasPermission(PERMISSIONS.CATEGORY_DELETE);
+
+  const [q, setQ] = useUrlState({ search: '' });
+  const [all, setAll] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [editing, setEditing] = useState<Category | null>(null);
   const [formKey, setFormKey] = useState(0);
   const [density, setDensity] = useDensity('categoriesDensity');
+  const formRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { load(); }, []);
 
@@ -41,129 +59,153 @@ export default function CategoriesPage() {
     setLoading(true);
     try {
       const result = await fetchCategories(1, 500);
-      setAllCategories(result.items);
-    } catch (err: unknown) {
-      toast.error(
-        (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message ||
-          'Failed to load categories',
-      );
+      setAll(result.items);
+      setLoaded(true);
+    } catch (err) {
+      toast.error(errorMessage(err, 'Failed to load categories'));
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleDelete(category: Category) {
-    if (!(await confirm({ title: 'Delete Category', message: `Delete category "${category.name}"? This cannot be undone.`, confirmLabel: 'Delete', danger: true }))) return;
+  function edit(c: Category) {
+    setEditing(c);
+    // On narrow screens the form sits above the list — bring it into view.
+    requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      formRef.current?.querySelector<HTMLInputElement>('input')?.focus();
+    });
+  }
+
+  async function handleDelete(c: Category) {
+    const children = all.filter((x) => x.parentId === c.id).length;
+    const posts = c._count?.posts ?? 0;
+    const notes = [
+      posts ? `${posts} post${posts === 1 ? '' : 's'} will lose this category.` : '',
+      children ? `${children} subcategor${children === 1 ? 'y' : 'ies'} will become top-level.` : '',
+    ].filter(Boolean).join(' ');
+    if (!(await confirm({
+      title: `Delete “${c.name}”?`,
+      message: `${notes} This cannot be undone.`.trim(),
+      confirmLabel: 'Delete category',
+      danger: true,
+    }))) return;
     try {
-      await deleteCategory(category.id);
-      if (editingCategory?.id === category.id) setEditingCategory(null);
-      await load();
-    } catch (err: unknown) {
-      toast.error(
-        (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message ||
-          'Failed to delete category',
-      );
+      await deleteCategory(c.id);
+      if (editing?.id === c.id) setEditing(null);
+      toast.success(`Deleted “${c.name}”`);
+      load();
+    } catch (err) {
+      toast.error(errorMessage(err, 'Failed to delete category'));
     }
   }
 
-  function handleSaved() {
-    setEditingCategory(null);
-    setFormKey((k) => k + 1);
-    load();
-  }
+  // Searching flattens the tree; otherwise parents are followed by their children.
+  const rows = useMemo(() => {
+    const term = q.search.trim().toLowerCase();
+    if (!term) return toTreeOrder(all);
+    return all
+      .filter((c) => c.name.toLowerCase().includes(term) || c.slug.toLowerCase().includes(term) || (c.description ?? '').toLowerCase().includes(term))
+      .map((cat) => ({ cat, depth: 0 }));
+  }, [all, q.search]);
 
-  // When searching: flat filter across all fields.
-  // When not searching: tree order (parents first, children indented beneath them).
-  const displayCategories = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return toTreeOrder(allCategories);
-    return allCategories.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.slug.toLowerCase().includes(q) ||
-        (c.description ?? '').toLowerCase().includes(q),
-    );
-  }, [allCategories, search]);
+  function menu(c: Category): MenuItem[] {
+    return [
+      { label: 'Edit', icon: faPen, onClick: () => edit(c), hidden: !canEdit },
+      { label: 'View posts', icon: faList, onClick: () => navigate(`/admin/posts?category=${c.id}`) },
+      { label: 'View on site', icon: faArrowUpRightFromSquare, onClick: () => window.open(`/categories/${c.slug}`, '_blank', 'noopener') },
+      { label: 'Delete', icon: faTrashCan, onClick: () => handleDelete(c), danger: true, hidden: !canDelete, divider: true },
+    ];
+  }
 
   return (
     <AdminLayout>
-      <h2 className={styles.title}>Categories</h2>
+      <PageHeader title="Categories" subtitle={loaded ? `${all.length} categor${all.length === 1 ? 'y' : 'ies'}` : ' '} />
 
-      <div className={styles.layout}>
-        <div className={styles.formColumn}>
-          <CategoryForm
-            key={`${editingCategory?.id ?? 'new'}-${formKey}`}
-            category={editingCategory}
-            categories={allCategories}
-            onSaved={handleSaved}
-            onCancel={() => setEditingCategory(null)}
-          />
+      <div className={t.split}>
+        <div className={t.splitAside} ref={formRef}>
+          {canEdit && (
+            <CategoryForm
+              key={`${editing?.id ?? 'new'}-${formKey}`}
+              category={editing}
+              categories={all}
+              onSaved={() => { setEditing(null); setFormKey((k) => k + 1); load(); }}
+              onCancel={() => setEditing(null)}
+            />
+          )}
         </div>
 
-        <div className={styles.listColumn}>
-          <div className={styles.toolbar}>
-            <div className={styles.search}>
-              <input
-                type="text"
-                placeholder="Search categories..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <div className={styles.densitySwitch} role="group" aria-label="List density">
-              <button type="button" className={`${styles.densityOption} ${density === 'compact'   ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')}   title="Compact"    aria-pressed={density === 'compact'}  ><FontAwesomeIcon icon={faCompress}    /></button>
-              <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed"  aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
-              <button type="button" className={`${styles.densityOption} ${density === 'relaxed'   ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')}   title="Relaxed"    aria-pressed={density === 'relaxed'}  ><FontAwesomeIcon icon={faExpand}       /></button>
-            </div>
+        <div className={t.splitMain}>
+          <div className={t.toolbar}>
+            <SearchInput value={q.search} onChange={(search) => setQ({ search })} placeholder="Search categories" delay={0} />
+            <div className={t.spacer} />
+            <DensityToggle value={density} onChange={setDensity} />
           </div>
 
-          <div className={styles.tableWrapper}>
-            <table className={styles[`density_${density}`]}>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Slug</th>
-                  <th>Description</th>
-                  <th className={styles.countCell}>Posts</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayCategories.map((category) => {
-                  const isChild = !!category.parentId && !search.trim();
-                  return (
-                    <tr key={category.id} className={isChild ? styles.subcategoryRow : undefined}>
-                      <td>
-                        <span className={isChild ? styles.subcategoryName : undefined}>
-                          {isChild && <span className={styles.nestingMark} aria-hidden="true">└</span>}
-                          {category.icon && <span className={styles.icon}>{category.icon}</span>}
-                          {category.name}
-                          {category.parentId && search.trim() && (
-                            <span className={styles.parentBadge}>{category.parent?.name}</span>
-                          )}
-                        </span>
-                      </td>
-                      <td><code className={styles.slug}>{category.slug}</code></td>
-                      <td className={styles.description}>{category.description || '—'}</td>
-                      <td className={styles.countCell}>{category._count?.posts ?? '—'}</td>
-                      <td className={styles.actions}>
-                        <button onClick={() => setEditingCategory(category)}>Edit</button>
-                        <button className={styles.deleteButton} onClick={() => handleDelete(category)}>Delete</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <Card>
+            <LoadingBar active={loading && loaded} />
+            <div className={t.scroll}>
+              <table className={`${t.table} ${t[`d_${density}`]}`}>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th className={t.hideMd}>Description</th>
+                    <th className={t.num}>Posts</th>
+                    <th className={t.actionsCol}><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!loaded && <TableSkeleton rows={6} cols={4} />}
+                  {rows.map(({ cat: c, depth }) => {
+                    const posts = c._count?.posts ?? 0;
+                    return (
+                      <tr key={c.id} className={editing?.id === c.id ? t.rowSelected : undefined}>
+                        <td className={t.primaryCell}>
+                          <div className={t.primaryWrap} style={{ paddingLeft: `${depth * 1.25}rem` }}>
+                            {depth > 0 && <span className={t.faint} aria-hidden="true">└</span>}
+                            {c.icon && <span aria-hidden="true">{c.icon}</span>}
+                            <div className={t.stack}>
+                              {canEdit
+                                ? <button type="button" className={t.primary} onClick={() => edit(c)}>{c.name}</button>
+                                : <span className={t.primary}>{c.name}</span>}
+                              <span className={t.secondary}>
+                                <span className={t.mono}>/{c.slug}</span>
+                                {q.search && c.parent?.name && <span className={t.chip}>in {c.parent.name}</span>}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className={`${t.muted} ${t.hideMd}`}><span className={t.clamp2}>{c.description || <span className={t.faint}>—</span>}</span></td>
+                        <td className={t.num}>
+                          {posts > 0
+                            ? <Link to={`/admin/posts?category=${c.id}`} className={t.countLink} title={`View posts in ${c.name}`}>{posts}</Link>
+                            : <span className={t.faint}>0</span>}
+                        </td>
+                        <td className={t.actionsCol}>
+                          <div className={t.rowActions}>
+                            {canEdit && (
+                              <button type="button" className={t.quickAction} onClick={() => edit(c)} title="Edit" aria-label={`Edit ${c.name}`}>
+                                <FontAwesomeIcon icon={faPen} />
+                              </button>
+                            )}
+                            <RowMenu items={menu(c)} label={`Actions for ${c.name}`} />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-            {!loading && displayCategories.length === 0 && (
-              <div className={styles.empty}>No categories found.</div>
+            {loaded && rows.length === 0 && (
+              q.search ? (
+                <EmptyState icon={faMagnifyingGlass} title={`No categories match “${q.search}”`} action={<Button onClick={() => setQ({ search: '' })}>Clear search</Button>} />
+              ) : (
+                <EmptyState icon={faLayerGroup} title="No categories yet" description="Use the form to add your first category." />
+              )
             )}
-          </div>
-
-          <div className={styles.pagination}>
-            <span>{displayCategories.length} {displayCategories.length === 1 ? 'category' : 'categories'}</span>
-          </div>
+          </Card>
         </div>
       </div>
     </AdminLayout>

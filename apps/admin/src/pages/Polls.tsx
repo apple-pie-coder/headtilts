@@ -1,253 +1,291 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { AxiosError } from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faEdit, faTrash, faRotateLeft, faDownload, faCompress, faGripVertical, faExpand, faShareNodes } from '@fortawesome/free-solid-svg-icons';
-import { useDensity } from '../hooks/useDensity';
+import {
+  faPlus, faPen, faTrashCan, faRotateLeft, faDownload, faShareNodes, faArrowUpRightFromSquare, faLock,
+  faLockOpen, faSquarePollVertical, faMagnifyingGlass,
+} from '@fortawesome/free-solid-svg-icons';
 import { AdminLayout } from '../components/AdminLayout';
 import { useToast } from '../components/ToastContext';
 import { useConfirm } from '../components/ConfirmDialog';
-import { fetchPolls, deletePoll, resetPollVotes, exportPollUrl, fetchPollShares, Poll, PollShare, PollShareClick } from '../services/polls';
+import {
+  Button, Card, DensityToggle, EmptyState, LoadingBar, MenuItem, PageHeader, Pagination, RowMenu, SearchInput,
+  StatusBadge, TableSkeleton, Tabs, relativeTime, absoluteTime,
+} from '../components/ui';
+import t from '../components/ui/table.module.css';
+import {
+  fetchPolls, deletePoll, resetPollVotes, exportPollUrl, fetchPollShares, updatePoll, Poll, PollShare, PollShareClick,
+} from '../services/polls';
 import { PERMISSIONS } from '@headtilts/shared';
 import { useAuth } from '../hooks/useAuth';
+import { useDensity } from '../hooks/useDensity';
+import { useHotkeys } from '../hooks/useHotkeys';
+import { useUrlState } from '../hooks/useUrlState';
 import styles from './Polls.module.css';
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Draft', open: 'Open', closed: 'Closed', scheduled: 'Scheduled',
+const STATUS_META: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' | 'info' }> = {
+  open: { label: 'Open', tone: 'success' },
+  scheduled: { label: 'Scheduled', tone: 'warning' },
+  draft: { label: 'Draft', tone: 'neutral' },
+  closed: { label: 'Closed', tone: 'info' },
 };
 
-const STATUS_CLASS: Record<string, string> = {
-  open:      styles.statusOpen,
-  closed:    styles.statusClosed,
-  draft:     styles.statusDraft,
-  scheduled: styles.statusScheduled,
-};
-
-const LIMIT = 20;
+function errorMessage(err: unknown, fallback: string): string {
+  return (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || fallback;
+}
 
 export default function PollsPage() {
   const toast = useToast();
   const confirm = useConfirm();
+  const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const canCreate = hasPermission(PERMISSIONS.POLL_CREATE);
-  const canEdit   = hasPermission(PERMISSIONS.POLL_EDIT);
-  const canReset  = hasPermission(PERMISSIONS.POLL_RESET);
+  const canEdit = hasPermission(PERMISSIONS.POLL_EDIT);
+  const canReset = hasPermission(PERMISSIONS.POLL_RESET);
   const canDelete = hasPermission(PERMISSIONS.POLL_DELETE);
 
-  const [polls, setPolls]               = useState<Poll[]>([]);
-  const [total, setTotal]               = useState(0);
-  const [page, setPage]                 = useState(1);
-  const [search, setSearch]             = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [loading, setLoading]           = useState(true);
-  const [density, setDensity]           = useDensity('pollsDensity');
-  const [sharesPoll,   setSharesPoll]   = useState<Poll | null>(null);
-  const [shares,       setShares]       = useState<PollShare[]>([]);
+  const [q, setQ] = useUrlState({ status: '', search: '', page: '1', per: '20' });
+  const page = Math.max(1, Number(q.page) || 1);
+  const perPage = Number(q.per) || 20;
+
+  const [polls, setPolls] = useState<Poll[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [density, setDensity] = useDensity('pollsDensity');
+  const [sharesPoll, setSharesPoll] = useState<Poll | null>(null);
+  const [shares, setShares] = useState<PollShare[]>([]);
   const [sharesLoading, setSharesLoading] = useState(false);
   const [expandedShare, setExpandedShare] = useState<number | null>(null);
+  const reqId = useRef(0);
 
-  useEffect(() => { load(); }, [page, search, statusFilter]);
-
-  async function load() {
+  const load = useCallback(async () => {
+    const id = ++reqId.current;
     setLoading(true);
     try {
-      const data = await fetchPolls(page, LIMIT, search || undefined, statusFilter || undefined);
+      const data = await fetchPolls(page, perPage, q.search || undefined, q.status || undefined);
+      if (id !== reqId.current) return;
       setPolls(data.items);
       setTotal(data.pagination.total);
-    } catch {
-      toast.error('Failed to load polls');
+      setLoaded(true);
+    } catch (err) {
+      if (id === reqId.current) toast.error(errorMessage(err, 'Failed to load polls'));
     } finally {
-      setLoading(false);
+      if (id === reqId.current) setLoading(false);
     }
-  }
+  }, [page, perPage, q.search, q.status]);
+
+  useEffect(() => { load(); }, [load]);
+
+  useHotkeys({
+    n: () => { if (canCreate) navigate('/admin/polls/new'); },
+    Escape: () => { if (sharesPoll) setSharesPoll(null); },
+  });
 
   async function handleDelete(poll: Poll) {
-    const ok = await confirm({
-      title: 'Delete poll',
-      message: `Delete "${poll.title}"? This also removes all recorded votes.`,
-      confirmLabel: 'Delete',
+    if (!(await confirm({
+      title: `Delete “${poll.title}”?`,
+      message: `${poll._count.votes ? `All ${poll._count.votes} recorded vote${poll._count.votes === 1 ? '' : 's'} will be lost. ` : ''}This cannot be undone.`,
+      confirmLabel: 'Delete poll',
       danger: true,
-    });
-    if (!ok) return;
+    }))) return;
     try {
       await deletePoll(poll.id);
       toast.success('Poll deleted');
       load();
-    } catch {
-      toast.error('Failed to delete poll');
+    } catch (err) {
+      toast.error(errorMessage(err, 'Failed to delete poll'));
     }
   }
 
   async function handleReset(poll: Poll) {
-    const ok = await confirm({
-      title: 'Reset votes',
-      message: `Reset all ${poll._count.votes} vote(s) for "${poll.title}"? This cannot be undone.`,
-      confirmLabel: 'Reset',
+    if (!(await confirm({
+      title: 'Reset all votes?',
+      message: `All ${poll._count.votes} vote${poll._count.votes === 1 ? '' : 's'} for “${poll.title}” will be cleared. This cannot be undone.`,
+      confirmLabel: 'Reset votes',
       danger: true,
-    });
-    if (!ok) return;
+    }))) return;
     try {
       await resetPollVotes(poll.id);
       toast.success('Votes reset');
       load();
-    } catch {
-      toast.error('Failed to reset votes');
+    } catch (err) {
+      toast.error(errorMessage(err, 'Failed to reset votes'));
     }
+  }
+
+  async function setStatus(poll: Poll, status: string) {
+    const prev = poll.status;
+    setPolls((list) => list.map((p) => (p.id === poll.id ? { ...p, status } : p)));
+    try {
+      await updatePoll(poll.id, { status });
+      toast.success(status === 'closed' ? `Closed “${poll.title}” to new votes` : `Reopened “${poll.title}”`, {
+        action: { label: 'Undo', onClick: () => updatePoll(poll.id, { status: prev }).then(load).catch((e) => toast.error(errorMessage(e, 'Undo failed'))) },
+      });
+    } catch (err) {
+      toast.error(errorMessage(err, 'Failed to update poll'));
+    }
+    load();
   }
 
   async function handleViewShares(poll: Poll) {
     setSharesPoll(poll);
     setShares([]);
+    setExpandedShare(null);
     setSharesLoading(true);
     try {
-      const data = await fetchPollShares(poll.id);
-      setShares(data);
-    } catch {
-      toast.error('Failed to load share analytics');
+      setShares(await fetchPollShares(poll.id));
+    } catch (err) {
+      toast.error(errorMessage(err, 'Failed to load share analytics'));
     } finally {
       setSharesLoading(false);
     }
   }
 
-  const pages = Math.max(1, Math.ceil(total / LIMIT));
+  function menu(poll: Poll): MenuItem[] {
+    return [
+      { label: 'Edit', icon: faPen, onClick: () => navigate(`/admin/polls/${poll.id}/edit`), hidden: !canEdit },
+      { label: 'View on site', icon: faArrowUpRightFromSquare, onClick: () => window.open(`/polls/${poll.slug}`, '_blank', 'noopener'), hidden: poll.status === 'draft' },
+      { label: 'Share analytics', icon: faShareNodes, onClick: () => handleViewShares(poll) },
+      { label: 'Export votes (CSV)', icon: faDownload, onClick: () => { window.location.href = exportPollUrl(poll.id); }, hidden: poll._count.votes === 0 },
+      { label: 'Close voting', icon: faLock, onClick: () => setStatus(poll, 'closed'), hidden: !canEdit || poll.status !== 'open', divider: true },
+      { label: 'Reopen voting', icon: faLockOpen, onClick: () => setStatus(poll, 'open'), hidden: !canEdit || poll.status !== 'closed', divider: true },
+      { label: 'Reset votes', icon: faRotateLeft, onClick: () => handleReset(poll), danger: true, hidden: !canReset || poll._count.votes === 0, divider: true },
+      { label: 'Delete', icon: faTrashCan, onClick: () => handleDelete(poll), danger: true, hidden: !canDelete },
+    ];
+  }
 
   return (
     <AdminLayout>
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Polls</h1>
-          <p className={styles.subtitle}>{total} poll{total !== 1 ? 's' : ''}</p>
-        </div>
-        {canCreate && (
-          <Link to="/admin/polls/new" className={styles.addButton}>
-            <FontAwesomeIcon icon={faPlus} /> New Poll
-          </Link>
-        )}
+      <PageHeader
+        title="Polls"
+        subtitle={loaded ? `${total} poll${total === 1 ? '' : 's'}` : ' '}
+        actions={canCreate && <Button variant="primary" icon={faPlus} kbd="N" onClick={() => navigate('/admin/polls/new')}>New poll</Button>}
+      />
+
+      <Tabs
+        tabs={[
+          { key: '', label: 'All' },
+          ...Object.entries(STATUS_META).map(([key, m]) => ({ key, label: m.label })),
+        ]}
+        value={q.status}
+        onChange={(status) => setQ({ status })}
+      />
+
+      <div className={t.toolbar}>
+        <SearchInput value={q.search} onChange={(search) => setQ({ search })} placeholder="Search polls" />
+        <div className={t.spacer} />
+        <DensityToggle value={density} onChange={setDensity} />
       </div>
 
-      <div className={styles.toolbar}>
-        <div className={styles.filter}>
-          <label>Search</label>
-          <input
-            placeholder="Search polls…"
-            value={search}
-            autoFocus
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          />
-        </div>
-        <div className={styles.filter}>
-          <label>Status</label>
-          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
-            <option value="">All statuses</option>
-            <option value="open">Open</option>
-            <option value="draft">Draft</option>
-            <option value="scheduled">Scheduled</option>
-            <option value="closed">Closed</option>
-          </select>
-        </div>
-        <div className={styles.filter}>
-          <label>Density</label>
-          <div className={styles.densitySwitch} role="group" aria-label="List density">
-            <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
-            <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
-            <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
-          </div>
-        </div>
-      </div>
-
-      <div className={styles.tableWrapper}>
-        <table className={styles[`density_${density}`]}>
-          <thead>
-            <tr>
-              <th>Poll</th>
-              <th>Status</th>
-              <th>Mode</th>
-              <th>Votes</th>
-              <th>Options</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={6} className={styles.empty}>Loading…</td></tr>
-            ) : polls.length === 0 ? (
-              <tr><td colSpan={6} className={styles.empty}>No polls found.</td></tr>
-            ) : polls.map((poll) => (
-              <tr key={poll.id}>
-                <td>
-                  <Link to={`/admin/polls/${poll.id}/edit`} className={styles.titleLink}>
-                    {poll.title}
-                  </Link>
-                  <div className={styles.question}>{poll.question}</div>
-                  <div className={styles.slug}>/polls/{poll.slug}</div>
-                </td>
-                <td>
-                  <span className={`${styles.statusBadge} ${STATUS_CLASS[poll.status] ?? ''}`}>
-                    {STATUS_LABELS[poll.status] ?? poll.status}
-                  </span>
-                </td>
-                <td>
-                  <span className={styles.modeChip}>
-                    {poll.voteMode === 'multiple' ? 'Multi-choice' : 'Single choice'}
-                  </span>
-                </td>
-                <td className={styles.voteCount}>{poll._count.votes}</td>
-                <td className={styles.optionCount}>{poll.options.length}</td>
-                <td>
-                  <div className={styles.actions}>
-                    {canEdit && (
-                      <Link to={`/admin/polls/${poll.id}/edit`} className={styles.actionBtn} title="Edit poll">
-                        <FontAwesomeIcon icon={faEdit} />
-                      </Link>
-                    )}
-                    {canReset && poll._count.votes > 0 && (
-                      <button className={styles.actionBtn} title="Reset votes" onClick={() => handleReset(poll)}>
-                        <FontAwesomeIcon icon={faRotateLeft} />
-                      </button>
-                    )}
-                    <a href={exportPollUrl(poll.id)} download className={styles.actionBtn} title="Export CSV">
-                      <FontAwesomeIcon icon={faDownload} />
-                    </a>
-                    <button
-                      className={styles.actionBtn}
-                      title="Share analytics"
-                      onClick={() => handleViewShares(poll)}
-                    >
-                      <FontAwesomeIcon icon={faShareNodes} />
-                    </button>
-                    {canDelete && (
-                      <button
-                        className={`${styles.actionBtn} ${styles.danger}`}
-                        title="Delete poll"
-                        onClick={() => handleDelete(poll)}
-                      >
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
-                    )}
-                  </div>
-                </td>
+      <Card>
+        <LoadingBar active={loading && loaded} />
+        <div className={t.scroll}>
+          <table className={`${t.table} ${t[`d_${density}`]}`}>
+            <thead>
+              <tr>
+                <th>Poll</th>
+                <th>Status</th>
+                <th className={t.hideMd}>Leading answer</th>
+                <th className={t.num}>Votes</th>
+                <th className={t.actionsCol}><span className="sr-only">Actions</span></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {pages > 1 && (
-        <div className={styles.pagination}>
-          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>← Prev</button>
-          <span>Page {page} of {pages}</span>
-          <button disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>Next →</button>
+            </thead>
+            <tbody>
+              {!loaded && <TableSkeleton rows={5} cols={5} />}
+              {polls.map((poll) => {
+                const votes = poll._count.votes;
+                const optionVotes = poll.options.reduce((n, o) => n + (o._count?.votes ?? 0), 0);
+                const leader = [...poll.options].sort((a, b) => (b._count?.votes ?? 0) - (a._count?.votes ?? 0))[0];
+                const pct = leader && optionVotes ? Math.round(((leader._count?.votes ?? 0) / optionVotes) * 100) : 0;
+                const window_ = poll.status === 'scheduled' && poll.startsAt
+                  ? `Opens ${relativeTime(poll.startsAt)}`
+                  : poll.status === 'open' && poll.endsAt
+                    ? `Closes ${relativeTime(poll.endsAt)}`
+                    : '';
+                return (
+                  <tr key={poll.id}>
+                    <td className={t.primaryCell}>
+                      <div className={t.stack}>
+                        {canEdit
+                          ? <Link to={`/admin/polls/${poll.id}/edit`} className={t.primary}>{poll.title}</Link>
+                          : <span className={t.primary}>{poll.title}</span>}
+                        <span className={t.secondary}>
+                          <span className={t.clamp2}>{poll.question}</span>
+                        </span>
+                        <span className={t.secondary}>
+                          <span className={t.chip}>{poll.voteMode === 'multiple' ? 'Multiple choice' : 'Single choice'}</span>
+                          <span>{poll.options.length} options</span>
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <div className={t.stack}>
+                        <StatusBadge tone={STATUS_META[poll.status]?.tone ?? 'neutral'}>{STATUS_META[poll.status]?.label ?? poll.status}</StatusBadge>
+                        {window_ && <span className={t.secondary} title={absoluteTime(poll.status === 'scheduled' ? poll.startsAt : poll.endsAt)}>{window_}</span>}
+                      </div>
+                    </td>
+                    <td className={t.hideMd}>
+                      {optionVotes > 0 && leader ? (
+                        <div className={styles.leader} title={`${leader._count?.votes ?? 0} of ${optionVotes} votes`}>
+                          <span className={styles.leaderText}>{leader.text}</span>
+                          <span className={styles.leaderBar}><span style={{ width: `${pct}%` }} /></span>
+                          <span className={styles.leaderPct}>{pct}%</span>
+                        </div>
+                      ) : <span className={t.faint}>No votes yet</span>}
+                    </td>
+                    <td className={t.num}>{votes.toLocaleString()}</td>
+                    <td className={t.actionsCol}>
+                      <div className={t.rowActions}>
+                        {canEdit && (
+                          <Link to={`/admin/polls/${poll.id}/edit`} className={t.quickAction} title="Edit" aria-label={`Edit ${poll.title}`}>
+                            <FontAwesomeIcon icon={faPen} />
+                          </Link>
+                        )}
+                        <RowMenu items={menu(poll)} label={`Actions for ${poll.title}`} />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
+
+        {loaded && polls.length === 0 && (
+          q.search ? (
+            <EmptyState icon={faMagnifyingGlass} title={`No polls match “${q.search}”`} action={<Button onClick={() => setQ({ search: '' })}>Clear search</Button>} />
+          ) : (
+            <EmptyState
+              icon={faSquarePollVertical}
+              title={q.status ? `No ${STATUS_META[q.status]?.label.toLowerCase()} polls` : 'No polls yet'}
+              description={q.status ? undefined : 'Ask your readers a question and see the results live.'}
+              action={canCreate && !q.status && <Button variant="primary" icon={faPlus} onClick={() => navigate('/admin/polls/new')}>New poll</Button>}
+            />
+          )
+        )}
+      </Card>
+
+      {loaded && total > 0 && (
+        <Pagination
+          page={page}
+          pageSize={perPage}
+          total={total}
+          onPage={(p) => setQ({ page: String(p) })}
+          onPageSize={(n) => setQ({ per: String(n) })}
+        />
       )}
 
       {sharesPoll && (
-        <div className={styles.sharesOverlay}>
-          <div className={styles.sharesModal}>
+        <div className={styles.sharesOverlay} onMouseDown={(e) => { if (e.target === e.currentTarget) setSharesPoll(null); }}>
+          <div className={styles.sharesModal} role="dialog" aria-modal="true" aria-label="Share analytics">
             <div className={styles.sharesModalHeader}>
               <div>
                 <h2 className={styles.sharesModalTitle}>Share Analytics</h2>
                 <p className={styles.sharesModalSub}>"{sharesPoll.title}"</p>
               </div>
-              <button className={styles.sharesClose} onClick={() => setSharesPoll(null)}>✕</button>
+              <button className={styles.sharesClose} onClick={() => setSharesPoll(null)} aria-label="Close">✕</button>
             </div>
 
             {sharesLoading ? (
@@ -292,9 +330,8 @@ export default function PollsPage() {
                     </thead>
                     <tbody>
                       {shares.map((s) => (
-                        <>
+                        <Fragment key={s.id}>
                           <tr
-                            key={s.id}
                             className={s.clickDetails.length > 0 ? styles.shareRowClickable : undefined}
                             onClick={() => s.clickDetails.length > 0 && setExpandedShare(expandedShare === s.id ? null : s.id)}
                           >
@@ -326,7 +363,7 @@ export default function PollsPage() {
                               <td colSpan={5} className={styles.dateCell}>{new Date(c.clickedAt).toLocaleString()}</td>
                             </tr>
                           ))}
-                        </>
+                        </Fragment>
                       ))}
                     </tbody>
                   </table>

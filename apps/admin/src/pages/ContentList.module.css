@@ -1,0 +1,72 @@
+/* Post/page-specific bits; shared table styles live in components/ui/table.module.css */
+
+.titleCell { min-width: 260px; }
+
+.thumb {
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 2rem;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--ghost);
+  color: var(--t3);
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--sep);
+}
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
+.relaxed .thumb { width: 3.5rem; height: 2.5rem; }
+
+.slug { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; }
+
+.roleTag,
+.tplTag {
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+.roleTag { background: var(--accent-bg); color: var(--accent-text); }
+.tplTag { background: var(--ghost); color: var(--t2); }
+
+.dateCell { white-space: nowrap; color: var(--t1); }
+.dateCell span { display: block; }
+.dateLabel { font-size: 0.6875rem; color: var(--t3); }
+.compact .dateLabel { display: none; }
+
+/* Featured star */
+.star {
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--t3);
+  opacity: 0.45;
+  font-size: 0.85rem;
+  transition: color var(--ease), opacity var(--ease), transform var(--ease), background var(--ease);
+}
+.star:hover:not(:disabled) { opacity: 1; background: var(--warning-bg); color: var(--warning); }
+.star:active:not(:disabled) { transform: scale(0.85); }
+.star:disabled { cursor: default; }
+.starOn { color: #ffb800; opacity: 1; }
+
+@media (max-width: 768px) {
+  .titleCell { min-width: 200px; }
+  .thumb { display: none; }
+}
+
+/* "Alice is editing" */
+.lockTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: fit-content;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--warning-bg);
+  color: var(--warning-t);
+  font-size: 0.72rem;
+  font-weight: 600;
+}

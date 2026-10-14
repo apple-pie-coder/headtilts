@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { Request, Response } from 'express';
 import * as postsService from '../services/posts.service';
 import * as revisionsService from '../services/revisions.service';
+import * as postLocks from '../services/postLocks.service';
 import { sendSuccess, sendError } from '../utils/response';
 import { ApiError, ForbiddenError, parseIntParam } from '../utils/errors';
 import { PERMISSIONS } from '@headtilts/shared';
@@ -66,6 +67,7 @@ function postInputFromBody(req: Request) {
     parentId,
     status,
     scheduledFor,
+    publishedAt,
     featuredImage,
     template,
     isFeatured,
@@ -94,6 +96,7 @@ function postInputFromBody(req: Request) {
     parentId: parentId !== undefined ? (parentId === null ? null : Number(parentId)) : undefined,
     status,
     scheduledFor,
+    publishedAt: typeof publishedAt === 'string' ? publishedAt : undefined,
     featuredImage,
     template: template !== undefined ? (template || null) : undefined,
     isFeatured: isFeatured !== undefined ? Boolean(isFeatured) : undefined,
@@ -201,6 +204,12 @@ export async function create(req: Request, res: Response): Promise<void> {
 export async function update(req: Request, res: Response): Promise<void> {
   try {
     const id = parseIntParam(req.params.id);
+    // Saves from the editor carry this header: refuse them while someone else
+    // holds the edit lock, so a late autosave can't overwrite their work.
+    if (req.get('x-post-lock')) {
+      const other = postLocks.heldByOther(id, req.user!.sub);
+      if (other) throw new ApiError('LOCKED', `${other.user.name} is editing this post now`, 423, { lock: other });
+    }
     const input = postInputFromBody(req);
     await assertCanSetStatus(req, input.status);
     const old = await postsService.getPostById(id);
@@ -302,6 +311,49 @@ export async function previewLink(req: Request, res: Response): Promise<void> {
       .digest('hex');
 
     sendSuccess(res, { url: `/preview/${id}?token=${token}&exp=${exp}`, expiresAt: new Date(exp) });
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+/* ── Edit locks ("Alice is currently editing") ───────────────── */
+
+export async function locks(req: Request, res: Response): Promise<void> {
+  try {
+    const ids = String(req.query.ids ?? '')
+      .split(',')
+      .map((v) => Number(v))
+      .filter((n) => Number.isInteger(n) && n > 0)
+      .slice(0, 200);
+    sendSuccess(res, postLocks.list(ids));
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function acquireLock(req: Request, res: Response): Promise<void> {
+  try {
+    const id = parseIntParam(req.params.id);
+    const post = await prisma.post.findUnique({ where: { id }, select: { id: true, title: true } });
+    if (!post) throw new ApiError('NOT_FOUND', 'Post not found', 404);
+    await assertCanModifyPosts(req, [id]);
+    const result = await postLocks.acquire(id, req.user!.sub, {
+      takeover: req.body?.takeover === true,
+      // Heartbeats renew silently; only a real "open" tells the editor someone's waiting.
+      notify: req.body?.heartbeat !== true,
+      title: post.title,
+    });
+    sendSuccess(res, { ...result, ttlMs: postLocks.LOCK_TTL_MS });
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function releaseLock(req: Request, res: Response): Promise<void> {
+  try {
+    const id = parseIntParam(req.params.id);
+    if (!postLocks.release(id, req.user!.sub)) postLocks.leaveQueue(id, req.user!.sub);
+    sendSuccess(res, { released: true });
   } catch (error) {
     handleError(res, error);
   }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faTrash, faCopy, faCheck, faKey, faCompress, faGripVertical, faExpand } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faTrash, faCopy, faCheck, faKey } from '@fortawesome/free-solid-svg-icons';
 import { useDensity } from '../hooks/useDensity';
 import { AdminLayout } from '../components/AdminLayout';
 import { useToast } from '../components/ToastContext';
@@ -9,6 +9,7 @@ import {
   fetchApiKeys, fetchScopes, createApiKey, deleteApiKey,
   ApiKey, ApiKeyCreated,
 } from '../services/apiKeys';
+import { Button, DensityToggle, PageHeader } from '../components/ui';
 import styles from './ApiKeys.module.css';
 
 const SCOPE_GROUPS: { label: string; resource: string }[] = [
@@ -182,24 +183,16 @@ export default function ApiKeysPage() {
 
   return (
     <AdminLayout>
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.title}>API Keys</h1>
-          <p className={styles.subtitle}>
-            Create long-lived keys for external scripts and integrations. Each key is shown only once on creation.
-          </p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div className={styles.densitySwitch} role="group" aria-label="List density">
-            <button type="button" className={`${styles.densityOption} ${density === 'compact' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('compact')} title="Compact" aria-pressed={density === 'compact'}><FontAwesomeIcon icon={faCompress} /></button>
-            <button type="button" className={`${styles.densityOption} ${density === 'condensed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('condensed')} title="Condensed" aria-pressed={density === 'condensed'}><FontAwesomeIcon icon={faGripVertical} /></button>
-            <button type="button" className={`${styles.densityOption} ${density === 'relaxed' ? styles.densityOptionActive : ''}`} onClick={() => setDensity('relaxed')} title="Relaxed" aria-pressed={density === 'relaxed'}><FontAwesomeIcon icon={faExpand} /></button>
-          </div>
-          <button className={styles.addButton} onClick={() => setShowForm((v) => !v)}>
-            <FontAwesomeIcon icon={faPlus} /> New Key
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="API keys"
+        subtitle="Long-lived keys for scripts and integrations. Each key is shown only once, when it's created."
+        actions={
+          <>
+            <DensityToggle value={density} onChange={setDensity} />
+            <Button variant="primary" icon={faPlus} onClick={() => setShowForm((v) => !v)} aria-expanded={showForm}>New key</Button>
+          </>
+        }
+      />
 
       {/* One-time reveal banner */}
       {revealedKey && (

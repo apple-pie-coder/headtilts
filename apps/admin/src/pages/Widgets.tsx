@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { AxiosError } from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronUp, faChevronDown, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faChevronUp, faChevronDown, faXmark, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { PERMISSIONS } from '@headtilts/shared';
 import { AdminLayout } from '../components/AdminLayout';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -20,6 +20,7 @@ import {
 import { fetchCategories } from '../services/categories';
 import { fetchPosts } from '../services/posts';
 import { fetchPolls, Poll } from '../services/polls';
+import { Button, PageHeader } from '../components/ui';
 import styles from './Widgets.module.css';
 
 function errMsg(err: unknown, fallback: string) {
@@ -408,14 +409,11 @@ export default function WidgetsPage() {
 
   return (
     <AdminLayout>
-      <div className={styles.header}>
-        <h2 className={styles.title}>Widgets</h2>
-        {canCreate && (
-          <button className={styles.addButton} onClick={openCreate}>
-            Add Widget
-          </button>
-        )}
-      </div>
+      <PageHeader
+        title="Widgets"
+        subtitle="Reusable blocks for your site's sidebars and footer areas."
+        actions={canCreate && <Button variant="primary" icon={faPlus} onClick={openCreate}>Add widget</Button>}
+      />
 
 
       {/* Create / Edit panel */}

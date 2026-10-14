@@ -6,6 +6,7 @@ import {
   faCircleCheck, faTriangleExclamation, faCircleXmark,
   faRotate, faServer, faDatabase, faMicrochip, faMemory,
 } from '@fortawesome/free-solid-svg-icons';
+import { PageHeader } from '../components/ui';
 import styles from './Health.module.css';
 
 interface HealthData {
@@ -137,19 +138,15 @@ export default function HealthPage() {
   return (
     <AdminLayout>
       <div className={styles.page}>
-        <div className={styles.header}>
-          <div>
-            <h1 className={styles.title}>System Health</h1>
-            {lastFetch && (
-              <p className={styles.subtitle}>
-                Last updated {lastFetch.toLocaleTimeString()} · auto-refreshes every 15 s
-              </p>
-            )}
-          </div>
-          <button className={styles.refreshBtn} onClick={fetch} disabled={loading} title="Refresh now">
-            <FontAwesomeIcon icon={faRotate} spin={loading} /> Refresh
-          </button>
-        </div>
+        <PageHeader
+          title="System health"
+          subtitle={lastFetch ? `Last updated ${lastFetch.toLocaleTimeString()} · refreshes every 15 s` : ' '}
+          actions={
+            <button className={styles.refreshBtn} onClick={fetch} disabled={loading} title="Refresh now">
+              <FontAwesomeIcon icon={faRotate} spin={loading} /> Refresh
+            </button>
+          }
+        />
 
         {error && <div className={styles.errorBanner}>{error}</div>}
 

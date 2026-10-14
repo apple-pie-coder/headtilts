@@ -1,0 +1,43 @@
+.wrap { position: relative; display: flex; align-items: center; width: min(340px, 100%); }
+
+.icon { position: absolute; left: 0.75rem; color: var(--t3); font-size: 0.8rem; pointer-events: none; }
+
+.wrap input {
+  width: 100%;
+  height: 2.25rem;
+  padding: 0 0.75rem 0 2.1rem;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--r-sm);
+  font-size: 0.875rem;
+}
+.wrap input:focus { outline: none; border-color: var(--accent); box-shadow: var(--input-ring); }
+.wrap input::-webkit-search-cancel-button { display: none; }
+
+.results {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  z-index: 120;
+  list-style: none;
+  padding: 0.3rem;
+  background: var(--modal-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  box-shadow: var(--glass-shadow), 0 12px 32px rgba(0, 0, 0, 0.16);
+}
+
+.option { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.45rem 0.6rem; border-radius: var(--r-xs); cursor: pointer; }
+.optionActive { background: var(--accent-bg); }
+.label { font-size: 0.875rem; color: var(--t1); font-weight: 500; }
+.optionActive .label { color: var(--accent); }
+.where { font-size: 0.72rem; color: var(--t3); }
+.none { padding: 0.6rem; font-size: 0.85rem; color: var(--t3); }
+
+/* Applied to the matched setting after jumping to it. */
+.flash { animation: flash 1.8s ease-out; border-radius: var(--r-xs); }
+@keyframes flash {
+  0%, 30% { background: var(--accent-bg); box-shadow: 0 0 0 4px var(--accent-bg); }
+  100% { background: transparent; box-shadow: 0 0 0 4px transparent; }
+}

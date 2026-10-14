@@ -11,6 +11,8 @@ export interface PostInput {
   parentId?: number | null;
   status?: string;
   scheduledFor?: string | null;
+  /** Original publish date — only honoured when creating a published post. */
+  publishedAt?: string | null;
   featuredImage?: string;
   template?: string | null;
   isFeatured?: boolean;
@@ -92,8 +94,12 @@ export async function createPost(input: PostInput): Promise<Post> {
   return response.data.data;
 }
 
-export async function updatePost(id: number, input: Partial<PostInput>): Promise<Post> {
-  const response = await apiClient.put(`/posts/${id}`, input);
+/**
+ * `fromEditor` marks saves made from the post editor: the API refuses them
+ * while another user holds the edit lock (HTTP 423).
+ */
+export async function updatePost(id: number, input: Partial<PostInput>, opts: { fromEditor?: boolean } = {}): Promise<Post> {
+  const response = await apiClient.put(`/posts/${id}`, input, opts.fromEditor ? { headers: { 'X-Post-Lock': '1' } } : undefined);
   return response.data.data;
 }
 
