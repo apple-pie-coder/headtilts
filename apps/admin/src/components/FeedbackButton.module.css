@@ -20,9 +20,9 @@
   font-weight: 600;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
   cursor: pointer;
-  transition: background var(--ease), transform var(--ease);
+  transition: background var(--ease), transform 0.2s ease;
 }
-.fab:hover { background: var(--accent-h); transform: translateY(-1px); }
+.fab:hover { background: var(--accent-h); }
 .fab:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .fabLabel {
   max-width: 0;
@@ -34,9 +34,17 @@
 .fab:hover .fabLabel,
 .fab:focus-visible .fabLabel { max-width: 8rem; opacity: 1; margin-left: 0.5rem; }
 @media (prefers-reduced-motion: reduce) { .fabLabel { transition: none; } }
-/* Phones: no floating button over the content — "Send feedback" is in the menu drawer. */
+/* Phones and tablets: same button, a touch bigger, in the corner (there's no
+   admin footer to clear). It lifts itself above pinned bars (FeedbackButton.tsx). */
 @media (max-width: 768px) {
-  .fab { display: none; }
+  .fab {
+    right: max(1rem, env(safe-area-inset-right));
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    min-width: 3rem;
+    height: 3rem;
+    font-size: 1rem;
+  }
+  .fab:hover .fabLabel { max-width: 0; opacity: 0; margin-left: 0; }
 }
 
 .overlay {

@@ -54,6 +54,59 @@ export function FeedbackButton() {
     window.addEventListener('admin:open-feedback', show);
     return () => window.removeEventListener('admin:open-feedback', show);
   }, []);
+
+  // Never cover a pinned bar (a page's save bar, bulk actions, an editor
+  // footer): if a control in a fixed or sticky bar sits where the button
+  // rests, lift the button just above that bar. Ordinary content scrolling
+  // underneath doesn't move it; the pages leave room at the bottom for that.
+  const fabRef = useRef<HTMLButtonElement>(null);
+  const [lift, setLift] = useState(0);
+  const liftRef = useRef(0);
+  useEffect(() => {
+    let frame = 0;
+    const check = () => {
+      frame = 0;
+      const fab = fabRef.current;
+      if (!fab || fab.getClientRects().length === 0) return;   // hidden
+      const r = fab.getBoundingClientRect();
+      const top = r.top + liftRef.current;            // where it rests, unlifted
+      const bottom = r.bottom + liftRef.current;
+      const points: [number, number][] = [
+        [r.left + 4, (top + bottom) / 2], [(r.left + r.right) / 2, (top + bottom) / 2], [r.right - 4, (top + bottom) / 2],
+        [(r.left + r.right) / 2, top + 4], [(r.left + r.right) / 2, bottom - 4],
+      ];
+      let barTop = Infinity;
+      for (const [x, y] of points) {
+        const hit = document.elementsFromPoint(x, y).find((el) => !fab.contains(el));
+        if (!hit || !hit.closest('button, a, input, select, textarea, [role="button"]')) continue;
+        for (let el: Element | null = hit; el && el !== document.body; el = el.parentElement) {
+          const pos = getComputedStyle(el).position;
+          if (pos !== 'fixed' && pos !== 'sticky') continue;
+          const box = el.getBoundingClientRect();
+          // Skip full-screen layers (dialogs, drawers): they sit above the button anyway.
+          if (box.height < window.innerHeight * 0.4) barTop = Math.min(barTop, box.top);
+          break;
+        }
+      }
+      const next = barTop === Infinity ? 0 : Math.max(0, Math.round(bottom - barTop + 12));
+      if (next !== liftRef.current) { liftRef.current = next; setLift(next); }
+    };
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(check); };
+    schedule();
+    const settle = window.setTimeout(schedule, 600);   // after the new page has rendered
+    document.addEventListener('scroll', schedule, true);
+    window.addEventListener('resize', schedule);
+    const main = document.getElementById('main-content');
+    const mo = main ? new MutationObserver(schedule) : null;
+    if (main) mo!.observe(main, { childList: true, subtree: true });
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.clearTimeout(settle);
+      document.removeEventListener('scroll', schedule, true);
+      window.removeEventListener('resize', schedule);
+      mo?.disconnect();
+    };
+  }, [location.pathname]);
   const [status, setStatus] = useState<FeedbackStatus | null>(null);
   const [type, setType] = useState<FeedbackType>('bug');
   const [title, setTitle] = useState('');
@@ -117,7 +170,7 @@ export function FeedbackButton() {
 
   return (
     <>
-      <button type="button" className={styles.fab} onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label="Feedback: report a problem or suggest an improvement" title="Report a problem or suggest an improvement">
+      <button type="button" ref={fabRef} className={styles.fab} style={lift ? { transform: `translateY(-${lift}px)` } : undefined} onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label="Feedback: report a problem or suggest an improvement" title="Report a problem or suggest an improvement">
         <FontAwesomeIcon icon={faCommentDots} /><span className={styles.fabLabel}>Feedback</span>
       </button>
 
