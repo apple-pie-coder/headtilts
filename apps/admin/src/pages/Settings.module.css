@@ -486,6 +486,9 @@
   line-height: 1.4;
 }
 
+/* The hint under a checkbox label goes on its own line. */
+.checkRow .fieldHint { display: block; margin-top: 0.2rem; }
+
 /* ── Radio stacks ── */
 
 .radioStack {
