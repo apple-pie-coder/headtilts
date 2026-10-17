@@ -58,6 +58,32 @@ export async function isMailConfigured(): Promise<boolean> {
 }
 
 /**
+ * Connect to and authenticate with the SMTP server without sending anything.
+ * Returns null when SMTP isn't configured.
+ */
+export async function verifySmtp(timeoutMs = 5000): Promise<{ ok: boolean; host: string; error?: string } | null> {
+  const config = await getSmtpConfig();
+  if (!config) return null;
+  const transport = nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    auth: config.user ? { user: config.user, pass: config.pass } : undefined,
+    connectionTimeout: timeoutMs,
+    greetingTimeout: timeoutMs,
+    socketTimeout: timeoutMs,
+  });
+  try {
+    await transport.verify();
+    return { ok: true, host: `${config.host}:${config.port}` };
+  } catch (err) {
+    return { ok: false, host: `${config.host}:${config.port}`, error: err instanceof Error ? err.message : String(err) };
+  } finally {
+    transport.close();
+  }
+}
+
+/**
  * Send an email via the configured SMTP server (DB settings take priority over
  * environment variables). When SMTP is not configured the message is logged
  * instead so dev flows keep working. Returns true when handed to the server.

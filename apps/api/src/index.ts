@@ -5,6 +5,7 @@ import { publishDuePosts } from './services/posts.service';
 import { initRealtime } from './realtime/notifications.gateway';
 import { prisma } from './config/database';
 import { startBackupScheduler, } from './services/backupScheduler';
+import { heartbeat, startHealthSampler } from './services/healthMonitor';
 import { seedSmtpFromEnv } from './services/settings.service';
 import { reconcileBackupRecords } from './services/backup.service';
 
@@ -16,9 +17,20 @@ function validateEnv(): void {
     console.error(`Missing required environment variables: ${missing.join(', ')}`);
     process.exit(1);
   }
-  if (process.env.NODE_ENV === 'production' && process.env.JWT_SECRET === 'dev-secret') {
-    console.error('JWT_SECRET must not be "dev-secret" in production');
-    process.exit(1);
+  if (process.env.NODE_ENV === 'production') {
+    // Anyone who knows (or guesses) these can mint valid sessions.
+    const weak = (['JWT_SECRET', 'JWT_REFRESH_SECRET'] as const).filter((key) => {
+      const value = process.env[key] ?? '';
+      return value.length < 32 || value.startsWith('dev-') || value.toLowerCase().includes('change');
+    });
+    if (weak.length > 0) {
+      console.error(`${weak.join(', ')} must be random strings of at least 32 characters in production`);
+      process.exit(1);
+    }
+    if (process.env.JWT_SECRET === process.env.JWT_REFRESH_SECRET) {
+      console.error('JWT_SECRET and JWT_REFRESH_SECRET must be different');
+      process.exit(1);
+    }
   }
 }
 
@@ -27,7 +39,7 @@ const SCHEDULED_PUBLISH_INTERVAL_MS = 60 * 1000;
 
 function startScheduledPublisher(): NodeJS.Timeout {
   const run = () =>
-    publishDuePosts().catch((error) => {
+    (heartbeat('publisher'), publishDuePosts()).catch((error) => {
       console.error('Scheduled publish check failed:', error);
     });
   run();
@@ -65,12 +77,15 @@ async function start(): Promise<void> {
     const backupTimer = startBackupScheduler();
     console.log('✓ Backup scheduler running (every 60s)');
     console.log('✓ Scheduled post publisher running (every 60s)');
+    // Once-a-minute health samples for the admin Health page (24h, in memory)
+    const stopHealthSampler = startHealthSampler();
 
     // Graceful shutdown
     process.on('SIGTERM', async () => {
       console.log('SIGTERM received, shutting down gracefully...');
       clearInterval(publisherTimer);
       clearInterval(backupTimer);
+      stopHealthSampler();
       await disconnectDatabase();
       process.exit(0);
     });
@@ -79,6 +94,7 @@ async function start(): Promise<void> {
       console.log('SIGINT received, shutting down gracefully...');
       clearInterval(publisherTimer);
       clearInterval(backupTimer);
+      stopHealthSampler();
       await disconnectDatabase();
       process.exit(0);
     });

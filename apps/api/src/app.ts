@@ -9,6 +9,7 @@ import { uploadDir } from './middleware/upload';
 import { prisma } from './config/database';
 import { generateXml } from './services/sitemap.service';
 import { activityLogger } from './middleware/activityLogger';
+import { recordRequest } from './services/healthMonitor';
 import apiRoutes from './routes';
 
 export function createApp(): Express {
@@ -145,7 +146,8 @@ export function createApp(): Express {
     }
   });
 
-  // Activity logging for all authenticated mutations
+  // Request timing for the Health page, then activity logging for authenticated mutations
+  app.use('/api', recordRequest);
   app.use('/api', activityLogger);
 
   // API Routes

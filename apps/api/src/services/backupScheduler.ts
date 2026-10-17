@@ -1,5 +1,6 @@
 import { createBackup } from './backup.service';
 import { getBackupSettings } from './backup.settings';
+import { heartbeat } from './healthMonitor';
 
 // Tracks the date string of the last scheduled run (YYYY-MM-DD) so we
 // don't double-fire if the interval drifts and hits the same minute twice.
@@ -9,6 +10,7 @@ export function startBackupScheduler(): NodeJS.Timeout {
   // Check every minute. If we're past the scheduled time for today and
   // haven't run yet, fire immediately (handles API restarts after scheduled time).
   return setInterval(async () => {
+    heartbeat('backupScheduler');
     try {
       const settings = await getBackupSettings();
       if (settings.schedule === 'disabled') return;

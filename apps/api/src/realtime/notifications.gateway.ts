@@ -68,6 +68,11 @@ export function initRealtime(server: HttpServer): SocketIOServer {
   return io;
 }
 
+/** Number of open admin real-time connections (null before the server is attached). */
+export function realtimeClientCount(): number | null {
+  return io ? io.engine.clientsCount : null;
+}
+
 /** Push a notification to all of a user's open admin connections (if any). */
 export function pushNotification(userId: string, notification: unknown): void {
   io?.to(`user:${userId}`).emit('notification', notification);
