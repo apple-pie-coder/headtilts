@@ -16,6 +16,7 @@ import {
 import t from '../components/ui/table.module.css';
 import {
   fetchPolls, deletePoll, resetPollVotes, exportPollUrl, fetchPollShares, updatePoll, Poll, PollShare, PollShareClick,
+  fetchPollAnalytics, PollAnalyticsData,
 } from '../services/polls';
 import { PERMISSIONS } from '@headtilts/shared';
 import { useAuth } from '../hooks/useAuth';
@@ -77,6 +78,10 @@ export default function PollsPage() {
   }, [page, perPage, q.search, q.status]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Stats strip: refreshed with the list so votes and statuses stay in step.
+  const [stats, setStats] = useState<PollAnalyticsData | null>(null);
+  useEffect(() => { fetchPollAnalytics().then(setStats).catch(() => {}); }, [total, loaded]);
 
   useHotkeys({
     n: () => { if (canCreate) navigate('/admin/polls/new'); },
@@ -163,6 +168,8 @@ export default function PollsPage() {
         subtitle={loaded ? `${total} poll${total === 1 ? '' : 's'}` : ' '}
         actions={canCreate && <Button variant="primary" icon={faPlus} kbd="N" onClick={() => navigate('/admin/polls/new')}>New poll</Button>}
       />
+
+      {stats && <PollStats stats={stats} onStatus={(status) => setQ({ status })} onOpenPoll={(id) => navigate(`/admin/polls/${id}/edit`)} />}
 
       <Tabs
         tabs={[
@@ -374,5 +381,55 @@ export default function PollsPage() {
         </div>
       )}
     </AdminLayout>
+  );
+}
+
+/** Open polls, total votes, the last 30 days of voting and the most-voted poll. */
+function PollStats({ stats, onStatus, onOpenPoll }: { stats: PollAnalyticsData; onStatus: (s: string) => void; onOpenPoll: (id: number) => void }) {
+  const o = stats.overview;
+  // The API lists only days with votes; fill the gaps so the chart is a true 30 days.
+  const byDay = new Map(stats.votesOverTime.map((d) => [d.date, d.votes]));
+  const days = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(Date.now() - (29 - i) * 86_400_000).toISOString().slice(0, 10);
+    return byDay.get(d) ?? 0;
+  });
+  const month = days.reduce((a, b) => a + b, 0);
+  const week = days.slice(-7).reduce((a, b) => a + b, 0);
+  const max = Math.max(1, ...days);
+  const pts = days.map((v, i) => `${(i / 29) * 100},${30 - (v / max) * 26 - 2}`).join(' ');
+  const top = [...stats.pollBreakdown].sort((a, b) => b.totalVotes - a.totalVotes)[0];
+  return (
+    <div className={styles.stats} role="group" aria-label="Poll statistics">
+      <button type="button" className={styles.stat} onClick={() => onStatus('open')}>
+        <span className={styles.statValue}>{o.open}</span>
+        <span className={styles.statLabel}>Open now</span>
+        <span className={styles.statSub}>{o.scheduled} scheduled · {o.draft} draft · {o.closed} closed</span>
+      </button>
+      <div className={styles.stat}>
+        <span className={styles.statValue}>{o.totalVotes.toLocaleString()}</span>
+        <span className={styles.statLabel}>Votes all time</span>
+        <span className={styles.statSub}>across {o.total} poll{o.total === 1 ? '' : 's'}</span>
+      </div>
+      <div className={`${styles.stat} ${styles.statWide}`}>
+        <span className={styles.statRow}>
+          <span>
+            <span className={styles.statValue}>{month.toLocaleString()}</span>
+            <span className={styles.statLabel}>Votes in the last 30 days</span>
+            <span className={styles.statSub}>{week.toLocaleString()} this week</span>
+          </span>
+          <svg className={styles.spark} viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true">
+            <polygon points={`0,30 ${pts} 100,30`} className={styles.sparkArea} />
+            <polyline points={pts} className={styles.sparkLine} />
+          </svg>
+        </span>
+      </div>
+      {top && top.totalVotes > 0 && (
+        <button type="button" className={styles.stat} onClick={() => onOpenPoll(top.id)}>
+          <span className={styles.statLabel}>Most voted</span>
+          <span className={styles.statTitle}>{top.title}</span>
+          <span className={styles.statSub}>{top.totalVotes.toLocaleString()} votes{top.options[0] ? ` · leading: ${[...top.options].sort((a, b) => b.votes - a.votes)[0].text}` : ''}</span>
+        </button>
+      )}
+    </div>
   );
 }
