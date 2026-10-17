@@ -1,24 +1,40 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { randomId } from '../utils/id';
+import { resolveMediaUrl } from '../services/api';
 import { fetchPublicPoll, submitVote, PublicPoll, PollOptionResult } from '../services/polls';
+import { pollTiming, votesLabel } from '../utils/pollTime';
+import { postPath } from '../utils/permalink';
 import './PollWidget.css';
 
 function getVoterId(): string {
   const key = 'headtilts_voter_id';
-  let id = localStorage.getItem(key);
-  if (!id) { id = crypto.randomUUID(); localStorage.setItem(key, id); }
-  return id;
+  try {
+    let id = localStorage.getItem(key);
+    if (!id) { id = randomId(); localStorage.setItem(key, id); }
+    return id;
+  } catch {
+    return randomId();
+  }
 }
 
 interface Props {
   slug: string;
   onLoaded?: (poll: PublicPoll) => void;
+  /** "full" is the poll's own page: big question, picture, related article, share. */
+  variant?: 'card' | 'full';
+  onShare?: () => void;
 }
 
-export function PollWidget({ slug, onLoaded }: Props) {
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+export function PollWidget({ slug, onLoaded, variant = 'card', onShare }: Props) {
   const [poll, setPoll] = useState<PublicPoll | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [changing, setChanging] = useState(false);
+  const [justVoted, setJustVoted] = useState(false);
   const [error, setError] = useState('');
   const voterId = useRef(getVoterId());
 
@@ -30,17 +46,16 @@ export function PollWidget({ slug, onLoaded }: Props) {
         onLoaded?.(p);
         if (p.hasVoted) setSelected(p.options.filter((o) => o.isMyVote).map((o) => o.id));
       })
-      .catch(() => setError('Failed to load poll'))
+      .catch(() => setError('This poll couldn’t be loaded.'))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   function toggle(id: number) {
     if (!poll) return;
-    if (poll.voteMode === 'single') {
-      setSelected([id]);
-    } else {
-      setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
-    }
+    setError('');
+    if (poll.voteMode === 'single') setSelected([id]);
+    else setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
   async function handleVote() {
@@ -50,107 +65,144 @@ export function PollWidget({ slug, onLoaded }: Props) {
     try {
       const updated = await submitVote(slug, selected, voterId.current);
       setPoll(updated);
+      setChanging(false);
+      setJustVoted(true);
     } catch (e: unknown) {
-      setError((e as Error).message || 'Failed to submit vote');
+      setError((e as Error).message || 'Your vote didn’t go through. Please try again.');
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (loading) return <div className="poll-widget poll-widget--loading"><div className="poll-spinner" /></div>;
-  if (error && !poll) return <div className="poll-widget poll-widget--error">{error}</div>;
-  if (!poll) return null;
+  if (loading) return <div className={`poll poll--${variant} poll--loading`} aria-busy="true"><div className="poll-skeleton" /></div>;
+  if (!poll) return <div className={`poll poll--${variant} poll--error`}>{error || 'Poll not found.'}</div>;
 
+  const isOpen = poll.status === 'open';
   const isClosed = poll.status === 'closed';
-  const canVote = !poll.hasVoted && !isClosed && poll.status === 'open';
-  const canChange = poll.hasVoted && poll.allowVoteChange && !isClosed;
-  const showForm = canVote || canChange;
+  const voting = isOpen && (!poll.hasVoted || changing);
+  const results = poll.showResults && !voting;
+  const max = Math.max(0, ...poll.options.map((o) => o.votes ?? 0));
+  const timing = pollTiming(poll.status, poll.endsAt, poll.startsAt);
+  const Question = variant === 'full' ? 'h1' : 'h3';
+  const hiddenNote = !poll.showResults && (poll.hasVoted || !isOpen)
+    ? poll.resultVisibility === 'after_close' ? 'Results are revealed when the poll closes.' : null
+    : null;
 
   return (
-    <div className={`poll-widget ${isClosed ? 'poll-widget--closed' : ''}`}>
-      {poll.featuredImage && (
-        <img src={poll.featuredImage} alt="" className="poll-featured" />
+    <section className={`poll poll--${variant}${isClosed ? ' poll--closed' : ''}${justVoted ? ' poll--just-voted' : ''}`} aria-label={`Poll: ${poll.question}`}>
+      {variant === 'full' && poll.featuredImage && (
+        <img src={resolveMediaUrl(poll.featuredImage)} alt="" className="poll-hero" />
       )}
-      <div className="poll-body">
-        <div className="poll-meta">
-          <span className={`poll-status poll-status--${poll.status}`}>
-            {isClosed ? 'Poll closed' : poll.status === 'open' ? 'Poll open' : poll.status}
+      <div className="poll-inner">
+        <div className="poll-top">
+          <span className={`poll-pill poll-pill--${poll.status}`}>
+            <span className="poll-dot" aria-hidden="true" />
+            {isOpen ? 'Open poll' : isClosed ? 'Final results' : poll.status === 'scheduled' ? 'Coming soon' : 'Poll'}
           </span>
-          <span className="poll-total">{poll.totalVotes} vote{poll.totalVotes !== 1 ? 's' : ''}</span>
+          <span className="poll-facts">
+            {votesLabel(poll.totalVotes)}
+            {timing && <> · {timing}</>}
+          </span>
         </div>
 
-        <p className="poll-question">{poll.question}</p>
+        <Question className="poll-question">{poll.question}</Question>
         {poll.description && <p className="poll-description">{poll.description}</p>}
-
-        <div className="poll-options">
-          {poll.options.map((opt) => (
-            <PollOptionItem
-              key={opt.id}
-              option={opt}
-              showForm={showForm}
-              showResults={poll.showResults}
-              isSelected={selected.includes(opt.id)}
-              voteMode={poll.voteMode}
-              onToggle={() => toggle(opt.id)}
-            />
-          ))}
-        </div>
-
-        {error && <p className="poll-error">{error}</p>}
-
-        {showForm && (
-          <button
-            className="poll-vote-btn"
-            onClick={handleVote}
-            disabled={submitting || selected.length === 0}
-          >
-            {submitting ? 'Submitting…' : poll.hasVoted ? 'Change vote' : 'Submit vote'}
-          </button>
+        {voting && (
+          <p className="poll-hint" id={`poll-hint-${poll.id}`}>
+            {poll.voteMode === 'multiple' ? 'Pick all that apply' : 'Pick one'}
+            {!poll.showResults && poll.resultVisibility === 'after_vote' && ' — results appear after you vote'}
+          </p>
         )}
 
-        {poll.hasVoted && !canChange && (
-          <p className="poll-voted-msg">You've voted</p>
+        {voting ? (
+          <div className="poll-choices" role={poll.voteMode === 'multiple' ? 'group' : 'radiogroup'} aria-describedby={`poll-hint-${poll.id}`}>
+            {poll.options.map((opt, i) => {
+              const on = selected.includes(opt.id);
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  role={poll.voteMode === 'multiple' ? 'checkbox' : 'radio'}
+                  aria-checked={on}
+                  className={`poll-choice${on ? ' poll-choice--on' : ''}`}
+                  onClick={() => toggle(opt.id)}
+                >
+                  <span className={`poll-mark poll-mark--${poll.voteMode === 'multiple' ? 'check' : 'letter'}`} aria-hidden="true">
+                    {poll.voteMode === 'multiple' ? (on ? '✓' : '') : LETTERS[i] ?? '•'}
+                  </span>
+                  <span className="poll-choice-text">{opt.text}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <ol className="poll-results">
+            {poll.options.map((opt) => (
+              <ResultRow key={opt.id} option={opt} show={results} leading={results && (opt.votes ?? 0) === max && max > 0} closed={isClosed} />
+            ))}
+          </ol>
+        )}
+
+        {error && <p className="poll-error" role="alert">{error}</p>}
+
+        <div className="poll-bottom">
+          {voting && (
+            <>
+              <button type="button" className="poll-submit" onClick={handleVote} disabled={submitting || selected.length === 0}>
+                {submitting ? 'Sending…' : changing ? 'Update my vote' : selected.length === 0 ? 'Choose an answer' : 'Vote'}
+              </button>
+              {changing && <button type="button" className="poll-link" onClick={() => setChanging(false)}>Cancel</button>}
+            </>
+          )}
+          {!voting && poll.hasVoted && (
+            <span className="poll-thanks">
+              <span aria-hidden="true">✓</span> {justVoted ? 'Thanks — your vote is in' : 'You voted'}
+              {isOpen && poll.allowVoteChange && <button type="button" className="poll-link" onClick={() => setChanging(true)}>Change vote</button>}
+            </span>
+          )}
+          {!voting && !poll.hasVoted && isOpen === false && !isClosed && <span className="poll-thanks">Voting hasn’t opened yet.</span>}
+          {hiddenNote && <span className="poll-note">{hiddenNote}</span>}
+          <span className="poll-spacer" />
+          {onShare && <button type="button" className="poll-share" onClick={onShare}>Share</button>}
+          {variant === 'card' && (
+            <Link to={`/polls/${poll.slug}`} className="poll-link">More polls →</Link>
+          )}
+        </div>
+
+        {variant === 'full' && poll.post && (
+          <Link to={postPath(poll.post)} className="poll-related">
+            <span>From the article</span>
+            <strong>{poll.post.title}</strong>
+          </Link>
         )}
       </div>
-    </div>
+    </section>
   );
 }
 
-function PollOptionItem({
-  option, showForm, showResults, isSelected, voteMode, onToggle,
-}: {
-  option: PollOptionResult;
-  showForm: boolean;
-  showResults: boolean;
-  isSelected: boolean;
-  voteMode: string;
-  onToggle: () => void;
-}) {
+function ResultRow({ option, show, leading, closed }: { option: PollOptionResult; show: boolean; leading: boolean; closed: boolean }) {
   const pct = option.percentage ?? 0;
+  // Animate from 0 the first time results appear.
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    if (!show) return;
+    const t = requestAnimationFrame(() => setWidth(pct));
+    return () => cancelAnimationFrame(t);
+  }, [show, pct]);
   return (
-    <div
-      className={`poll-option ${isSelected ? 'poll-option--selected' : ''} ${option.isMyVote && !showForm ? 'poll-option--my-vote' : ''} ${showForm ? 'poll-option--clickable' : ''}`}
-      onClick={showForm ? onToggle : undefined}
-      role={showForm ? 'button' : undefined}
-      tabIndex={showForm ? 0 : undefined}
-      onKeyDown={showForm ? (e) => e.key === 'Enter' && onToggle() : undefined}
-    >
-      {showForm && (
-        <span className="poll-option-control">
-          {voteMode === 'multiple'
-            ? <span className={`poll-checkbox ${isSelected ? 'poll-checkbox--checked' : ''}`} />
-            : <span className={`poll-radio ${isSelected ? 'poll-radio--checked' : ''}`} />}
+    <li className={`poll-result${leading ? ' poll-result--lead' : ''}${option.isMyVote ? ' poll-result--mine' : ''}`}>
+      {show && <span className="poll-bar" style={{ width: `${width}%` }} aria-hidden="true" />}
+      <span className="poll-result-text">
+        {option.text}
+        {leading && <span className="poll-tag">{closed ? 'Winner' : 'Leading'}</span>}
+        {option.isMyVote && <span className="poll-tag poll-tag--mine">Your vote</span>}
+      </span>
+      {show && (
+        <span className="poll-result-num">
+          <strong>{pct}%</strong>
+          <span>{(option.votes ?? 0).toLocaleString()}</span>
         </span>
       )}
-      <span className="poll-option-text">{option.text}</span>
-      {showResults && option.percentage !== null && (
-        <span className="poll-option-pct">{option.percentage}%</span>
-      )}
-      {showResults && (
-        <div className="poll-option-bar">
-          <div className="poll-option-bar-fill" style={{ width: `${pct}%` }} />
-        </div>
-      )}
-    </div>
+    </li>
   );
 }

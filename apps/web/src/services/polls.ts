@@ -24,6 +24,8 @@ export interface PublicPoll {
   endsAt: string | null;
   featuredImage: string | null;
   showSidebar: boolean;
+  /** The article this poll belongs to, if any. */
+  post?: { id: number; title: string; slug: string; publishedAt: string | null } | null;
   totalVotes: number;
   hasVoted: boolean;
   showResults: boolean;
@@ -48,13 +50,21 @@ export interface PublicPollSummary {
   status: string;
   featuredImage: string | null;
   endsAt: string | null;
+  startsAt?: string | null;
+  voteMode?: string;
+  resultVisibility?: string;
+  totalVotes?: number;
+  optionCount?: number;
+  /** Results are null unless the poll lets everyone see them (always for closed polls). */
+  options?: { text: string; votes: number | null; percentage: number | null }[];
   _count: { votes: number };
 }
 
-export async function fetchPublicPolls(page = 1, limit = 20): Promise<{ items: PublicPollSummary[]; total: number; page: number; limit: number }> {
+export async function fetchPublicPolls(page = 1, limit = 20, status: 'open' | 'closed' = 'open'): Promise<{ items: PublicPollSummary[]; total: number; page: number; limit: number }> {
   const url = new URL(`${BASE}/public/polls`, window.location.origin);
   url.searchParams.set('page', String(page));
   url.searchParams.set('limit', String(limit));
+  if (status !== 'open') url.searchParams.set('status', status);
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error('Failed to load polls');
   const json = await res.json();
