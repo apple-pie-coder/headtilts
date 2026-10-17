@@ -8,6 +8,8 @@ import { errorHandler } from './middleware/errorHandler';
 import { uploadDir } from './middleware/upload';
 import { prisma } from './config/database';
 import { generateXml } from './services/sitemap.service';
+import { renderPage } from './services/pageMeta.service';
+import { buildFeed } from './services/feed.service';
 import { activityLogger } from './middleware/activityLogger';
 import { recordRequest } from './services/healthMonitor';
 import apiRoutes from './routes';
@@ -18,6 +20,38 @@ export function createApp(): Express {
   // Behind nginx in production — trust the first proxy so rate limiting
   // and logging see the real client IP from X-Forwarded-For.
   app.set('trust proxy', 1);
+
+  // Public site pages, sent here by nginx as /_page/<path>, get their title,
+  // description and social preview tags filled in (see pageMeta.service).
+  // Registered before helmet: the site's HTML keeps the headers the web
+  // container gives it, as helmet's CSP would block embeds and remote images.
+  // On an error nginx falls back to the plain web app.
+  app.get(/^\/_page(\/.*)?$/, async (req, res) => {
+    try {
+      const raw = req.originalUrl.slice('/_page'.length) || '/';
+      const q = raw.indexOf('?');
+      const result = await renderPage(q === -1 ? raw : raw.slice(0, q), q === -1 ? '' : raw.slice(q));
+      if ('redirect' in result) { res.redirect(result.status, result.redirect); return; }
+      res.status(result.status).type('html').setHeader('Cache-Control', 'no-cache');
+      res.send(result.html);
+    } catch {
+      res.status(502).send('');
+    }
+  });
+
+  // RSS feeds at the addresses feed readers look for
+  app.get(['/feed', '/rss.xml', '/categories/:slug/feed', '/tags/:slug/feed'], async (req, res) => {
+    try {
+      const scope = req.path.startsWith('/categories/') ? { category: req.params.slug }
+        : req.path.startsWith('/tags/') ? { tag: req.params.slug } : {};
+      const feed = await buildFeed(scope);
+      if (!feed) { res.status(404).type('text').send('No such category or tag'); return; }
+      res.type('application/rss+xml; charset=utf-8').setHeader('Cache-Control', 'public, max-age=300');
+      res.send(feed);
+    } catch {
+      res.status(500).send('');
+    }
+  });
 
   // Security headers. crossOriginResourcePolicy is relaxed so /uploads
   // images can be embedded by the web/admin apps on other origins.

@@ -21,6 +21,7 @@ import { ApiError, ValidationError } from '../utils/errors';
 import { clientIp } from '../utils/clientIp';
 import { postPublicSelect } from '../services/publicSelect';
 import { getPublicFrontPage } from '../services/frontPage.service';
+import { buildFeed } from '../services/feed.service';
 
 // Throttle comment/reaction writes per IP
 const commentLimiter = rateLimit({
@@ -306,71 +307,11 @@ router.post('/contact', publicWriteLimiter(), asyncHandler(async (req: Request, 
   sendSuccess(res, { ok: true });
 }));
 
-function xmlEscape(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-// GET /public/feed — RSS 2.0 feed of published posts
-router.get('/feed', asyncHandler(async (_req: Request, res: Response) => {
-  const settingRows = await prisma.setting.findMany({
-    where: { key: { in: ['site_title', 'site_description', 'posts_per_rss', 'rss_content'] } },
-  });
-  const settings: Record<string, string> = Object.fromEntries(settingRows.map((r) => [r.key, r.value]));
-
-  const limit = Math.max(1, Math.min(50, Number(settings.posts_per_rss) || 10));
-  const useFullContent = settings.rss_content === 'full';
-  const siteUrl = (process.env.SITE_URL || 'http://localhost:5173').replace(/\/$/, '');
-  const structure = await getPermalinkStructure();
-
-  const posts = await prisma.post.findMany({
-    where: { status: 'published', type: 'post' },
-    orderBy: { publishedAt: 'desc' },
-    take: limit,
-    select: {
-      id: true, title: true, slug: true, excerpt: true, content: true, publishedAt: true,
-      author: { select: { username: true, firstName: true, lastName: true } },
-      categories: { select: { category: { select: { name: true } } } },
-    },
-  });
-
-  const items = posts.map((post) => {
-    const link = `${siteUrl}${buildPostPath(structure, post)}`;
-    const description = useFullContent
-      ? `<![CDATA[${post.content.replace(/]]>/g, ']]]]><![CDATA[>')}]]>`
-      : xmlEscape(post.excerpt || '');
-    const authorName = post.author
-      ? [post.author.firstName, post.author.lastName].filter(Boolean).join(' ') || post.author.username
-      : '';
-    return [
-      '    <item>',
-      `      <title>${xmlEscape(post.title)}</title>`,
-      `      <link>${link}</link>`,
-      `      <guid isPermaLink="true">${link}</guid>`,
-      post.publishedAt ? `      <pubDate>${post.publishedAt.toUTCString()}</pubDate>` : '',
-      authorName ? `      <dc:creator>${xmlEscape(authorName)}</dc:creator>` : '',
-      ...post.categories.map(({ category }) => `      <category>${xmlEscape(category.name)}</category>`),
-      `      <description>${description}</description>`,
-      '    </item>',
-    ].filter(Boolean).join('\n');
-  }).join('\n');
-
-  const feed = `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:atom="http://www.w3.org/2005/Atom">
-  <channel>
-    <title>${xmlEscape(settings.site_title || 'Headtilts')}</title>
-    <link>${siteUrl}</link>
-    <description>${xmlEscape(settings.site_description || '')}</description>
-    <language>en</language>
-    <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
-    <atom:link href="${siteUrl}/api/public/feed" rel="self" type="application/rss+xml"/>
-${items}
-  </channel>
-</rss>`;
-
+// GET /public/feed?category=&tag= — RSS 2.0 feed (also served at /feed)
+router.get('/feed', asyncHandler(async (req: Request, res: Response) => {
+  const one = (v: unknown) => (typeof v === 'string' && v ? v : undefined);
+  const feed = await buildFeed({ category: one(req.query.category), tag: one(req.query.tag) });
+  if (!feed) { sendError(res, 'NOT_FOUND', 'No such category or tag', 404); return; }
   res.setHeader('Content-Type', 'application/rss+xml; charset=utf-8');
   res.status(200).send(feed);
 }));
