@@ -2,9 +2,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useSiteSettings } from '../context/SiteSettingsContext';
 import { PermalinkPage } from './PermalinkPage';
 import { PostsArchive } from './PostsArchive';
-import { PostFeed } from '../components/PostFeed';
-import { FrontPageHero } from '../components/FrontPageHero';
-import { WidgetZone } from '../components/WidgetZone';
+import { FrontPage } from '../components/FrontPage';
 import { PageDetail } from './PageDetail';
 
 export function HomePage() {
@@ -26,11 +24,6 @@ export function HomePage() {
     return <PageDetail slug={front_page_slug} />;
   }
 
-  return (
-    <>
-      <FrontPageHero />
-      <WidgetZone zone="front-page-featured" className="front-page-featured" />
-      <PostFeed />
-    </>
-  );
+  // Built in Admin → Front page.
+  return <FrontPage />;
 }
