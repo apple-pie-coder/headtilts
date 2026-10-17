@@ -9,6 +9,7 @@ export interface PostResult {
   excerpt: string | null;
   publishedAt: string | null;
   featuredImage: string | null;
+  featuredImageFocus?: string | null;
   author: { username: string; firstName: string | null; lastName: string | null } | null;
   categories: { category: { name: string; slug: string } }[];
 }

@@ -7,6 +7,11 @@ export function resolveMediaUrl(url: string | null | undefined): string {
   return `${BASE_ORIGIN}${url.startsWith('/') ? '' : '/'}${url}`;
 }
 
+/** A failed API call; `status` lets pages tell "not found" from "try again". */
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) { super(message); }
+}
+
 async function get<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
   const url = new URL(`${BASE}${path}`, window.location.origin);
   if (params) {
@@ -17,7 +22,7 @@ async function get<T>(path: string, params?: Record<string, string | number | un
   const res = await fetch(url.toString());
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body?.error?.message || `HTTP ${res.status}`);
+    throw new ApiError(body?.error?.message || `HTTP ${res.status}`, res.status);
   }
   const json = await res.json();
   return json.data as T;

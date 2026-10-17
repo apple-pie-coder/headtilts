@@ -1,6 +1,41 @@
 import { useMemo } from 'react';
+import { toEmbed } from '@headtilts/shared';
 import { sanitizeHtml } from '../utils/sanitize';
 import { PollWidget } from './PollWidget';
+import { StreamingPlayer } from './MediaPlayers';
+
+/** A player iframe's src back to the public link toEmbed() understands. */
+function linkFromSrc(src: string): string | null {
+  if (toEmbed(src)) return src;
+  const spotify = src.replace('open.spotify.com/embed/', 'open.spotify.com/');
+  return spotify !== src && toEmbed(spotify) ? spotify : null;
+}
+
+/**
+ * Turn media into [embed] markers before sanitising strips iframes:
+ *  - iframes from the editor's video button (YouTube, Spotify…)
+ *  - a paragraph holding nothing but a supported link (paste-a-URL embeds)
+ * Unknown iframes are dropped, as before.
+ */
+function markEmbeds(html: string): string {
+  if (!/<iframe|https?:\/\//i.test(html)) return html;
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const marker = (url: string) => {
+    const p = doc.createElement('p');
+    p.textContent = `[embed url="${encodeURIComponent(url)}"]`;
+    return p;
+  };
+  doc.querySelectorAll('iframe').forEach((f) => {
+    const url = linkFromSrc(f.getAttribute('src') ?? '');
+    if (url) f.replaceWith(marker(url)); else f.remove();
+  });
+  doc.querySelectorAll('p').forEach((p) => {
+    const text = (p.textContent ?? '').trim();
+    const onlyLink = p.children.length === 0 || (p.children.length === 1 && p.children[0].tagName === 'A' && p.children[0].textContent?.trim() === text);
+    if (onlyLink && /^https?:\/\/\S+$/.test(text) && toEmbed(text)) p.replaceWith(marker(text));
+  });
+  return doc.body.innerHTML;
+}
 
 // Inject id attributes on h2/h3 so TableOfContents anchor links work.
 function injectHeadingIds(html: string): string {
@@ -30,18 +65,20 @@ const POLL_RE = new RegExp(
   'gi',
 );
 
-type Segment = { type: 'html'; html: string } | { type: 'poll'; slug: string };
+const EMBED_RE = /<p[^>]*>\[embed url="([^"]+)"\]<\/p>/;
+
+type Segment = { type: 'html'; html: string } | { type: 'poll'; slug: string } | { type: 'embed'; url: string };
 
 function splitSegments(html: string): Segment[] {
   const segments: Segment[] = [];
   let lastIndex = 0;
-  const re = new RegExp(POLL_RE.source, 'gi');
+  const re = new RegExp(`${POLL_RE.source}|${EMBED_RE.source}`, 'gi');
   let match: RegExpExecArray | null;
   while ((match = re.exec(html)) !== null) {
     if (match.index > lastIndex) {
       segments.push({ type: 'html', html: html.slice(lastIndex, match.index) });
     }
-    segments.push({ type: 'poll', slug: match[1] });
+    segments.push(match[1] ? { type: 'poll', slug: match[1] } : { type: 'embed', url: decodeURIComponent(match[2]) });
     lastIndex = match.index + match[0].length;
   }
   if (lastIndex < html.length) {
@@ -55,12 +92,22 @@ interface Props {
   className?: string;
 }
 
+/**
+ * Text pasted from Word or WordPress often joins every word with &nbsp;, which
+ * turns a paragraph into one unbreakable "word" that wraps mid-letter. Turn
+ * spaces between words back into normal spaces; a lone &nbsp; (an intentional
+ * spacer paragraph) is kept.
+ */
+function normalizeSpaces(html: string): string {
+  return html.replace(/([^\s>])(?:&nbsp;|\u00a0)(?=[^\s<])/g, '$1 ');
+}
+
 export function RichContent({ html, className }: Props) {
-  const segments = useMemo(() => splitSegments(injectHeadingIds(html)).map((seg) =>
+  const segments = useMemo(() => splitSegments(injectHeadingIds(markEmbeds(normalizeSpaces(html)))).map((seg) =>
     seg.type === 'html' ? { ...seg, html: sanitizeHtml(seg.html) } : seg
   ), [html]);
 
-  const hasPoll = segments.some((s) => s.type === 'poll');
+  const hasPoll = segments.some((s) => s.type !== 'html');
 
   if (!hasPoll) {
     return (
@@ -76,6 +123,8 @@ export function RichContent({ html, className }: Props) {
       {segments.map((seg, i) =>
         seg.type === 'html' ? (
           seg.html ? <div key={i} dangerouslySetInnerHTML={{ __html: seg.html }} /> : null
+        ) : seg.type === 'embed' ? (
+          <StreamingPlayer key={i} url={seg.url} title="Embedded media" />
         ) : (
           <div key={i} className="post-poll-embed">
             <PollWidget slug={seg.slug} />

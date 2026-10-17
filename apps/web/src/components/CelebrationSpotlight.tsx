@@ -70,6 +70,13 @@ function CelebrationSlide({ item }: { item: Celebration }) {
       <h2 className="celebration-name">{item.name}</h2>
       {meta && <div className="celebration-meta">{meta}</div>}
       <p className="celebration-message">{message}</p>
+      {item.photo && item.photoCredit && (
+        <p className="celebration-credit">
+          {item.photoCreditUrl
+            ? <a href={item.photoCreditUrl} target="_blank" rel="noopener noreferrer">{item.photoCredit}</a>
+            : item.photoCredit}
+        </p>
+      )}
     </div>
   );
 }

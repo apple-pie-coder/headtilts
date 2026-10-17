@@ -6,6 +6,7 @@ import { fetchMenu } from '../services/taxonomy';
 import { resolveMediaUrl } from '../services/api';
 import { MenuItem } from '../types';
 import { WidgetZone } from './WidgetZone';
+import { CategoryIcon } from './CategoryIcon';
 import { CelebrationSpotlight } from './CelebrationSpotlight';
 import { useSiteSettings } from '../context/SiteSettingsContext';
 import { useTheme, ThemeMode } from '../context/ThemeContext';
@@ -13,6 +14,7 @@ import { useLayout } from '../context/LayoutContext';
 import { applyRobotsPolicy } from '../utils/seo';
 import { SearchBar } from './SearchBar';
 import { BackgroundEffect } from './BackgroundEffect';
+import { isFrontPagePreview } from './FrontPage';
 
 const THEME_OPTIONS: { value: ThemeMode; icon: typeof faSun; label: string }[] = [
   { value: 'system', icon: faDesktop, label: 'System' },
@@ -94,9 +96,9 @@ export function SiteLayout({ children }: { children: ReactNode }) {
 
   return (
     <>
-    <BackgroundEffect />
+    {!isFrontPagePreview() && <BackgroundEffect />}
     <div className="site-wrap" style={{ position: 'relative', zIndex: 2 }}>
-      {!isBlank && <CelebrationSpotlight />}
+      {!isBlank && !isFrontPagePreview() && <CelebrationSpotlight />}
       {!isBlank && (
         <header className={`site-header${isFullBleed ? ' site-header--transparent' : ''}`}>
           <div className="container header-inner">
@@ -120,6 +122,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
                     to={item.url || '#'}
                     className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
                   >
+                    <CategoryIcon icon={item.icon} iconSvg={item.iconSvg} />
                     {item.title}
                   </NavLink>
                 ))}
@@ -163,7 +166,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
             {footerItems.length > 0 && (
               <nav className="footer-legal-links">
                 {footerItems.map((item) => (
-                  <Link key={item.id} to={item.url || '#'}>{item.title}</Link>
+                  <Link key={item.id} to={item.url || '#'}><CategoryIcon icon={item.icon} iconSvg={item.iconSvg} />{item.title}</Link>
                 ))}
               </nav>
             )}

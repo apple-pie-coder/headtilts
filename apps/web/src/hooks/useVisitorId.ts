@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
+import { randomId } from '../utils/id';
 
 const VISITOR_KEY = 'ht_visitor_id';
 
 function getOrCreateVisitorId(): string {
   let id = localStorage.getItem(VISITOR_KEY);
   if (!id) {
-    id = crypto.randomUUID();
+    id = randomId();
     localStorage.setItem(VISITOR_KEY, id);
   }
   return id;

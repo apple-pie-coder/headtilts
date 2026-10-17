@@ -10,6 +10,7 @@ import { useLayout } from '../context/LayoutContext';
 import { useSiteSettings } from '../context/SiteSettingsContext';
 import { applySeo, resetSeo } from '../utils/seo';
 import { Category, Pagination, PostSummary } from '../types';
+import { CategoryIcon } from '../components/CategoryIcon';
 
 const PAGE_SIZE = 10;
 
@@ -61,7 +62,7 @@ export function CategoryArchivePage() {
       <Breadcrumb crumbs={[{ label: 'Home', href: '/' }, { label: category?.name || slug || 'Category' }]} />
       <div className="page-hero">
         <p className="archive-label">Category</p>
-        <h1 className="page-title">{category?.name || slug}</h1>
+        <h1 className="page-title">{category && <CategoryIcon icon={category.icon} iconSvg={category.iconSvg} />}{category?.name || slug}</h1>
         {category?.description && <p className="archive-description">{category.description}</p>}
         {!loading && pagination && (
           <p className="archive-count">{pagination.total} post{pagination.total !== 1 ? 's' : ''}</p>

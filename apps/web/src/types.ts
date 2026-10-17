@@ -14,6 +14,7 @@ export interface Category {
   description?: string | null;
   parentId?: number | null;
   icon?: string | null;
+  iconSvg?: string | null;
   showSidebar?: boolean;
   _count?: { posts: number };
 }
@@ -36,6 +37,7 @@ export interface PostSummary {
   publishedAt: string | null;
   updatedAt: string;
   featuredImage: string | null;
+  featuredImageFocus?: string | null;
   template?: string | null;
   isFeatured?: boolean;
   showSidebar?: boolean;
@@ -43,10 +45,41 @@ export interface PostSummary {
   coAuthors: { user: Author }[];
   categories: { category: Category }[];
   tags: { tag: Tag }[];
+  articleType?: 'article' | 'news' | 'review' | 'qna';
+  review?: ReviewSummary | null;
+}
+
+export interface ReviewSummary {
+  subjectType: 'album' | 'ep' | 'single';
+  subjectTitle: string;
+  artist: string;
+  rating: number | null;
+  coverImage: string | null;
+}
+
+export interface ReviewFull extends ReviewSummary {
+  releaseDate: string | null;
+  label: string | null;
+  genre: string | null;
+  verdict: string | null;
+  highlights: string[] | null;
+  tracklist: { title: string; duration?: string | null }[] | null;
+  streaming: Record<string, string> | null;
+}
+
+export interface QnaSession {
+  subject: string;
+  subjectType: 'band' | 'artist' | 'person';
+  sessionDate: string | null;
+  host: string | null;
+  items: { question: string; askedBy?: string | null; answer: string; answeredBy?: string | null }[];
 }
 
 export interface PostFull extends PostSummary {
   content: string;
+  videoUrl?: string | null;
+  review?: ReviewFull | null;
+  qna?: QnaSession | null;
   showToc?: string | null;
   metaTitle: string | null;
   metaDescription: string | null;
@@ -75,6 +108,8 @@ export interface MenuItem {
   title: string;
   url: string | null;
   position: number;
+  icon?: string | null;
+  iconSvg?: string | null;
 }
 
 export interface Menu {
@@ -171,6 +206,8 @@ export interface Celebration {
   day: number;
   year: number | null;
   photo: string | null;
+  photoCredit?: string | null;
+  photoCreditUrl?: string | null;
   message: string | null;
 }
 

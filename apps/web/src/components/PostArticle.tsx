@@ -18,6 +18,13 @@ import { SeriesNav } from './SeriesNav';
 import { Breadcrumb } from './Breadcrumb';
 import { Author, PostFull } from '../types';
 import { readingTime } from '../utils/readingTime';
+import { youtubeId, youtubeStart } from '@headtilts/shared';
+import { postJsonLd, useJsonLd } from '../utils/schema';
+import { ReviewCard } from './ReviewCard';
+import { YouTubePlayer } from './MediaPlayers';
+import { focusStyle } from '../utils/focus';
+import { Tape } from './Tape';
+import { QnaSection } from './QnaSection';
 
 function displayName(author: Author): string {
   const name = [author.firstName, author.lastName].filter(Boolean).join(' ');
@@ -25,7 +32,7 @@ function displayName(author: Author): string {
 }
 
 export function PostArticle({ post }: { post: PostFull }) {
-  const { date_format, time_format, timezone, site_title, site_tagline, site_description, toc_enabled } = useSiteSettings();
+  const { date_format, time_format, timezone, site_title, site_tagline, site_description, toc_enabled, site_logo } = useSiteSettings();
   const { setShowSidebar } = useLayout();
   const articleRef = useRef<HTMLElement>(null);
 
@@ -39,7 +46,8 @@ export function PostArticle({ post }: { post: PostFull }) {
     return list;
   }, [post.author, post.coAuthors]);
 
-  const readMins = useMemo(() => readingTime(post.content ?? ''), [post.content]);
+  // A Q&A's questions and answers are most of what readers read.
+  const readMins = useMemo(() => readingTime((post.content ?? '') + (post.qna?.items ?? []).map((i) => ` ${i.question} ${i.answer}`).join('')), [post.content, post.qna]);
 
   const resolvedContent = useMemo(() => resolveShortcodes(post.content ?? '', {
     siteName: site_title,
@@ -75,6 +83,18 @@ export function PostArticle({ post }: { post: PostFull }) {
   }, [post, site_title]);
 
   const primaryCategory = post.categories[0]?.category ?? null;
+  const review = post.articleType === 'review' ? post.review ?? null : null;
+  const videoId = post.videoUrl ? youtubeId(post.videoUrl) : null;
+  // The review card already shows the cover; don't repeat it as a banner.
+  const showBanner = post.featuredImage && !(review && (!review.coverImage || review.coverImage === post.featuredImage));
+
+  useJsonLd('post-jsonld', postJsonLd(post, {
+    siteTitle: site_title,
+    siteLogo: site_logo,
+    origin: window.location.origin,
+    url: post.canonicalUrl || `${window.location.origin}${window.location.pathname}`,
+    authors: allAuthors,
+  }));
 
   return (
     <>
@@ -86,17 +106,16 @@ export function PostArticle({ post }: { post: PostFull }) {
       <article className="post-full" ref={articleRef}>
       <ReadingProgress targetRef={articleRef} />
 
-      {post.featuredImage && (
-        <img src={resolveMediaUrl(post.featuredImage)} alt={post.title} className="post-featured-img" />
+      {showBanner && (
+        <img src={resolveMediaUrl(post.featuredImage!)} alt={post.title} className="post-featured-img" style={focusStyle(post)} />
       )}
 
       <header className="post-header">
         <div className="post-meta">
-          {post.categories.map(({ category }) => (
-            <Link key={category.id} to={`/categories/${category.slug}`} className="post-cat">
-              {category.name}
-            </Link>
-          ))}
+          {post.articleType === 'news' && <span className="type-badge type-badge--news">News</span>}
+          {review && <span className="type-badge type-badge--review">Review</span>}
+          {post.articleType === 'qna' && <span className="type-badge type-badge--qna">Q&amp;A</span>}
+          {post.categories.map(({ category }) => <Tape key={category.id} category={category} />)}
         </div>
         <h1 className="post-title">{post.title}</h1>
         <div className="post-byline">
@@ -130,6 +149,13 @@ export function PostArticle({ post }: { post: PostFull }) {
         </div>
       </header>
 
+      {review && <ReviewCard review={review} fallbackCover={post.featuredImage} />}
+      {videoId && (
+        <div className="post-featured-video">
+          <YouTubePlayer videoId={videoId} title={post.title} start={youtubeStart(post.videoUrl!)} />
+        </div>
+      )}
+
       <SeriesNav slug={post.slug} />
       {(() => {
         // Per-post override wins; fall back to sitewide toc_enabled (default: show)
@@ -138,6 +164,7 @@ export function PostArticle({ post }: { post: PostFull }) {
         return show ? <TableOfContents html={resolvedContent} /> : null;
       })()}
       <RichContent html={resolvedContent} className="post-content" />
+      {post.articleType === 'qna' && post.qna && <QnaSection qna={post.qna} />}
 
       {post.tags.length > 0 && (
         <footer className="post-tags">

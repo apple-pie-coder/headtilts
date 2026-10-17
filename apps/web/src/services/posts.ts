@@ -76,7 +76,7 @@ export function togglePostReaction(
 
 export interface RelatedPost {
   id: number; title: string; slug: string; publishedAt: string | null;
-  featuredImage: string | null; excerpt: string | null;
+  featuredImage: string | null; featuredImageFocus?: string | null; excerpt: string | null;
 }
 
 export function fetchRelatedPosts(slug: string, limit?: number): Promise<RelatedPost[]> {

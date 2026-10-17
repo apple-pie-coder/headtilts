@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { randomId } from '../utils/id';
 import { createComment, fetchComments, toggleCommentReaction } from '../services/posts';
 import { useSiteSettings } from '../context/SiteSettingsContext';
 import { formatDate } from '../utils/date';
@@ -10,7 +11,7 @@ const AUTHOR_KEY = 'ht_comment_author';
 function getVisitorId(): string {
   let id = localStorage.getItem(VISITOR_KEY);
   if (!id) {
-    id = crypto.randomUUID();
+    id = randomId();
     localStorage.setItem(VISITOR_KEY, id);
   }
   return id;

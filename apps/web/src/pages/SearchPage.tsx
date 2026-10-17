@@ -16,6 +16,7 @@ import {
 import { useSiteSettings } from '../context/SiteSettingsContext';
 import { applySeo, resetSeo } from '../utils/seo';
 import styles from './SearchPage.module.css';
+import { focusStyle } from '../utils/focus';
 
 type ActiveType = SearchType;
 
@@ -35,7 +36,7 @@ function PostCard({ post }: { post: PostResult }) {
     <li className={styles.result}>
       {post.featuredImage && (
         <Link to={`/posts/${post.slug}`} className={styles.thumb}>
-          <img src={resolveMediaUrl(post.featuredImage)} alt={post.title} loading="lazy" />
+          <img src={resolveMediaUrl(post.featuredImage)} alt={post.title} loading="lazy" style={focusStyle(post)} />
         </Link>
       )}
       <div className={styles.info}>
@@ -53,7 +54,7 @@ function PostCard({ post }: { post: PostResult }) {
           {post.categories.length > 0 && (
             <span className={styles.cats}>
               {post.categories.map((c) => (
-                <Link key={c.category.slug} to={`/category/${c.category.slug}`} className={styles.catChip}>
+                <Link key={c.category.slug} to={`/categories/${c.category.slug}`} className={styles.catChip}>
                   {c.category.name}
                 </Link>
               ))}
@@ -83,7 +84,7 @@ function TagCard({ tag }: { tag: TagResult }) {
   return (
     <li className={styles.result}>
       <div className={styles.info}>
-        <Link className={styles.title} to={`/tag/${tag.slug}`}>{tag.name}</Link>
+        <Link className={styles.title} to={`/tags/${tag.slug}`}>{tag.name}</Link>
         {tag.description && <p className={styles.excerpt}>{tag.description}</p>}
         <div className={styles.byline}>
           <span className={styles.typeBadge}>Tag</span>
@@ -98,7 +99,7 @@ function CategoryCard({ cat }: { cat: CategoryResult }) {
   return (
     <li className={styles.result}>
       <div className={styles.info}>
-        <Link className={styles.title} to={`/category/${cat.slug}`}>{cat.name}</Link>
+        <Link className={styles.title} to={`/categories/${cat.slug}`}>{cat.name}</Link>
         {cat.description && <p className={styles.excerpt}>{cat.description}</p>}
         <div className={styles.byline}>
           <span className={styles.typeBadge}>Category</span>

@@ -9,9 +9,11 @@ import { postPath } from '../utils/permalink';
 import { CalendarMonth, PublicWidget, PublicWidgetZone } from '../types';
 import { PollWidget } from './PollWidget';
 import { PollCarousel } from './PollCarousel';
+import { focusStyle } from '../utils/focus';
+import { CategoryIcon } from './CategoryIcon';
 
 interface PostItem { id: number; title: string; slug: string; publishedAt: string | null; excerpt: string | null }
-interface CategoryItem { id: number; name: string; slug: string; _count?: { posts: number } }
+interface CategoryItem { id: number; name: string; slug: string; icon?: string | null; iconSvg?: string | null; _count?: { posts: number } }
 interface TagItem { id: number; name: string; slug: string }
 
 interface FeaturedPostItem {
@@ -21,8 +23,9 @@ interface FeaturedPostItem {
   publishedAt: string | null;
   excerpt: string | null;
   featuredImage: string | null;
+  featuredImageFocus?: string | null;
   isFeatured: boolean;
-  categories: { category: { id: number; name: string; slug: string } }[];
+  categories: { category: { id: number; name: string; slug: string; icon?: string | null; iconSvg?: string | null } }[];
 }
 
 interface CompactPostItem {
@@ -31,6 +34,7 @@ interface CompactPostItem {
   slug: string;
   publishedAt: string | null;
   featuredImage: string | null;
+  featuredImageFocus?: string | null;
 }
 
 function TextWidget({ widget }: { widget: PublicWidget }) {
@@ -94,7 +98,7 @@ function FeaturedCard({ post }: { post: FeaturedPostItem }) {
     <article className="fp-featured-card">
       <Link to={postPath(post)} className="fp-featured-card-image-wrap">
         {post.featuredImage ? (
-          <img src={resolveMediaUrl(post.featuredImage)} alt={post.title} className="fp-featured-card-image" />
+          <img src={resolveMediaUrl(post.featuredImage)} alt={post.title} className="fp-featured-card-image" style={focusStyle(post)} />
         ) : (
           <span className="fp-featured-card-image fp-featured-card-image--placeholder" />
         )}
@@ -163,7 +167,7 @@ function CompactPostsWidget({ widget }: { widget: PublicWidget }) {
             <span className="fp-compact-rank">{idx + 1}</span>
             <Link to={postPath(post)} className="fp-compact-thumb-wrap">
               {post.featuredImage ? (
-                <img src={resolveMediaUrl(post.featuredImage)} alt="" className="fp-compact-thumb" />
+                <img src={resolveMediaUrl(post.featuredImage)} alt="" className="fp-compact-thumb" style={focusStyle(post)} />
               ) : (
                 <span className="fp-compact-thumb fp-compact-thumb--placeholder" />
               )}
@@ -195,7 +199,7 @@ function CategoriesWidget({ widget }: { widget: PublicWidget }) {
       <ul className="widget-list">
         {visible.map((cat) => (
           <li key={cat.id} className="widget-list-row">
-            <Link to={`/categories/${cat.slug}`} className="widget-link">{cat.name}</Link>
+            <Link to={`/categories/${cat.slug}`} className="widget-link"><CategoryIcon icon={cat.icon} iconSvg={cat.iconSvg} />{cat.name}</Link>
             {showCount && cat._count && (
               <span className="widget-count">{cat._count.posts}</span>
             )}

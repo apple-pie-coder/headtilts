@@ -1,64 +1,84 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchPosts } from '../services/posts';
-import { resolveMediaUrl } from '../services/api';
 import { useSiteSettings } from '../context/SiteSettingsContext';
-import { formatDate } from '../utils/date';
-import { authorName } from './PostCard';
+import { formatDate, timeAgo } from '../utils/date';
 import { PostSummary } from '../types';
 import { postPath } from '../utils/permalink';
+import { authorName, plain, StoryImage } from './PostCard';
+import { Tape } from './Tape';
 
-function HeroSlide({ post, variant }: { post: PostSummary; variant: 'big' | 'small' }) {
+/** Ids shown in the lead block, so the feed below can skip them. */
+export type LeadIds = Set<number>;
+
+/**
+ * Front page lead: the newest featured story, big, beside a rail of headlines.
+ * The rail lists the other featured stories when there are some, otherwise the
+ * latest stories — so the block is never empty while anything is published.
+ */
+export function FrontPageHero({ onShown }: { onShown?: (ids: LeadIds) => void }) {
   const { date_format, timezone } = useSiteSettings();
-  const TitleTag = variant === 'big' ? 'h1' : 'h3';
-  return (
-    <Link to={postPath(post)} className={`fph-slide fph-slide--${variant}`}>
-      {post.featuredImage ? (
-        <img src={resolveMediaUrl(post.featuredImage)} alt="" className="fph-slide-image" />
-      ) : (
-        <span className="fph-slide-image fph-slide-image--placeholder" />
-      )}
-      <div className="fph-slide-overlay" />
-      <div className="fph-slide-content">
-        {post.categories[0] && (
-          <span className="fph-slide-cat">{post.categories[0].category.name}</span>
-        )}
-        <TitleTag className="fph-slide-title">{post.title}</TitleTag>
-        {variant === 'big' && post.excerpt && <p className="fph-slide-excerpt">{post.excerpt}</p>}
-        <div className="fph-slide-meta">
-          {post.publishedAt && <span>{formatDate(post.publishedAt, date_format, timezone)}</span>}
-          {variant === 'big' && post.author && <span> · {authorName(post)}</span>}
-        </div>
-      </div>
-    </Link>
-  );
-}
+  const [lead, setLead] = useState<PostSummary | null>(null);
+  const [rail, setRail] = useState<PostSummary[]>([]);
+  const [railTitle, setRailTitle] = useState('Latest');
 
-export function FrontPageHero() {
-  const [posts, setPosts] = useState<PostSummary[] | null>(null);
-
-  // Featured posts (curated in Admin → Posts → Featured), newest first, capped at 5:
-  // the first is shown large, the rest as a 4-up row below.
   useEffect(() => {
     let cancelled = false;
-    fetchPosts({ featured: true, limit: 5 })
-      .then((res) => { if (!cancelled) setPosts(res.items); })
-      .catch(() => { if (!cancelled) setPosts([]); });
+    Promise.all([fetchPosts({ featured: true, limit: 5 }), fetchPosts({ featured: false, limit: 6 })])
+      .then(([featured, latest]) => {
+        if (cancelled) return;
+        const top = featured.items[0] ?? latest.items[0] ?? null;
+        const more = featured.items.length >= 2 ? featured.items.slice(1, 5) : latest.items.filter((p) => p.id !== top?.id).slice(0, 5);
+        setLead(top);
+        setRail(more);
+        setRailTitle(featured.items.length >= 2 ? 'Featured' : 'Latest');
+        onShown?.(new Set([top?.id, ...more.map((p) => p.id)].filter((id): id is number => id != null)));
+      })
+      .catch(() => { if (!cancelled) onShown?.(new Set()); });
     return () => { cancelled = true; };
   }, []);
 
-  if (!posts || posts.length === 0) return null;
+  if (!lead) return <div className="lead lead--loading" aria-hidden="true" />;
 
-  const [big, ...rest] = posts;
-  const small = rest.slice(0, 4);
-
+  const cat = lead.categories[0]?.category;
+  const href = postPath(lead);
   return (
-    <section className="fph-hero">
-      <HeroSlide post={big} variant="big" />
-      {small.length > 0 && (
-        <div className="fph-small-grid">
-          {small.map((post) => <HeroSlide key={post.id} post={post} variant="small" />)}
+    <section className="lead" aria-label="Top stories">
+      <article className="lead-story">
+        <Link to={href} className="lead-media" tabIndex={-1} aria-hidden="true">
+          <StoryImage post={lead} className="story-media--lead" />
+        </Link>
+        <div className="lead-body">
+          {cat && <Tape category={cat} />}
+          <h1 className="lead-title"><Link to={href}>{lead.title}</Link></h1>
+          {lead.excerpt && <p className="lead-excerpt">{plain(lead.excerpt)}</p>}
+          <p className="story-byline">
+            {authorName(lead) && <span className="story-author">{authorName(lead)}</span>}
+            {lead.publishedAt && <time dateTime={lead.publishedAt}>{formatDate(lead.publishedAt, date_format, timezone)}</time>}
+          </p>
         </div>
+      </article>
+
+      {rail.length > 0 && (
+        <aside className="lead-rail" aria-labelledby="lead-rail-title">
+          <h2 id="lead-rail-title" className="rail-title">{railTitle}</h2>
+          <ol className="rail-list">
+            {rail.map((p) => (
+              <li key={p.id} className="rail-item">
+                <Link to={postPath(p)} className="rail-link">
+                  <span className="rail-text">
+                    <span className="rail-headline">{p.title}</span>
+                    <span className="rail-meta">
+                      {p.categories[0]?.category.name}
+                      {p.publishedAt && <time dateTime={p.publishedAt}>{timeAgo(p.publishedAt)}</time>}
+                    </span>
+                  </span>
+                  <StoryImage post={p} className="story-media--thumb" />
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </aside>
       )}
     </section>
   );

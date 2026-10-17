@@ -5,6 +5,7 @@ import { faMagnifyingGlass, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { searchAll, SearchGrouped } from '../services/search';
 import { resolveMediaUrl } from '../services/api';
 import styles from './SearchBar.module.css';
+import { focusStyle } from '../utils/focus';
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -152,6 +153,7 @@ export function SearchBar() {
                           src={resolveMediaUrl(post.featuredImage)}
                           alt=""
                           className={styles.thumb}
+                          style={focusStyle(post)}
                         />
                       )}
                       <span className={styles.itemContent}>
@@ -194,7 +196,7 @@ export function SearchBar() {
                         key={tag.id}
                         type="button"
                         className={styles.pill}
-                        onClick={() => closeAndNav(`/tag/${tag.slug}`)}
+                        onClick={() => closeAndNav(`/tags/${tag.slug}`)}
                       >
                         {tag.name}
                       </button>
@@ -212,7 +214,7 @@ export function SearchBar() {
                         key={cat.id}
                         type="button"
                         className={styles.pill}
-                        onClick={() => closeAndNav(`/category/${cat.slug}`)}
+                        onClick={() => closeAndNav(`/categories/${cat.slug}`)}
                       >
                         {cat.name}
                       </button>

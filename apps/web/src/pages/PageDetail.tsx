@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import { fetchPage } from '../services/posts';
 import { PostFull } from '../types';
+import { LoadError } from '../components/LoadError';
 import { useLayout, templateToVariant } from '../context/LayoutContext';
 import { useSiteSettings } from '../context/SiteSettingsContext';
 import { ContactForm } from '../components/ContactForm';
@@ -22,7 +21,7 @@ export function PageDetailPage() {
 export function PageDetail({ slug }: { slug: string }) {
   const [page, setPage] = useState<PostFull | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<unknown>(null);
   const { setVariant, setShowSidebar } = useLayout();
   const { posts_page_slug, site_title, site_tagline, site_description, date_format, timezone } = useSiteSettings();
 
@@ -35,7 +34,7 @@ export function PageDetail({ slug }: { slug: string }) {
         setVariant(templateToVariant(p.template));
         setShowSidebar(Boolean(p.showSidebar));
       })
-      .catch((err: Error) => setError(err.message))
+      .catch(setError)
       .finally(() => setLoading(false));
 
     return () => {
@@ -72,13 +71,7 @@ export function PageDetail({ slug }: { slug: string }) {
   }, [page, site_title]);
 
   if (loading) return <div className="loading-msg">Loading…</div>;
-  if (error || !page) return (
-    <div className="error-page">
-      <h1>Page Not Found</h1>
-      <p>{error || 'This page does not exist.'}</p>
-      <Link to="/" className="back-link"><FontAwesomeIcon icon={faArrowLeft} /> Back to home</Link>
-    </div>
-  );
+  if (error || !page) return <LoadError error={error} what="Page" />;
 
   // If this page is designated as the "Posts page" (Settings → Reading), show the
   // blog post listing instead of the page's own content — mirrors WordPress behavior.
