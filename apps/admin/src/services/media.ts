@@ -33,11 +33,14 @@ export async function fetchUploadConfig(): Promise<UploadConfig> {
   return response.data.data;
 }
 
+export type MediaSort = 'newest' | 'oldest' | 'name' | 'largest';
+
 export async function fetchMedia(
   page: number,
   limit: number,
   search?: string,
   folderId?: number | null,
+  sort?: MediaSort,
 ): Promise<PaginatedResponse<Media>> {
   const response = await apiClient.get('/media', {
     params: {
@@ -45,6 +48,7 @@ export async function fetchMedia(
       limit,
       search: search || undefined,
       folderId: folderId === null ? 'null' : folderId,
+      sort: sort && sort !== 'newest' ? sort : undefined,
     },
   });
   return response.data.data;
@@ -131,6 +135,15 @@ export async function createFolder(name: string): Promise<MediaFolder> {
 
 export async function deleteFolder(id: number): Promise<void> {
   await apiClient.delete(`/media/folders/${id}`);
+}
+
+export async function renameFolder(id: number, name: string): Promise<MediaFolder> {
+  return (await apiClient.put(`/media/folders/${id}`, { name })).data.data;
+}
+
+/** Totals for "All media" and "Unfiled". */
+export async function fetchMediaCounts(): Promise<{ all: number; unfiled: number }> {
+  return (await apiClient.get('/media/counts')).data.data;
 }
 
 export async function fetchMediaUsage(id: number): Promise<{ count: number; posts: { id: number; title: string; slug: string; status: string; type: string }[] }> {

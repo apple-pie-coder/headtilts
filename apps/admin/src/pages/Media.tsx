@@ -4,25 +4,34 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faTableCellsLarge, faList, faPlus, faUpload, faCopy, faTrashCan, faFolderOpen, faCheck, faChevronLeft,
   faChevronRight, faTriangleExclamation, faArrowUpRightFromSquare, faXmark, faCloudArrowUp,
+  faFolder, faImages, faInbox, faPen,
 } from '@fortawesome/free-solid-svg-icons';
 import { PERMISSIONS } from '@headtilts/shared';
 import { AdminLayout } from '../components/AdminLayout';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/ToastContext';
-import { MediaGrid } from '../components/MediaGrid';
-import { BulkBar, Button, Kbd, PageHeader, SearchInput } from '../components/ui';
+import { MEDIA_DRAG_TYPE, MediaGrid } from '../components/MediaGrid';
+import { BulkBar, Button, Kbd, PageHeader, RowMenu, SearchInput } from '../components/ui';
 import { useAuth } from '../hooks/useAuth';
 import { useHotkeys, isTypingTarget } from '../hooks/useHotkeys';
 import { useUrlState } from '../hooks/useUrlState';
 import { Media, MediaFolder } from '../types';
 import {
-  bulkDeleteMedia, createFolder, deleteFolder, deleteMedia, fetchFolders, fetchMedia,
-  fetchUploadConfig, fetchMediaUsage, replaceMedia, resolveMediaUrl, updateMedia, uploadMediaBatch, UploadConfig,
+  bulkDeleteMedia, createFolder, deleteFolder, deleteMedia, fetchFolders, fetchMedia, fetchMediaCounts, MediaSort,
+  fetchUploadConfig, fetchMediaUsage, renameFolder, replaceMedia, resolveMediaUrl, updateMedia, uploadMediaBatch, UploadConfig,
 } from '../services/media';
 import styles from './Media.module.css';
 
-const PAGE_SIZE = 24;
+// Enough to fill a wide screen at medium size without endless paging.
+const PAGE_SIZE = 60;
 const VIEW_KEY = 'mediaView';
+const SIZE_KEY = 'mediaTileSize';
+const SORTS: { value: MediaSort; label: string }[] = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'name', label: 'Name A–Z' },
+  { value: 'largest', label: 'Largest first' },
+];
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -51,7 +60,8 @@ export default function MediaPage() {
   const canDelete = hasPermission(PERMISSIONS.MEDIA_DELETE);
 
   // Folder, search and page live in the URL so links and the back button work.
-  const [q, setQ] = useUrlState({ folder: 'all', search: '', page: '1' });
+  const [q, setQ] = useUrlState({ folder: 'all', search: '', page: '1', sort: 'newest' });
+  const sort = (SORTS.some((o) => o.value === q.sort) ? q.sort : 'newest') as MediaSort;
   const page = Math.max(1, Number(q.page) || 1);
   const folderFilter: FolderFilter = q.folder === 'all' ? 'all' : q.folder === 'unfiled' ? null : Number(q.folder);
   const setPage = (p: number) => setQ({ page: String(p) });
@@ -64,6 +74,13 @@ export default function MediaPage() {
     try { return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'gallery'; } catch { return 'gallery'; }
   });
   const [config, setConfig] = useState<UploadConfig | null>(null);
+  const [tileSize, setTileSizeState] = useState<'s' | 'm' | 'l'>(() => {
+    try { const v = localStorage.getItem(SIZE_KEY); return v === 's' || v === 'l' ? v : 'm'; } catch { return 'm'; }
+  });
+  const setTileSize = (v: 's' | 'm' | 'l') => { setTileSizeState(v); try { localStorage.setItem(SIZE_KEY, v); } catch { /* ignore */ } };
+  const [counts, setCounts] = useState<{ all: number; unfiled: number } | null>(null);
+  const [renaming, setRenaming] = useState<{ id: number; name: string } | null>(null);
+  const [dropTarget, setDropTarget] = useState<'unfiled' | number | null>(null);
 
   // Folders
   const [folders, setFolders] = useState<MediaFolder[]>([]);
@@ -105,7 +122,7 @@ export default function MediaPage() {
     setLoading(true);
     try {
       const folderId = folderFilter === 'all' ? undefined : folderFilter;
-      const result = await fetchMedia(page, PAGE_SIZE, q.search, folderId);
+      const result = await fetchMedia(page, PAGE_SIZE, q.search, folderId, sort);
       if (id !== reqId.current) return;
       setItems(result.items);
       setTotal(result.pagination.total);
@@ -114,7 +131,7 @@ export default function MediaPage() {
     } finally {
       if (id === reqId.current) setLoading(false);
     }
-  }, [page, q.search, q.folder]);
+  }, [page, q.search, q.folder, sort]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -142,6 +159,7 @@ export default function MediaPage() {
     } catch {
       setFolders([]);
     }
+    fetchMediaCounts().then(setCounts).catch(() => {});
   }
 
   // ── Client-side pre-checks ──
@@ -210,6 +228,27 @@ export default function MediaPage() {
     if (files.length) handleUpload(files);
   }
 
+  // Files from the computer (not library files being dragged to a folder).
+  const isFileDrag = (e: DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
+  const isMediaDrag = (e: DragEvent) => Array.from(e.dataTransfer.types).includes(MEDIA_DRAG_TYPE);
+
+  /** Drag a file (or the current selection) from the grid onto a folder. */
+  function dropTargetProps(target: 'unfiled' | number) {
+    return {
+      onDragOver: (e: DragEvent) => { if (canUpload && isMediaDrag(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropTarget(target); } },
+      onDragLeave: (e: DragEvent) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropTarget(null); },
+      onDrop: (e: DragEvent) => {
+        setDropTarget(null);
+        if (!isMediaDrag(e)) return;
+        e.preventDefault();
+        try {
+          const ids = JSON.parse(e.dataTransfer.getData(MEDIA_DRAG_TYPE)) as number[];
+          moveFiles(ids, target === 'unfiled' ? null : target);
+        } catch { /* not ours */ }
+      },
+    };
+  }
+
   // Paste an image from the clipboard (e.g. a screenshot) to upload it.
   useEffect(() => {
     function onPaste(e: ClipboardEvent) {
@@ -262,21 +301,42 @@ export default function MediaPage() {
     }
   }
 
-  async function handleBulkMove(value: string) {
-    if (selectedIds.size === 0) return;
-    const folderId = value === 'unfiled' ? null : Number(value);
+  async function moveFiles(ids: number[], folderId: number | null) {
+    const moving = ids.filter((id) => (items.find((m) => m.id === id)?.folderId ?? null) !== folderId);
     const name = folderId === null ? 'Unfiled' : folders.find((f) => f.id === folderId)?.name ?? 'folder';
+    if (moving.length === 0) { toast.info(`Already in ${name}`); return; }
     setBulkBusy(true);
     try {
-      await Promise.all(Array.from(selectedIds).map((id) => updateMedia(id, { folderId })));
-      toast.success(`Moved ${selectedIds.size} file${selectedIds.size === 1 ? '' : 's'} to ${name}`);
-      exitSelectMode();
+      await Promise.all(moving.map((id) => updateMedia(id, { folderId })));
+      toast.success(`Moved ${moving.length} file${moving.length === 1 ? '' : 's'} to ${name}`);
+      if (selectMode) exitSelectMode();
+      if (selected && moving.includes(selected.id)) setSelected({ ...selected, folderId });
       await load();
       await refreshFolders();
     } catch (err: unknown) {
       toast.error(errMsg(err, 'Failed to move files'));
     } finally {
       setBulkBusy(false);
+    }
+  }
+
+  async function handleBulkMove(value: string) {
+    if (selectedIds.size === 0) return;
+    await moveFiles(Array.from(selectedIds), value === 'unfiled' ? null : Number(value));
+  }
+
+  async function handleRenameFolder() {
+    if (!renaming) return;
+    const name = renaming.name.trim();
+    const current = folders.find((f) => f.id === renaming.id);
+    if (!name || name === current?.name) { setRenaming(null); return; }
+    try {
+      await renameFolder(renaming.id, name);
+      setRenaming(null);
+      await refreshFolders();
+      toast.success('Folder renamed');
+    } catch (err: unknown) {
+      toast.error(errMsg(err, 'Failed to rename folder'));
     }
   }
 
@@ -440,7 +500,7 @@ export default function MediaPage() {
     <AdminLayout>
       <PageHeader
         title="Media library"
-        subtitle={<>{total} file{total === 1 ? '' : 's'} in {currentFolderName}{canUpload && <> · drop, paste or press <Kbd>U</Kbd> to upload</>}</>}
+        subtitle={canUpload ? <>Drop files anywhere on the grid, paste a screenshot, or press <Kbd>U</Kbd> to upload</> : 'Images and files used across the site'}
         actions={canUpload && (
           <Button variant="primary" icon={faUpload} kbd="U" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
             {uploading ? `Uploading ${progress}%` : 'Upload'}
@@ -449,228 +509,269 @@ export default function MediaPage() {
       />
       <input ref={fileInputRef} type="file" accept={acceptAttr} multiple onChange={handleFileInputChange} hidden />
 
-      <div className={styles.shell}>
-        {/* Folder sidebar */}
+      <div className={`${styles.workspace} ${selected ? styles.withDetails : ''}`}>
+        {/* Folders */}
         <aside className={styles.folders} aria-label="Folders">
-          <button type="button" className={folderTabClass('all')} onClick={() => setFolderFilter('all')}>
-            All media
+          <p className={styles.folderHeading}>Library</p>
+          <button type="button" className={folderTabClass('all')} onClick={() => setFolderFilter('all')} aria-current={folderFilter === 'all' ? 'true' : undefined}>
+            <FontAwesomeIcon icon={faImages} className={styles.folderIcon} />
+            <span className={styles.folderName}>All media</span>
+            {counts && <span className={styles.folderCount}>{counts.all}</span>}
           </button>
-          <button type="button" className={folderTabClass(null)} onClick={() => setFolderFilter(null)}>
-            Unfiled
+          <button type="button" className={`${folderTabClass(null)} ${dropTarget === 'unfiled' ? styles.folderDrop : ''}`} onClick={() => setFolderFilter(null)}
+            aria-current={folderFilter === null ? 'true' : undefined} {...dropTargetProps('unfiled')}>
+            <FontAwesomeIcon icon={faInbox} className={styles.folderIcon} />
+            <span className={styles.folderName}>Unfiled</span>
+            {counts && <span className={styles.folderCount}>{counts.unfiled}</span>}
           </button>
-          <div className={styles.folderDivider} />
-          {folders.map((f) => (
-            <div key={f.id} className={styles.folderRow}>
-              <button type="button" className={folderTabClass(f.id)} onClick={() => setFolderFilter(f.id)}>
-                <FontAwesomeIcon icon={faFolderOpen} className={styles.folderIcon} />
-                {f.name} {typeof f.count === 'number' && <span className={styles.folderCount}>{f.count}</span>}
+
+          <div className={styles.folderHeadingRow}>
+            <p className={styles.folderHeading}>Folders</p>
+            {canUpload && (
+              <button type="button" className={styles.folderPlus} onClick={() => setShowNewFolder(true)} aria-label="New folder" title="New folder">
+                <FontAwesomeIcon icon={faPlus} />
               </button>
-              {canDelete && (
-                <button type="button" className={styles.folderDelete} title={`Delete folder ${f.name}`} aria-label={`Delete folder ${f.name}`} onClick={() => handleDeleteFolder(f)}>
-                  <FontAwesomeIcon icon={faXmark} />
-                </button>
-              )}
-            </div>
-          ))}
-          {canUpload && (
-            showNewFolder ? (
-              <form
-                className={styles.folderForm}
-                onSubmit={(e) => { e.preventDefault(); handleCreateFolder(); }}
-              >
+            )}
+          </div>
+          {folders.length === 0 && !showNewFolder && <p className={styles.folderEmpty}>No folders yet.</p>}
+          {folders.map((f) => (
+            renaming?.id === f.id ? (
+              <form key={f.id} className={styles.folderForm} onSubmit={(e) => { e.preventDefault(); handleRenameFolder(); }}>
                 <input
                   type="text"
                   autoFocus
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  placeholder="Folder name"
-                  onKeyDown={(e) => { if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderName(''); } }}
+                  value={renaming.name}
+                  onChange={(e) => setRenaming({ ...renaming, name: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === 'Escape') setRenaming(null); }}
+                  onBlur={handleRenameFolder}
+                  aria-label={`Rename folder ${f.name}`}
                 />
-                <button type="submit" disabled={!newFolderName.trim()}>Add</button>
+                <button type="submit">Save</button>
               </form>
             ) : (
-              <button type="button" className={styles.folderAdd} onClick={() => setShowNewFolder(true)}><FontAwesomeIcon icon={faPlus} /> New folder</button>
-            )
-          )}
-        </aside>
-
-        <div className={styles.layout}>
-          <div className={styles.libraryColumn}>
-            <div className={styles.toolbar}>
-              <SearchInput value={q.search} onChange={(search) => setQ({ search })} placeholder="Search files" />
-              <div className={styles.toolbarRight}>
-                <div className={styles.viewToggle} role="group" aria-label="View">
-                  <button type="button" className={`${styles.viewButton} ${view === 'gallery' ? styles.viewButtonActive : ''}`} onClick={() => setView('gallery')} title="Gallery view" aria-pressed={view === 'gallery'}><FontAwesomeIcon icon={faTableCellsLarge} /></button>
-                  <button type="button" className={`${styles.viewButton} ${view === 'list' ? styles.viewButtonActive : ''}`} onClick={() => setView('list')} title="List view" aria-pressed={view === 'list'}><FontAwesomeIcon icon={faList} /></button>
-                </div>
-                {(canDelete || canUpload) && (
-                  <Button size="sm" variant={selectMode ? 'primary' : 'secondary'} icon={faCheck} onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}>
-                    {selectMode ? 'Done' : 'Select'}
-                  </Button>
+              <div key={f.id} className={`${styles.folderRow} ${dropTarget === f.id ? styles.folderDrop : ''}`} {...dropTargetProps(f.id)}>
+                <button type="button" className={folderTabClass(f.id)} onClick={() => setFolderFilter(f.id)} aria-current={folderFilter === f.id ? 'true' : undefined}>
+                  <FontAwesomeIcon icon={folderFilter === f.id ? faFolderOpen : faFolder} className={styles.folderIcon} />
+                  <span className={styles.folderName}>{f.name}</span>
+                  {typeof f.count === 'number' && <span className={styles.folderCount}>{f.count}</span>}
+                </button>
+                {(canUpload || canDelete) && (
+                  <span className={styles.folderMenu}>
+                    <RowMenu label={`Actions for folder ${f.name}`} items={[
+                      { label: 'Rename', icon: faPen, onClick: () => setRenaming({ id: f.id, name: f.name }), hidden: !canUpload },
+                      { label: 'Delete folder', icon: faTrashCan, danger: true, onClick: () => handleDeleteFolder(f), hidden: !canDelete },
+                    ]} />
+                  </span>
                 )}
               </div>
+            )
+          ))}
+          {canUpload && showNewFolder && (
+            <form className={styles.folderForm} onSubmit={(e) => { e.preventDefault(); handleCreateFolder(); }}>
+              <input
+                type="text"
+                autoFocus
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                placeholder="Folder name"
+                aria-label="New folder name"
+                onKeyDown={(e) => { if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderName(''); } }}
+              />
+              <button type="submit" disabled={!newFolderName.trim()}>Add</button>
+            </form>
+          )}
+          {canUpload && folders.length > 0 && <p className={styles.folderTip}>Drag files onto a folder to move them.</p>}
+        </aside>
+
+        {/* Library */}
+        <section className={styles.library} aria-label={currentFolderName}>
+          <div className={styles.libHead}>
+            <div className={styles.libTitle}>
+              <h2>{currentFolderName}</h2>
+              <span>{total} file{total === 1 ? '' : 's'}{q.search && <> matching “{q.search}”</>}</span>
+            </div>
+            {(canDelete || canUpload) && (
+              <Button size="sm" variant={selectMode ? 'primary' : 'secondary'} icon={faCheck} onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}>
+                {selectMode ? 'Done' : 'Select'}
+              </Button>
+            )}
+            <div className={styles.libControls}>
+              <SearchInput value={q.search} onChange={(search) => setQ({ search, page: '1' })} placeholder="Search files" />
+              <select className={styles.sortSelect} value={sort} onChange={(e) => setQ({ sort: e.target.value, page: '1' })} aria-label="Sort files">
+                {SORTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              {view === 'gallery' && (
+                <div className={styles.viewToggle} role="group" aria-label="Thumbnail size">
+                  {(['s', 'm', 'l'] as const).map((sz) => (
+                    <button key={sz} type="button" className={`${styles.viewButton} ${styles.sizeButton} ${tileSize === sz ? styles.viewButtonActive : ''}`}
+                      onClick={() => setTileSize(sz)} aria-pressed={tileSize === sz} title={{ s: 'Small', m: 'Medium', l: 'Large' }[sz] + ' thumbnails'}>
+                      <span className={styles[`size_${sz}`]} aria-hidden="true" />
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className={styles.viewToggle} role="group" aria-label="View">
+                <button type="button" className={`${styles.viewButton} ${view === 'gallery' ? styles.viewButtonActive : ''}`} onClick={() => setView('gallery')} title="Gallery view" aria-pressed={view === 'gallery'}><FontAwesomeIcon icon={faTableCellsLarge} /></button>
+                <button type="button" className={`${styles.viewButton} ${view === 'list' ? styles.viewButtonActive : ''}`} onClick={() => setView('list')} title="List view" aria-pressed={view === 'list'}><FontAwesomeIcon icon={faList} /></button>
+              </div>
+            </div>
+          </div>
+
+          {uploading && (
+            <div className={styles.progressTrack} role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+              <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+            </div>
+          )}
+
+          {/* Drop files from the computer anywhere on the grid to upload */}
+          <div
+            className={`${styles.gridCard} ${dragActive ? styles.dropActive : ''}`}
+            onDragOver={(e) => { if (isFileDrag(e)) { e.preventDefault(); if (canUpload && !uploading) setDragActive(true); } }}
+            onDragLeave={(e) => {
+              // Ignore leave events fired when moving over child elements.
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragActive(false);
+            }}
+            onDrop={(e) => { if (isFileDrag(e)) handleDrop(e); }}
+          >
+            {dragActive && (
+              <div className={styles.dropHint}>
+                <FontAwesomeIcon icon={faCloudArrowUp} />
+                Drop to upload to {typeof folderFilter === 'number' ? currentFolderName : 'the library'}
+              </div>
+            )}
+            {!loading && items.length === 0 && !q.search && canUpload ? (
+              <button type="button" className={styles.emptyDrop} onClick={() => fileInputRef.current?.click()}>
+                <FontAwesomeIcon icon={faCloudArrowUp} />
+                <strong>No files here yet</strong>
+                <span>Drag files here, paste a screenshot, or click to browse</span>
+              </button>
+            ) : (
+              <MediaGrid
+                items={items}
+                selectedId={selected?.id}
+                loading={loading}
+                page={page}
+                pages={pages}
+                view={view}
+                size={tileSize}
+                onSelect={setSelected}
+                onPageChange={setPage}
+                selectable={selectMode}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                dragIds={canUpload ? (item) => (selectedIds.has(item.id) ? Array.from(selectedIds) : [item.id]) : undefined}
+              />
+            )}
+          </div>
+        </section>
+
+        {/* Details — only while a file is open, so the grid gets the room otherwise */}
+        {selected && (
+          <aside className={styles.details} aria-label="File details">
+            <div className={styles.detailsCard}>
+            <div className={styles.detailsNav}>
+              <button type="button" className={styles.navBtn} disabled={selIdx <= 0} onClick={() => setSelected(items[selIdx - 1])} aria-label="Previous file" title="Previous (←)">
+                <FontAwesomeIcon icon={faChevronLeft} />
+              </button>
+              <span className={styles.detailsName} title={selected.originalName}>{selected.originalName}</span>
+              <button type="button" className={styles.navBtn} disabled={selIdx < 0 || selIdx >= items.length - 1} onClick={() => setSelected(items[selIdx + 1])} aria-label="Next file" title="Next (→)">
+                <FontAwesomeIcon icon={faChevronRight} />
+              </button>
+              <button type="button" className={styles.navBtn} onClick={() => setSelected(null)} aria-label="Close details" title="Close (Esc)">
+                <FontAwesomeIcon icon={faXmark} />
+              </button>
             </div>
 
-            {uploading && (
-              <div className={styles.progressTrack} role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
-                <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+            <div className={styles.preview}>
+              {isImage ? (
+                <img src={resolveMediaUrl(selected.url)} alt={selected.altText || selected.originalName} />
+              ) : (
+                <div className={styles.previewFile}>{selected.mimeType}</div>
+              )}
+            </div>
+
+            <div className={styles.quickRow}>
+              <Button size="sm" icon={faCopy} onClick={copyUrl}>Copy URL</Button>
+              <a className={styles.quickLink} href={resolveMediaUrl(selected.originalUrl || selected.url)} target="_blank" rel="noreferrer">
+                <FontAwesomeIcon icon={faArrowUpRightFromSquare} /> Open original
+              </a>
+            </div>
+
+            <ul className={styles.metaList}>
+              <li><span>Type</span><span>{selected.mimeType}</span></li>
+              <li><span>Size</span><span>{formatSize(selected.size)}</span></li>
+              {selected.width && selected.height && (
+                <li><span>Dimensions</span><span>{selected.width} × {selected.height} px</span></li>
+              )}
+              <li><span>Uploaded by</span><span>{uploaderName}</span></li>
+              <li><span>Uploaded</span><span>{formatDate(selected.createdAt)}</span></li>
+            </ul>
+
+            {usageCount !== null && (
+              <div className={usageCount > 0 ? styles.usageWarn : styles.usageOk}>
+                {usageCount > 0
+                  ? `Used in ${usageCount} post${usageCount !== 1 ? 's' : ''} — deleting it will break those images`
+                  : 'Not used in any posts'}
               </div>
             )}
 
-            {/* Drag-and-drop zone wraps the grid */}
-            <div
-              className={`${styles.gridCard} ${dragActive ? styles.dropActive : ''}`}
-              onDragOver={(e) => { e.preventDefault(); if (canUpload && !uploading) setDragActive(true); }}
-              onDragLeave={(e) => {
-                // Ignore leave events fired when moving over child elements.
-                if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragActive(false);
-              }}
-              onDrop={handleDrop}
-            >
-              {dragActive && (
-                <div className={styles.dropHint}>
-                  <FontAwesomeIcon icon={faCloudArrowUp} />
-                  Drop to upload to {typeof folderFilter === 'number' ? currentFolderName : 'the library'}
-                </div>
-              )}
-              {!loading && items.length === 0 && !q.search && canUpload ? (
-                <button type="button" className={styles.emptyDrop} onClick={() => fileInputRef.current?.click()}>
-                  <FontAwesomeIcon icon={faCloudArrowUp} />
-                  <strong>No files here yet</strong>
-                  <span>Drag files here, paste a screenshot, or click to browse</span>
-                </button>
-              ) : (
-                <MediaGrid
-                  items={items}
-                  selectedId={selected?.id}
-                  loading={loading}
-                  page={page}
-                  pages={pages}
-                  view={view}
-                  onSelect={setSelected}
-                  onPageChange={setPage}
-                  selectable={selectMode}
-                  selectedIds={selectedIds}
-                  onToggleSelect={toggleSelect}
-                />
-              )}
-            </div>
-          </div>
-
-          <div className={styles.detailsColumn}>
-            <div className={styles.detailsCard}>
-              {!selected ? (
-                <div className={styles.placeholder}>
-                  Select a file to see its details.
-                  {items.length > 0 && <span className={styles.placeholderHint}><Kbd>←</Kbd> <Kbd>→</Kbd> step through files</span>}
-                </div>
-              ) : (
-                <>
-                  <div className={styles.detailsNav}>
-                    <button type="button" className={styles.navBtn} disabled={selIdx <= 0} onClick={() => setSelected(items[selIdx - 1])} aria-label="Previous file" title="Previous (←)">
-                      <FontAwesomeIcon icon={faChevronLeft} />
-                    </button>
-                    <span className={styles.detailsName} title={selected.originalName}>{selected.originalName}</span>
-                    <button type="button" className={styles.navBtn} disabled={selIdx < 0 || selIdx >= items.length - 1} onClick={() => setSelected(items[selIdx + 1])} aria-label="Next file" title="Next (→)">
-                      <FontAwesomeIcon icon={faChevronRight} />
-                    </button>
-                    <button type="button" className={styles.navBtn} onClick={() => setSelected(null)} aria-label="Close details" title="Close (Esc)">
-                      <FontAwesomeIcon icon={faXmark} />
-                    </button>
-                  </div>
-
-                  <div className={styles.preview}>
-                    {isImage ? (
-                      <img src={resolveMediaUrl(selected.url)} alt={selected.altText || selected.originalName} />
-                    ) : (
-                      <div className={styles.previewFile}>{selected.mimeType}</div>
-                    )}
-                  </div>
-
-                  <div className={styles.quickRow}>
-                    <Button size="sm" icon={faCopy} onClick={copyUrl}>Copy URL</Button>
-                    <a className={styles.quickLink} href={resolveMediaUrl(selected.originalUrl || selected.url)} target="_blank" rel="noreferrer">
-                      <FontAwesomeIcon icon={faArrowUpRightFromSquare} /> Open original
-                    </a>
-                  </div>
-
-                  <ul className={styles.metaList}>
-                    <li><span>Type</span><span>{selected.mimeType}</span></li>
-                    <li><span>Size</span><span>{formatSize(selected.size)}</span></li>
-                    {selected.width && selected.height && (
-                      <li><span>Dimensions</span><span>{selected.width} × {selected.height} px</span></li>
-                    )}
-                    <li><span>Uploaded by</span><span>{uploaderName}</span></li>
-                    <li><span>Uploaded</span><span>{formatDate(selected.createdAt)}</span></li>
-                  </ul>
-
-                  {usageCount !== null && (
-                    <div className={usageCount > 0 ? styles.usageWarn : styles.usageOk}>
-                      {usageCount > 0
-                        ? `Used in ${usageCount} post${usageCount !== 1 ? 's' : ''} — deleting it will break those images`
-                        : 'Not used in any posts'}
-                    </div>
+            <form onSubmit={(e) => { e.preventDefault(); handleSaveMeta(); }}>
+              <div className={styles.formGroup}>
+                <label htmlFor="media-alt">
+                  Alt text
+                  {isImage && !meta.altText && (
+                    <span className={styles.altWarn}><FontAwesomeIcon icon={faTriangleExclamation} /> missing</span>
                   )}
+                </label>
+                <input id="media-alt" type="text" value={meta.altText} placeholder="Describe the image for screen readers and SEO" onChange={(e) => setMeta({ ...meta, altText: e.target.value })} disabled={!canUpload || saving} />
+              </div>
+              <div className={styles.formGroup}>
+                <label htmlFor="media-title">Title</label>
+                <input id="media-title" type="text" value={meta.title} onChange={(e) => setMeta({ ...meta, title: e.target.value })} disabled={!canUpload || saving} />
+              </div>
+              <div className={styles.formGroup}>
+                <label htmlFor="media-caption">Caption</label>
+                <input id="media-caption" type="text" value={meta.caption} onChange={(e) => setMeta({ ...meta, caption: e.target.value })} disabled={!canUpload || saving} />
+              </div>
+              <div className={styles.formGroup}>
+                <label htmlFor="media-desc">Description</label>
+                <textarea id="media-desc" rows={3} value={meta.description} onChange={(e) => setMeta({ ...meta, description: e.target.value })} disabled={!canUpload || saving} />
+              </div>
+              <div className={styles.formGroup}>
+                <label htmlFor="media-name">File name</label>
+                <input id="media-name" type="text" value={meta.originalName} onChange={(e) => setMeta({ ...meta, originalName: e.target.value })} disabled={!canUpload || saving} />
+              </div>
+              <div className={styles.formGroup}>
+                <label htmlFor="media-folder">Folder</label>
+                <select id="media-folder" className={styles.selectInput} value={meta.folderId} onChange={(e) => setMeta({ ...meta, folderId: e.target.value })} disabled={!canUpload || saving}>
+                  <option value="">Unfiled</option>
+                  {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+              </div>
 
-                  <form onSubmit={(e) => { e.preventDefault(); handleSaveMeta(); }}>
-                    <div className={styles.formGroup}>
-                      <label htmlFor="media-alt">
-                        Alt text
-                        {isImage && !meta.altText && (
-                          <span className={styles.altWarn}><FontAwesomeIcon icon={faTriangleExclamation} /> missing</span>
-                        )}
-                      </label>
-                      <input id="media-alt" type="text" value={meta.altText} placeholder="Describe the image for screen readers and SEO" onChange={(e) => setMeta({ ...meta, altText: e.target.value })} disabled={!canUpload || saving} />
-                    </div>
-                    <div className={styles.formGroup}>
-                      <label htmlFor="media-title">Title</label>
-                      <input id="media-title" type="text" value={meta.title} onChange={(e) => setMeta({ ...meta, title: e.target.value })} disabled={!canUpload || saving} />
-                    </div>
-                    <div className={styles.formGroup}>
-                      <label htmlFor="media-caption">Caption</label>
-                      <input id="media-caption" type="text" value={meta.caption} onChange={(e) => setMeta({ ...meta, caption: e.target.value })} disabled={!canUpload || saving} />
-                    </div>
-                    <div className={styles.formGroup}>
-                      <label htmlFor="media-desc">Description</label>
-                      <textarea id="media-desc" rows={3} value={meta.description} onChange={(e) => setMeta({ ...meta, description: e.target.value })} disabled={!canUpload || saving} />
-                    </div>
-                    <div className={styles.formGroup}>
-                      <label htmlFor="media-name">File name</label>
-                      <input id="media-name" type="text" value={meta.originalName} onChange={(e) => setMeta({ ...meta, originalName: e.target.value })} disabled={!canUpload || saving} />
-                    </div>
-                    <div className={styles.formGroup}>
-                      <label htmlFor="media-folder">Folder</label>
-                      <select id="media-folder" className={styles.selectInput} value={meta.folderId} onChange={(e) => setMeta({ ...meta, folderId: e.target.value })} disabled={!canUpload || saving}>
-                        <option value="">Unfiled</option>
-                        {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                      </select>
-                    </div>
-
-                    <div className={styles.actions}>
-                      {canUpload && (
-                        <Button type="submit" variant="primary" size="sm" disabled={saving || !dirty} title="Save (⌘/Ctrl+S)">
-                          {saving ? 'Saving…' : dirty ? 'Save details' : 'Saved'}
-                        </Button>
-                      )}
-                      {canUpload && dirty && (
-                        <Button size="sm" variant="ghost" onClick={() => setSelected({ ...selected })}>Discard</Button>
-                      )}
-                      {canUpload && (
-                        <Button size="sm" onClick={() => replaceInputRef.current?.click()} disabled={saving}>Replace file</Button>
-                      )}
-                      {canDelete && (
-                        <Button size="sm" variant="danger" icon={faTrashCan} onClick={handleDelete} disabled={deleting}>
-                          {deleting ? 'Deleting…' : 'Delete'}
-                        </Button>
-                      )}
-                    </div>
-                  </form>
-                  <input ref={replaceInputRef} type="file" accept={acceptAttr} onChange={handleReplaceChange} hidden />
-                </>
-              )}
+              <div className={styles.actions}>
+                {canUpload && (
+                  <Button type="submit" variant="primary" size="sm" disabled={saving || !dirty} title="Save (⌘/Ctrl+S)">
+                    {saving ? 'Saving…' : dirty ? 'Save details' : 'Saved'}
+                  </Button>
+                )}
+                {canUpload && dirty && (
+                  <Button size="sm" variant="ghost" onClick={() => setSelected({ ...selected })}>Discard</Button>
+                )}
+                {canUpload && (
+                  <Button size="sm" onClick={() => replaceInputRef.current?.click()} disabled={saving}>Replace file</Button>
+                )}
+                {canDelete && (
+                  <Button size="sm" variant="danger" icon={faTrashCan} onClick={handleDelete} disabled={deleting}>
+                    {deleting ? 'Deleting…' : 'Delete'}
+                  </Button>
+                )}
+              </div>
+            </form>
+            <input ref={replaceInputRef} type="file" accept={acceptAttr} onChange={handleReplaceChange} hidden />
             </div>
-          </div>
-        </div>
+          </aside>
+        )}
       </div>
 
       <BulkBar count={selectedIds.size} noun="file" onClear={exitSelectMode}>

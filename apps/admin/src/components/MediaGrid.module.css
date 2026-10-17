@@ -1,8 +1,11 @@
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--tile-min, 130px), 1fr));
   gap: 0.75rem;
 }
+
+.dimmed { opacity: 0.55; pointer-events: none; transition: opacity var(--ease); }
+.tile[draggable='true'], .listRow[draggable='true'] { cursor: grab; }
 
 .tile {
   position: relative;
@@ -72,6 +75,9 @@
 }
 
 .pagination button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   padding: 0.3125rem 0.875rem;
   border-radius: var(--r-sm);
   border: 1px solid var(--border);
@@ -84,7 +90,7 @@
 .pagination button:hover:not(:disabled) {
   background: var(--ghost-h);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }

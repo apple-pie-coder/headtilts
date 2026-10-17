@@ -1,38 +1,4 @@
-
-
-.layout {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  align-items: start;
-  gap: 1.5rem;
-}
-
-@media (max-width: 900px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-}
-
-.libraryColumn,
-.detailsColumn {
-  min-width: 0;
-}
-
-/* ── Toolbar ── */
-
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-  gap: 1rem;
-}
-
-.toolbarRight {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
+/* ── View / size toggles ── */
 
 .viewToggle {
   display: flex;
@@ -61,11 +27,9 @@
 
 .viewButtonActive {
   background: var(--surface-raised);
-  color: var(--accent);
+  color: var(--accent-text);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
-
-.uploadButton:hover:not(:disabled) { background: var(--accent-h); }
 
 /* ── Upload progress ── */
 
@@ -115,8 +79,6 @@
   box-shadow: var(--glass-shadow), var(--glass-shine);
   border-radius: var(--r);
   padding: 1.25rem;
-  position: sticky;
-  top: 4.5rem;
 }
 
 .preview {
@@ -239,112 +201,6 @@
 .saveButton:hover:not(:disabled) { background: var(--accent-h); }
 .deleteButton:hover:not(:disabled) { background: var(--danger-bg); filter: brightness(0.92); }
 
-.placeholder {
-  color: var(--t3);
-  font-size: 0.875rem;
-  text-align: center;
-  padding: 2rem 0;
-}
-
-/* ── Shell: folder sidebar + library ── */
-.shell {
-  display: grid;
-  grid-template-columns: 190px 1fr;
-  align-items: start;
-  gap: 1.25rem;
-}
-
-@media (max-width: 900px) {
-  .shell { grid-template-columns: 1fr; }
-}
-
-.folders {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  padding: 0.5rem;
-}
-
-.folderRow { display: flex; align-items: center; }
-
-.folderItem {
-  flex: 1;
-  text-align: left;
-  background: none;
-  border: none;
-  border-radius: var(--r-xs);
-  padding: 0.45rem 0.6rem;
-  font-size: 0.875rem;
-  color: var(--t1);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.folderItem:hover { background: var(--ghost); }
-.folderActive { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
-
-.folderCount {
-  font-size: 0.6875rem;
-  font-weight: 700;
-  background: var(--ghost);
-  border-radius: 999px;
-  padding: 0.05rem 0.4rem;
-  color: var(--t3);
-}
-
-.folderDelete {
-  border: none;
-  background: none;
-  color: var(--danger);
-  cursor: pointer;
-  font-size: 1rem;
-  padding: 0 0.35rem;
-  transition: color var(--ease);
-}
-.folderDelete:hover { color: var(--danger-h); }
-
-.folderDivider { height: 1px; background: var(--sep); margin: 0.35rem 0; }
-
-.folderAdd {
-  text-align: left;
-  background: none;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--r-xs);
-  padding: 0.45rem 0.6rem;
-  font-size: 0.8125rem;
-  color: var(--t2);
-  cursor: pointer;
-  margin-top: 0.35rem;
-}
-.folderAdd:hover { color: var(--accent); border-color: var(--accent); }
-
-.folderForm { display: flex; gap: 0.35rem; margin-top: 0.35rem; }
-.folderForm input {
-  flex: 1; min-width: 0;
-  padding: 0.4rem 0.5rem;
-  border: 1px solid var(--input-border);
-  border-radius: var(--r-xs);
-  background: var(--input-bg);
-  color: var(--t1);
-  font-size: 0.8125rem;
-}
-.folderForm button {
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: #fff;
-  border-radius: var(--r-xs);
-  padding: 0 0.7rem;
-  font-size: 0.8125rem;
-  cursor: pointer;
-}
-.folderForm button:disabled { opacity: 0.5; cursor: default; }
-
 /* Drag-and-drop */
 .gridCard { position: relative; }
 .dropActive { outline: 2px dashed var(--accent); outline-offset: -6px; }
@@ -355,7 +211,7 @@
   align-items: center;
   justify-content: center;
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 700;
   font-size: 1rem;
   border-radius: var(--r);
@@ -376,7 +232,7 @@
 
 .usageOk {
   font-size: 0.8125rem;
-  color: var(--success);
+  color: var(--success-t);
   background: var(--success-bg);
   padding: 0.3rem 0.6rem;
   border-radius: var(--r-xs);
@@ -385,7 +241,7 @@
 
 .usageWarn {
   font-size: 0.8125rem;
-  color: var(--danger);
+  color: var(--danger-t);
   background: var(--danger-bg);
   padding: 0.3rem 0.6rem;
   border-radius: var(--r-xs);
@@ -394,8 +250,6 @@
 
 /* ── Rebuilt interactions ── */
 .dropHint { gap: 0.6rem; z-index: 5; border: 2px dashed var(--accent); }
-.folderIcon { margin-right: 0.4rem; font-size: 0.75rem; color: var(--t3); }
-.folderActive .folderIcon { color: inherit; }
 
 .emptyDrop {
   width: 100%;
@@ -412,12 +266,11 @@
   font-size: 0.875rem;
   transition: border-color var(--ease), background var(--ease), color var(--ease);
 }
-.emptyDrop svg { font-size: 2rem; color: var(--accent); }
+.emptyDrop svg { font-size: 2rem; color: var(--accent-text); }
 .emptyDrop strong { color: var(--t1); font-size: 1rem; }
 .emptyDrop:hover { border-color: var(--accent); background: var(--accent-bg); }
 .emptyDrop:focus-visible { outline: none; box-shadow: var(--input-ring); }
 
-.placeholderHint { display: flex; gap: 0.25rem; justify-content: center; align-items: center; margin-top: 0.6rem; font-size: 0.75rem; }
 
 .detailsNav { display: flex; align-items: center; gap: 0.25rem; margin-bottom: 0.75rem; }
 .detailsName { flex: 1; min-width: 0; font-size: 0.875rem; font-weight: 600; color: var(--t1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
@@ -433,7 +286,7 @@
 .navBtn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 .quickRow { display: flex; align-items: center; gap: 0.75rem; margin: 0.75rem 0; flex-wrap: wrap; }
-.quickLink { font-size: 0.8125rem; color: var(--accent); display: inline-flex; align-items: center; gap: 0.35rem; }
+.quickLink { font-size: 0.8125rem; color: var(--accent-text); display: inline-flex; align-items: center; gap: 0.35rem; }
 .quickLink:hover { text-decoration: underline; }
 
 .altWarn { margin-left: 0.4rem; color: var(--warning-t); font-size: 0.7rem; font-weight: 600; text-transform: none; }
@@ -448,3 +301,180 @@
   font-size: 0.8125rem;
 }
 .bulkMove option { color: var(--t1); background: var(--modal-bg); }
+
+/* ═══ Workspace: folders | library | details (only while a file is open) ═══ */
+
+.workspace {
+  display: grid;
+  grid-template-columns: 228px minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+.withDetails { grid-template-columns: 228px minmax(0, 1fr) 340px; }
+
+/* ── Folder panel ── */
+.folders {
+  position: sticky;
+  top: 4.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: calc(100vh - 6rem);
+  overflow-y: auto;
+  padding: 0.75rem 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r);
+  box-shadow: var(--glass-shadow);
+}
+.folderHeading {
+  margin: 0.35rem 0.6rem 0.3rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+.folderHeadingRow { display: flex; align-items: center; justify-content: space-between; margin-top: 0.75rem; padding-right: 0.25rem; }
+.folderPlus {
+  display: grid; place-items: center;
+  width: 1.75rem; height: 1.75rem;
+  border: none; border-radius: var(--r-xs);
+  background: none; color: var(--t2); cursor: pointer;
+}
+.folderPlus:hover { background: var(--ghost); color: var(--accent-text); }
+.folderRow { position: relative; display: flex; align-items: center; border-radius: var(--r-xs); }
+.folderItem {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border: none;
+  border-radius: var(--r-xs);
+  background: none;
+  color: var(--t1);
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+}
+.folderItem:hover { background: var(--ghost); }
+.folderActive, .folderActive:hover { background: var(--accent-bg); color: var(--accent-text); font-weight: 600; }
+.folderIcon { width: 1rem; flex-shrink: 0; color: var(--t3); font-size: 0.875rem; }
+.folderActive .folderIcon { color: inherit; }
+.folderName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folderCount { flex-shrink: 0; font-size: 0.75rem; font-variant-numeric: tabular-nums; color: var(--t3); font-weight: 500; }
+.folderActive .folderCount { color: inherit; }
+/* Folder actions appear on hover/focus so the list stays calm. */
+.folderMenu { position: absolute; right: 0.15rem; opacity: 0; transition: opacity var(--ease); }
+.folderRow:hover .folderMenu,
+.folderRow:focus-within .folderMenu { opacity: 1; }
+.folderRow:hover .folderCount,
+.folderRow:focus-within .folderCount { visibility: hidden; }
+@media (hover: none) { .folderMenu { opacity: 1; } .folderCount { visibility: hidden; } }
+.folderDrop, .folderDrop .folderItem { background: var(--accent-bg) !important; box-shadow: inset 0 0 0 2px var(--accent); }
+.folderEmpty { margin: 0.25rem 0.6rem; font-size: 0.8125rem; color: var(--t3); }
+.folderTip { margin: 0.75rem 0.6rem 0.25rem; font-size: 0.75rem; line-height: 1.4; color: var(--t3); }
+.folderForm { display: flex; gap: 0.35rem; padding: 0.15rem 0.25rem; }
+.folderForm input {
+  flex: 1; min-width: 0;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-xs);
+  background: var(--input-bg);
+  color: var(--t1);
+  font-size: 0.875rem;
+  box-shadow: var(--input-ring);
+}
+.folderForm input:focus { outline: none; }
+.folderForm button {
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--r-xs);
+  padding: 0 0.7rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.folderForm button:disabled { opacity: 0.5; cursor: default; }
+
+/* ── Library ── */
+.library { min-width: 0; }
+.libHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.875rem;
+}
+.libTitle { flex: 1; display: flex; align-items: baseline; gap: 0.6rem; min-width: 0; }
+.libTitle h2 { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.libTitle span { font-size: 0.875rem; color: var(--t3); white-space: nowrap; }
+.libControls { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.libControls > :first-child { flex: 1 1 220px; }
+.sortSelect {
+  height: 2.125rem;
+  padding: 0 2rem 0 0.7rem;
+  border: 1px solid var(--input-border);
+  border-radius: var(--r-sm);
+  background: var(--input-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 14 8'%3E%3Cpath d='M1 1l6 6 6-6' stroke='%236e6e73' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 0.7rem center;
+  color: var(--t1);
+  font-size: 0.875rem;
+  appearance: none;
+  cursor: pointer;
+}
+.sortSelect:focus { outline: none; border-color: var(--accent); box-shadow: var(--input-ring); }
+.sizeButton { display: grid; place-items: center; width: 2rem; }
+.size_s, .size_m, .size_l { display: block; border: 1.5px solid currentColor; border-radius: 2px; }
+.size_s { width: 7px; height: 7px; }
+.size_m { width: 10px; height: 10px; }
+.size_l { width: 13px; height: 13px; }
+
+/* ── Details ── */
+.details { position: sticky; top: 4.5rem; max-height: calc(100vh - 6rem); overflow-y: auto; border-radius: var(--r); }
+
+/* Narrower screens: details as an overlay panel instead of a third column. */
+@media (max-width: 1180px) {
+  .withDetails { grid-template-columns: 228px minmax(0, 1fr); }
+  .details {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    z-index: 160;
+    width: min(380px, 100vw);
+    max-height: none;
+    border-radius: 0;
+    box-shadow: -12px 0 40px rgba(0, 0, 0, 0.25);
+  }
+  .details .detailsCard { min-height: 100%; border-radius: 0; }
+}
+
+/* Phones: folders become a scrolling row of chips above the grid. */
+@media (max-width: 760px) {
+  .workspace, .withDetails { grid-template-columns: minmax(0, 1fr); gap: 0.75rem; }
+  .folders {
+    position: static;
+    flex-direction: row;
+    align-items: center;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: none;
+    padding: 0.4rem;
+    gap: 0.35rem;
+  }
+  .folders::-webkit-scrollbar { display: none; }
+  .folderHeading, .folderTip, .folderEmpty { display: none; }
+  .folderHeadingRow { order: 99; margin: 0; padding: 0; }
+  .folderItem { flex: none; padding: 0.45rem 0.75rem; border: 1px solid var(--border); border-radius: 999px; white-space: nowrap; }
+  .folderName { overflow: visible; }
+  .folderRow { flex: none; }
+  .folderMenu { position: static; opacity: 1; }
+  .folderCount { visibility: visible !important; }
+  .folderForm { flex: none; min-width: 220px; }
+  .libControls { width: 100%; }
+  .libControls > :first-child { width: auto; flex: 1 1 100%; }
+  .details { width: 100vw; }
+}

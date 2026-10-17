@@ -1,5 +1,6 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+import type { CSSProperties, DragEvent } from 'react';
 import { Media } from '../types';
 import { resolveMediaUrl } from '../services/media';
 import styles from './MediaGrid.module.css';
@@ -46,15 +47,33 @@ interface MediaGridProps {
   selectable?: boolean;
   selectedIds?: Set<number>;
   onToggleSelect?: (id: number) => void;
+  /** Thumbnail size in the gallery view. */
+  size?: 's' | 'm' | 'l';
+  /** When set, files can be dragged (e.g. onto a folder); returns the ids being moved. */
+  dragIds?: (item: Media) => number[];
 }
+
+/** Drag payload type for moving library files between folders. */
+export const MEDIA_DRAG_TYPE = 'application/x-headtilts-media';
+const TILE_MIN = { s: '104px', m: '148px', l: '220px' };
 
 export function MediaGrid({
   items, selectedId, loading, page, pages, view = 'gallery',
-  onSelect, onPageChange, selectable = false, selectedIds, onToggleSelect,
+  onSelect, onPageChange, selectable = false, selectedIds, onToggleSelect, size = 'm', dragIds,
 }: MediaGridProps) {
-  if (loading) {
+  // Keep showing the current files (dimmed) while the next page loads.
+  if (loading && items.length === 0) {
     return <div className={styles.loading}>Loading…</div>;
   }
+
+  const drag = (item: Media) => dragIds ? {
+    draggable: true,
+    onDragStart: (e: DragEvent) => {
+      const ids = dragIds(item);
+      e.dataTransfer.setData(MEDIA_DRAG_TYPE, JSON.stringify(ids));
+      e.dataTransfer.effectAllowed = 'move';
+    },
+  } : {};
 
   if (items.length === 0) {
     return <div className={styles.empty}>No media found.</div>;
@@ -77,13 +96,13 @@ export function MediaGrid({
   const pagination = pages > 1 ? (
     <div className={styles.pagination}>
       <button onClick={() => onPageChange(Math.max(1, page - 1))} disabled={page <= 1}>
-        Previous
+        <FontAwesomeIcon icon={faChevronLeft} /> Previous
       </button>
       <span>
         Page {page} of {pages}
       </span>
       <button onClick={() => onPageChange(Math.min(pages, page + 1))} disabled={page >= pages}>
-        Next
+        Next <FontAwesomeIcon icon={faChevronRight} />
       </button>
     </div>
   ) : null;
@@ -91,7 +110,7 @@ export function MediaGrid({
   if (view === 'list') {
     return (
       <>
-        <div className={styles.list}>
+        <div className={`${styles.list} ${loading ? styles.dimmed : ''}`}>
           {items.map((item) => {
             const isSelected = selectedId === item.id;
             return (
@@ -100,6 +119,7 @@ export function MediaGrid({
                 type="button"
                 className={`${styles.listRow} ${isSelected ? styles.selected : ''} ${isChecked(item.id) ? styles.checkedRow : ''}`}
                 onClick={() => onSelect(item)}
+                {...drag(item)}
               >
                 {selectable
                   ? checkbox(item)
@@ -123,7 +143,7 @@ export function MediaGrid({
 
   return (
     <>
-      <div className={styles.grid}>
+      <div className={`${styles.grid} ${loading ? styles.dimmed : ''}`} style={{ '--tile-min': TILE_MIN[size] } as CSSProperties}>
         {items.map((item) => (
           <button
             key={item.id}
@@ -131,6 +151,7 @@ export function MediaGrid({
             className={`${styles.tile} ${selectedId === item.id ? styles.selected : ''} ${isChecked(item.id) ? styles.checkedTile : ''}`}
             onClick={() => onSelect(item)}
             title={item.originalName}
+            {...drag(item)}
           >
             {selectable && <span className={styles.tileCheck}>{checkbox(item)}</span>}
             <Thumb item={item} />
