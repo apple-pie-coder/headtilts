@@ -18,7 +18,7 @@
 .breadcrumbLink {
   border: none;
   background: none;
-  color: var(--accent);
+  color: var(--accent-text);
   cursor: pointer;
   padding: 0;
   font-size: inherit;
@@ -58,7 +58,7 @@
 .locationChip {
   display: inline-block;
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--accent-text);
   border-radius: 999px;
   padding: 0.125rem 0.625rem;
   font-size: 0.8125rem;
@@ -192,10 +192,11 @@ select.itemUrl {
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow), var(--glass-shine);
   border-radius: var(--r);
-  overflow: hidden;
+  /* not overflow:hidden — each row's icon picker opens a popup below it */
 }
 
 .panelHeader {
+  border-radius: var(--r) var(--r) 0 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -227,6 +228,7 @@ select.itemUrl {
 }
 
 .itemRow {
+  margin-left: calc(var(--depth, 0) * 2rem);
   display: flex;
   align-items: center;
   gap: 0.625rem;
@@ -295,7 +297,7 @@ select.itemUrl {
 }
 
 .type_url      { background: var(--ghost); color: var(--t2); }
-.type_page     { background: var(--accent-bg); color: var(--accent); }
+.type_page     { background: var(--accent-bg); color: var(--accent-text); }
 .type_post     { background: #e8f5e9; color: #2e7d32; }
 .type_category { background: #fff3e0; color: #e65100; }
 .type_tag      { background: #f3e5f5; color: #6a1b9a; }
@@ -363,7 +365,7 @@ select.itemUrl {
 
 .visibleBtn { color: var(--success-t) !important; }
 .hiddenBtn { color: var(--t3) !important; }
-.removeBtn { color: var(--danger) !important; }
+.removeBtn { color: var(--danger-t) !important; }
 .removeBtn:hover { background: var(--danger-bg) !important; }
 
 /* ── Add Panel ── */
@@ -432,3 +434,15 @@ select.itemUrl {
 
 .addBtn:hover:not(:disabled) { background: var(--accent-h); }
 .addBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Phones: each item stacks — icon + label, then type + link, then controls. */
+@media (max-width: 640px) {
+  .itemRow { flex-wrap: wrap; align-items: flex-start; margin-left: calc(var(--depth, 0) * 0.75rem); padding: 0.75rem; }
+  .itemHandle { display: none; }
+  .itemFields { flex: 1 1 calc(100% - 3.5rem); flex-direction: column; align-items: stretch; }
+  .itemTitle, .itemRef { flex: none; width: 100%; }
+  .itemTitle, .itemTypeSelect, .itemUrl { min-height: 2.5rem; font-size: 1rem; }
+  .itemUrl { flex: 1; min-width: 0; }
+  .itemControls { flex-basis: 100%; justify-content: flex-end; gap: 0.375rem; }
+  .itemControls button { width: 2.5rem; height: 2.5rem; }
+}

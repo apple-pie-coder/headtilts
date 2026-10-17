@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { CSSProperties, FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AxiosError } from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -15,6 +15,7 @@ import { fetchMenu, saveMenuItems, updateMenu } from '../services/menus';
 import { fetchPosts } from '../services/posts';
 import { fetchCategories } from '../services/categories';
 import { fetchTags } from '../services/tags';
+import { IconPicker, IconValue } from '../components/IconPicker';
 import styles from './MenuEditor.module.css';
 
 function errorMsg(err: unknown, fallback: string) {
@@ -31,6 +32,8 @@ interface DraftItem {
   postId: number | null;
   categoryId: number | null;
   tagId: number | null;
+  icon: string | null;
+  iconSvg: string | null;
   depth: number;
   position: number;
   isVisible: boolean;
@@ -64,6 +67,8 @@ function buildDrafts(items: MenuItem[], pageIds: Set<number>): DraftItem[] {
         postId: item.postId,
         categoryId: item.categoryId,
         tagId: item.tagId,
+        icon: item.icon ?? null,
+        iconSvg: item.iconSvg ?? null,
         depth: item.parentId != null ? 1 : 0,
         position: i,
         isVisible: item.isVisible,
@@ -147,6 +152,8 @@ export default function MenuEditorPage() {
         postId: (item.type === 'page' || item.type === 'post') && item.postId ? item.postId : undefined,
         categoryId: item.type === 'category' && item.categoryId ? item.categoryId : undefined,
         tagId: item.type === 'tag' && item.tagId ? item.tagId : undefined,
+        icon: item.icon,
+        iconSvg: item.iconSvg,
         depth: item.depth,
         position: i,
         isVisible: item.isVisible,
@@ -222,6 +229,8 @@ export default function MenuEditorPage() {
       postId: (newType === 'page' || newType === 'post') ? newPostId : null,
       categoryId: newType === 'category' ? newCategoryId : null,
       tagId: newType === 'tag' ? newTagId : null,
+      icon: null,
+      iconSvg: null,
       depth: newDepth,
       position: items.length,
       isVisible: true,
@@ -295,6 +304,14 @@ export default function MenuEditorPage() {
     setItems((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], title: value };
+      return next;
+    });
+  }
+
+  function handleIconChange(index: number, value: IconValue) {
+    setItems((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], icon: value.icon, iconSvg: value.iconSvg };
       return next;
     });
   }
@@ -413,11 +430,12 @@ export default function MenuEditorPage() {
                 <li
                   key={i}
                   className={styles.itemRow}
-                  style={{ marginLeft: `${item.depth * 2}rem` }}
+                  style={{ '--depth': item.depth } as CSSProperties}
                 >
                   <div className={styles.itemHandle}>
                     <span className={styles.depthDot} style={{ opacity: item.depth > 0 ? 1 : 0.2 }}><FontAwesomeIcon icon={faTurnUp} rotation={90} /></span>
                   </div>
+                  <IconPicker compact value={{ icon: item.icon, iconSvg: item.iconSvg }} onChange={(v) => handleIconChange(i, v)} disabled={!canEdit} />
                   <div className={styles.itemFields}>
                     <input
                       className={styles.itemTitle}

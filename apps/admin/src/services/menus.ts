@@ -13,6 +13,8 @@ export interface MenuItemDraftInput {
   postId?: number;
   categoryId?: number;
   tagId?: number;
+  icon?: string | null;
+  iconSvg?: string | null;
   depth: number;
   position: number;
   isVisible: boolean;
