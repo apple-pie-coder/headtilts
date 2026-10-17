@@ -1,0 +1,15 @@
+# Images install their own dependencies and build their own output; the host's
+# copies (pnpm symlinks, local dev builds) must never leak into the build context.
+**/node_modules
+**/dist
+**/.vite
+
+# Secrets and local tooling — not needed by any Dockerfile
+.env
+.env.*
+!.env.example
+.git
+.claude
+doc_extractor
+backups
+*.log
