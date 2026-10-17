@@ -1,6 +1,7 @@
 import { prisma } from '../config/database';
 import { ValidationError, NotFoundError, ConflictError } from '../utils/errors';
 import { slugify } from '@headtilts/shared';
+import { normalizeIconSvg } from '../utils/iconSvg';
 
 async function assertSlugAvailable(slug: string, excludeId?: number) {
   const existing = await prisma.category.findFirst({
@@ -84,6 +85,7 @@ interface CreateCategoryInput {
   description?: string;
   parentId?: number | null;
   icon?: string;
+  iconSvg?: unknown;
   showSidebar?: boolean;
 }
 
@@ -115,6 +117,7 @@ export async function createCategory(input: CreateCategoryInput) {
       description: input.description || undefined,
       parentId: input.parentId ?? undefined,
       icon: input.icon || undefined,
+      iconSvg: normalizeIconSvg(input.iconSvg) ?? undefined,
       showSidebar: input.showSidebar ?? false,
     },
     include: { parent: { select: { id: true, name: true } } },
@@ -127,6 +130,7 @@ interface UpdateCategoryInput {
   description?: string;
   parentId?: number | null;
   icon?: string;
+  iconSvg?: unknown;
   showSidebar?: boolean;
 }
 
@@ -179,6 +183,7 @@ export async function updateCategory(id: number, input: UpdateCategoryInput) {
       description: input.description,
       parentId: input.parentId,
       icon: input.icon,
+      iconSvg: normalizeIconSvg(input.iconSvg),
       showSidebar: input.showSidebar,
     },
     include: { parent: { select: { id: true, name: true } } },

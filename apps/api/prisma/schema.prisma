@@ -28,6 +28,8 @@ model User {
   mfaEnabled    Boolean  @default(false)
   mfaSecret     String?
   mfaBackupCodes String? @db.Text
+  // Last TOTP time-step accepted, so a code can't be replayed within its window
+  mfaLastUsedStep Int?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -44,6 +46,7 @@ model User {
 
   @@index([email])
   @@index([username])
+  feedback      Feedback[]
 }
 
 model Notification {
@@ -173,11 +176,17 @@ model Post {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   featuredImage   String?
+  // Crop focus for the featured image as a CSS object-position, e.g. "50% 30%".
+  featuredImageFocus String? @db.VarChar(20)
   template        String?
   isFeatured      Boolean   @default(false)
   showSidebar     Boolean   @default(false)
   commentStatus   String?   // null = inherit site default, "open" / "closed" = per-post override
   showToc         String?   // null = inherit site default, "yes" / "no" = per-post override
+  // Editorial kind of a post: "article" | "news" | "review" | "qna". Drives the
+  // schema.org markup (Article / NewsArticle / Review) and the type's extra fields.
+  articleType     String    @default("article") @db.VarChar(20)
+  videoUrl        String?   @db.VarChar(500) // featured YouTube video
 
   metaTitle       String?
   metaDescription String?
@@ -191,6 +200,8 @@ model Post {
   tags            PostTag[]
   coAuthors       PostCoAuthor[]
   seoMetadata     SeoMetadata?
+  review          Review?
+  qna             QnaSession?
   comments        Comment[]
   revisions       PostRevision[]
   polls           Poll[]
@@ -205,6 +216,76 @@ model Post {
   @@index([publishedAt])
   @@index([scheduledFor])
   @@index([isFeatured])
+  @@index([articleType])
+}
+
+// ===================== Music Reviews =====================
+
+// Review details for posts with articleType = "review". One per post.
+model Review {
+  id           Int       @id @default(autoincrement())
+  postId       Int       @unique
+  post         Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  subjectType  String    @default("album") @db.VarChar(20) // album | ep | single
+  subjectTitle String    @db.VarChar(255)                  // album / EP / track name
+  artist       String    @db.VarChar(255)
+  releaseDate  DateTime? @db.Date
+  label        String?   @db.VarChar(255)
+  genre        String?   @db.VarChar(120)
+  coverImage   String?   @db.VarChar(500)
+  rating       Float?                                    // 0–10 in 0.5 steps
+  verdict      String?   @db.VarChar(300)                // one-line summary
+  highlights   Json?                                     // standout tracks: string[]
+  tracklist    Json?                                     // { title, duration? }[]
+  streaming    Json?                                     // { spotify?, appleMusic?, … }: URLs
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([artist])
+  @@index([rating])
+}
+
+// ===================== Q&A Sessions =====================
+
+// Questions and answers for posts with articleType = "qna": an artist or band
+// answering questions (fan AMAs, press Q&As). One per post.
+model QnaSession {
+  id          Int       @id @default(autoincrement())
+  postId      Int       @unique
+  post        Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  subject     String    @db.VarChar(255)                 // who answers: band / artist / person
+  subjectType String    @default("band") @db.VarChar(20) // band | artist | person
+  sessionDate DateTime? @db.Date
+  host        String?   @db.VarChar(255)                 // e.g. "Fan AMA on Instagram"
+  items       Json                                       // { question, askedBy?, answer, answeredBy? }[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ===================== Admin Feedback =====================
+
+// Issues raised from the admin's feedback button. Mirrored to GitHub issues
+// when GITHUB_FEEDBACK_TOKEN is set; kept here either way so nothing is lost.
+model Feedback {
+  id           Int       @id @default(autoincrement())
+  type         String    @db.VarChar(20)  // bug | idea | question
+  title        String    @db.VarChar(200)
+  description  String    @db.Text
+  pagePath     String?   @db.VarChar(500)
+  context      Json?                       // browser, viewport, theme, app version, recent errors
+  screenshot   String?   @db.VarChar(500)  // /uploads/feedback/…
+  userId       String?
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  syncStatus   String    @default("pending") @db.VarChar(20) // pending | synced | failed | disabled
+  syncError    String?   @db.VarChar(500)
+  issueNumber  Int?
+  issueUrl     String?   @db.VarChar(500)
+  issueState   String?   @db.VarChar(20)  // open | closed (from GitHub)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([createdAt])
+  @@index([syncStatus])
 }
 
 // ===================== Post Revisions =====================
@@ -294,10 +375,12 @@ model CommentReaction {
   comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
   emoji     String
   visitorId String
+  ipAddress String?
   createdAt DateTime @default(now())
 
   @@unique([commentId, emoji, visitorId])
   @@index([commentId])
+  @@index([commentId, ipAddress])
 }
 
 model ContactSubmission {
@@ -319,7 +402,10 @@ model Category {
   slug        String    @unique
   description String?   @db.Text
   parentId    Int?
-  icon        String?
+  icon        String?   // Font Awesome class, e.g. "fa-solid fa-guitar" (or a legacy emoji)
+  // The chosen icon's SVG shape as JSON { w, h, d }, so the public site can draw
+  // it without shipping the whole icon library.
+  iconSvg     String?   @db.Text
   showSidebar Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -407,6 +493,8 @@ model MenuItem {
   postId      Int?
   categoryId  Int?
   tagId       Int?
+  icon        String?   @db.VarChar(100) // Font Awesome class, e.g. "fa-solid fa-calendar"
+  iconSvg     String?   @db.Text         // the icon's shape as JSON { w, h, d } (see Category.iconSvg)
   position    Int       @default(0)
   isVisible   Boolean   @default(true)
   createdAt   DateTime  @default(now())
@@ -522,6 +610,9 @@ model Celebration {
   day       Int      // 1-31
   year      Int?
   photo     String?  @db.Text
+  // Attribution for the photo (e.g. photographer and licence), shown under it.
+  photoCredit    String? @db.VarChar(300)
+  photoCreditUrl String? @db.VarChar(500)
   message   String?  @db.Text
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -630,10 +721,12 @@ model PostReaction {
   post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   emoji     String   // e.g. "❤️", "👏", "🔥", "😮"
   visitorId String
+  ipAddress String?
   createdAt DateTime @default(now())
 
   @@unique([postId, emoji, visitorId])
   @@index([postId])
+  @@index([postId, ipAddress])
 }
 
 // ===================== Series / Collections =====================

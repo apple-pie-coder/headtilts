@@ -1,3 +1,4 @@
+import { imageFromContent, withCardImages } from '../utils/cardImage';
 import crypto from 'crypto';
 import sharp from 'sharp';
 import { Router, IRouter, Request, Response } from 'express';
@@ -10,7 +11,7 @@ import { listPublicComments, createPublicComment, toggleReaction } from '../serv
 import { buildPostPath, getPermalinkStructure, matchPostPath } from '../utils/permalinks';
 import { getCalendarMonth } from '../services/calendar.service';
 import { getTodaysCelebrations } from '../services/celebrations.service';
-import { listPolls, getPublicPoll, submitVote } from '../services/polls.service';
+import { getPublicPoll, submitVote, listPublicPolls } from '../services/polls.service';
 import { listPublicEvents, getPublicEvent, registerForEvent, verifyPayment, cancelRegistration, generateIcal } from '../services/events.service';
 import { searchAll, searchType } from '../services/search.service';
 import { log } from '../services/logger.service';
@@ -18,6 +19,8 @@ import rateLimit from 'express-rate-limit';
 import { publicReadLimiter } from '../middleware/rateLimit';
 import { ApiError, ValidationError } from '../utils/errors';
 import { clientIp } from '../utils/clientIp';
+import { postPublicSelect } from '../services/publicSelect';
+import { getPublicFrontPage } from '../services/frontPage.service';
 
 // Throttle comment/reaction writes per IP
 const commentLimiter = rateLimit({
@@ -59,28 +62,21 @@ function optionalText(value: unknown, field: string, max: number): string | unde
 
 const router: IRouter = Router();
 
-const postPublicSelect = {
-  id: true,
-  title: true,
-  slug: true,
-  excerpt: true,
-  type: true,
-  parentId: true,
-  publishedAt: true,
-  updatedAt: true,
-  featuredImage: true,
-  template: true,
-  isFeatured: true,
-  showSidebar: true,
-  author: { select: { id: true, username: true, firstName: true, lastName: true, avatar: true, bio: true } },
-  coAuthors: { select: { user: { select: { id: true, username: true, firstName: true, lastName: true, avatar: true, bio: true } } }, orderBy: { order: 'asc' as const } },
-  categories: { select: { category: { select: { id: true, name: true, slug: true } } } },
-  tags: { select: { tag: { select: { id: true, name: true, slug: true } } } },
-} as const;
+// Distinct browser ids that may react to one post/comment from one network.
+const MAX_REACTORS_PER_IP = 20;
+
 
 const postPublicFullSelect = {
   ...postPublicSelect,
   content: true,
+  videoUrl: true,
+  review: {
+    select: {
+      subjectType: true, subjectTitle: true, artist: true, releaseDate: true, label: true, genre: true,
+      coverImage: true, rating: true, verdict: true, highlights: true, tracklist: true, streaming: true,
+    },
+  },
+  qna: { select: { subject: true, subjectType: true, sessionDate: true, host: true, items: true } },
   showToc: true,
   metaTitle: true,
   metaDescription: true,
@@ -179,7 +175,7 @@ router.get('/posts', publicReadLimiter, asyncHandler(async (req: Request, res: R
     prisma.post.count({ where }),
   ]);
 
-  sendSuccess(res, { items: posts, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+  sendSuccess(res, { items: await withCardImages(posts), pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
 }));
 
 // GET /public/posts/:slug
@@ -189,7 +185,8 @@ router.get('/posts/:slug', publicReadLimiter, asyncHandler(async (req: Request, 
     select: postPublicFullSelect,
   });
   if (!post) { sendError(res, 'NOT_FOUND', 'Post not found', 404); return; }
-  sendSuccess(res, post);
+  // `cardImage` (not featuredImage) so the article doesn't print a banner it never had.
+  sendSuccess(res, { ...post, cardImage: post.featuredImage ?? imageFromContent(post.content, post.videoUrl) });
 }));
 
 // GET /public/pages/:slug
@@ -213,6 +210,7 @@ router.get('/categories', publicReadLimiter, asyncHandler(async (_req: Request, 
       description: true,
       parentId: true,
       icon: true,
+      iconSvg: true,
       showSidebar: true,
       _count: { select: { posts: { where: { post: { status: 'published', type: 'post' } } } } },
     },
@@ -243,7 +241,7 @@ router.get('/menus/:location', publicReadLimiter, asyncHandler(async (req: Reque
       items: {
         where: { isVisible: true },
         orderBy: { position: 'asc' },
-        select: { id: true, parentId: true, title: true, url: true, position: true, postId: true, categoryId: true, tagId: true },
+        select: { id: true, parentId: true, title: true, url: true, position: true, postId: true, categoryId: true, tagId: true, icon: true, iconSvg: true },
       },
     },
   });
@@ -277,7 +275,7 @@ router.get('/menus/:location', publicReadLimiter, asyncHandler(async (req: Reque
         url = `/tags/${tagMap.get(item.tagId)!.slug}`;
       }
     }
-    return { id: item.id, parentId: item.parentId, title: item.title, url, position: item.position };
+    return { id: item.id, parentId: item.parentId, title: item.title, url, position: item.position, icon: item.icon, iconSvg: item.iconSvg };
   });
 
   sendSuccess(res, { id: menu.id, name: menu.name, location: menu.location, description: menu.description, items: resolvedItems });
@@ -488,6 +486,7 @@ router.post('/comments/:id/reactions', commentLimiter, asyncHandler(async (req: 
       Number(req.params.id),
       typeof emoji === 'string' ? emoji : '',
       typeof visitorId === 'string' ? visitorId : undefined,
+      clientIp(req),
     );
     sendSuccess(res, result);
   } catch (error) {
@@ -529,8 +528,13 @@ router.get('/authors/:username', publicReadLimiter, asyncHandler(async (req: Req
 
   sendSuccess(res, {
     author: user,
-    posts: { items: posts, pagination: { page, limit, total, pages: Math.ceil(total / limit) } },
+    posts: { items: await withCardImages(posts), pagination: { page, limit, total, pages: Math.ceil(total / limit) } },
   });
+}));
+
+// GET /public/front-page — the published front page layout with its stories, events etc.
+router.get('/front-page', publicReadLimiter, asyncHandler(async (_req: Request, res: Response) => {
+  sendSuccess(res, await getPublicFrontPage());
 }));
 
 // GET /public/celebrations/today — active artist birthdays/remembrances for today
@@ -574,8 +578,10 @@ router.get('/posts/:slug/reactions', publicReadLimiter, asyncHandler(async (req:
 
 // POST /public/posts/:slug/reactions — toggle an emoji reaction
 router.post('/posts/:slug/reactions', commentLimiter, asyncHandler(async (req: Request, res: Response) => {
-  const { emoji, visitorId } = req.body as { emoji?: string; visitorId?: string };
-  if (!emoji || !visitorId) { sendError(res, 'VALIDATION_ERROR', 'emoji and visitorId are required', 400); return; }
+  const { emoji, visitorId } = req.body as { emoji?: unknown; visitorId?: unknown };
+  if (typeof emoji !== 'string' || typeof visitorId !== 'string' || visitorId.length < 8 || visitorId.length > 64) {
+    sendError(res, 'VALIDATION_ERROR', 'emoji and visitorId are required', 400); return;
+  }
 
   const ALLOWED_EMOJIS = ['❤️', '👏', '🔥', '😮', '😢', '🙌'];
   if (!ALLOWED_EMOJIS.includes(emoji)) { sendError(res, 'VALIDATION_ERROR', 'Invalid emoji', 400); return; }
@@ -589,7 +595,14 @@ router.post('/posts/:slug/reactions', commentLimiter, asyncHandler(async (req: R
     await prisma.postReaction.delete({ where: { id: existing.id } });
     reacted = false;
   } else {
-    await prisma.postReaction.create({ data: { postId: post.id, emoji, visitorId } });
+    // visitorId is browser-generated; cap distinct "visitors" per network so
+    // counts can't be inflated by rotating ids.
+    const ip = clientIp(req);
+    const visitorsFromIp = await prisma.postReaction.groupBy({ by: ['visitorId'], where: { postId: post.id, ipAddress: ip } });
+    if (visitorsFromIp.length >= MAX_REACTORS_PER_IP && !visitorsFromIp.some((v) => v.visitorId === visitorId)) {
+      sendError(res, 'RATE_LIMITED', 'Too many reactions from your network on this post', 429); return;
+    }
+    await prisma.postReaction.create({ data: { postId: post.id, emoji, visitorId, ipAddress: ip } });
     reacted = true;
   }
   const count = await prisma.postReaction.count({ where: { postId: post.id, emoji } });
@@ -623,7 +636,7 @@ router.get('/posts/:slug/related', publicReadLimiter, asyncHandler(async (req: R
     orderBy: { publishedAt: 'desc' },
     take: limit,
   });
-  sendSuccess(res, related);
+  sendSuccess(res, await withCardImages(related));
 }));
 
 // GET /public/series/:slug — series info + ordered post list
@@ -693,7 +706,8 @@ router.get('/posts/:slug/series', publicReadLimiter, asyncHandler(async (req: Re
 router.get('/polls', publicReadLimiter, asyncHandler(async (req: Request, res: Response) => {
   const page  = Math.max(1, parseInt(req.query.page  as string) || 1);
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
-  const { items, total } = await listPolls(page, limit, undefined, 'open');
+  const status = req.query.status === 'closed' ? 'closed' : 'open';
+  const { items, total } = await listPublicPolls(status, page, limit);
   sendSuccess(res, { items, total, page, limit });
 }));
 

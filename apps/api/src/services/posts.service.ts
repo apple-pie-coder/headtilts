@@ -4,6 +4,7 @@ import { ValidationError, NotFoundError, ConflictError } from '../utils/errors';
 import { slugify } from '@headtilts/shared';
 import { buildPostPath, getPermalinkStructure } from '../utils/permalinks';
 import * as notifications from './notifications.service';
+import { PostExtrasInput, assertPublishable, prepareExtras, saveExtras } from './postExtras';
 
 const VALID_STATUSES = ['draft', 'published', 'scheduled', 'trash'];
 
@@ -26,6 +27,9 @@ const postInclude = {
   categories: { include: { category: true } },
   tags: { include: { tag: true } },
   parent: { select: { id: true, title: true, slug: true } },
+  review: true,
+  qna: true,
+  seoMetadata: { select: { focusKeyword: true, seoScore: true, readabilityScore: true } },
 };
 
 async function assertSlugAvailable(slug: string, excludeId?: number) {
@@ -91,6 +95,7 @@ interface ListPostsFilters {
   categoryId?: number;
   authorId?: string;
   featured?: boolean;
+  articleType?: string;
   type?: string;
   template?: string;
   sortBy?: 'publishedAt' | 'updatedAt' | 'title';
@@ -112,6 +117,7 @@ export async function listPosts(page: number, limit: number, filters: ListPostsF
     ...(filters.authorId !== undefined ? { authorId: filters.authorId } : {}),
     ...(filters.featured !== undefined ? { isFeatured: filters.featured } : {}),
     ...(filters.template !== undefined ? { template: filters.template || null } : {}),
+    ...(filters.articleType ? { articleType: filters.articleType } : {}),
   };
 
   const orderBy: Prisma.Enumerable<Prisma.PostOrderByWithRelationInput> = [];
@@ -144,7 +150,7 @@ export async function listPosts(page: number, limit: number, filters: ListPostsF
     statusCounts[group.status] = group._count._all;
   }
 
-  return { items: posts, total, statusCounts };
+  return { items: await Promise.all(posts.map(withPublicUrl)), total, statusCounts };
 }
 
 export async function getPostById(id: number) {
@@ -158,7 +164,12 @@ export async function getPostById(id: number) {
   return withPublicUrl(post);
 }
 
-interface PostInput {
+/** Word/WordPress pastes join words with &nbsp; so paragraphs can't wrap; store normal spaces. */
+function normalizeSpaces(html: string | undefined): string | undefined {
+  return html === undefined ? undefined : html.replace(/([^\s>])(?:&nbsp;|\u00a0)(?=[^\s<])/g, '$1 ');
+}
+
+interface PostInput extends PostExtrasInput {
   title: string;
   slug?: string;
   content?: string;
@@ -261,7 +272,7 @@ export async function createPost(input: PostInput, authorId: string) {
     throw new ValidationError('Title is required');
   }
 
-  const content = input.content ?? '';
+  const content = normalizeSpaces(input.content) ?? '';
 
   const slug = input.slug?.trim() ? slugify(input.slug) : slugify(title);
   if (!slug) {
@@ -271,6 +282,8 @@ export async function createPost(input: PostInput, authorId: string) {
   await assertSlugAvailable(slug);
 
   const { status, publishedAt, scheduledFor } = resolveStatusForCreate(input);
+  const extras = prepareExtras(input);
+  assertPublishable(extras, extras.articleType ?? 'article', status);
 
   if (input.categoryIds?.length) {
     const count = await prisma.category.count({ where: { id: { in: input.categoryIds } } });
@@ -279,13 +292,13 @@ export async function createPost(input: PostInput, authorId: string) {
     }
   }
 
-  const post = await prisma.$transaction(async (tx) => {
+  const createdId = await prisma.$transaction(async (tx) => {
     const created = await tx.post.create({
       data: {
         title,
         slug,
         content,
-        excerpt: input.excerpt || undefined,
+        excerpt: normalizeSpaces(input.excerpt) || undefined,
         type: input.type || 'post',
         parentId: input.parentId ?? null,
         authorId,
@@ -305,8 +318,13 @@ export async function createPost(input: PostInput, authorId: string) {
         ogTitle: input.ogTitle || undefined,
         ogDescription: input.ogDescription || undefined,
         ogImage: input.ogImage || undefined,
+        articleType: extras.articleType ?? 'article',
+        videoUrl: extras.videoUrl ?? null,
+        featuredImageFocus: extras.featuredImageFocus ?? null,
       },
     });
+
+    await saveExtras(tx, created.id, extras);
 
     if (input.categoryIds?.length) {
       await tx.postCategory.createMany({
@@ -330,9 +348,10 @@ export async function createPost(input: PostInput, authorId: string) {
       }
     }
 
-    return tx.post.findUniqueOrThrow({ where: { id: created.id }, include: postInclude });
+    return created.id;
   });
 
+  const post = await prisma.post.findUniqueOrThrow({ where: { id: createdId }, include: postInclude });
   return withPublicUrl(post);
 }
 
@@ -360,6 +379,8 @@ export async function updatePost(id: number, input: PostInput) {
   if (input.status !== undefined || input.scheduledFor !== undefined) {
     resolvedStatus = resolveStatusForUpdate(input, existing);
   }
+  const extras = prepareExtras(input);
+  assertPublishable(extras, extras.articleType ?? existing.articleType, resolvedStatus?.status ?? existing.status);
 
   if (input.categoryIds?.length) {
     const count = await prisma.category.count({ where: { id: { in: input.categoryIds } } });
@@ -368,14 +389,14 @@ export async function updatePost(id: number, input: PostInput) {
     }
   }
 
-  const post = await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     await tx.post.update({
       where: { id },
       data: {
         title,
         slug,
-        content: input.content,
-        excerpt: input.excerpt,
+        content: normalizeSpaces(input.content),
+        excerpt: normalizeSpaces(input.excerpt),
         ...(input.parentId !== undefined ? { parentId: input.parentId } : {}),
         featuredImage: input.featuredImage,
         ...(input.template !== undefined ? { template: input.template } : {}),
@@ -398,8 +419,13 @@ export async function updatePost(id: number, input: PostInput) {
         ogTitle: input.ogTitle,
         ogDescription: input.ogDescription,
         ogImage: input.ogImage,
+        ...(extras.articleType !== undefined ? { articleType: extras.articleType } : {}),
+        ...(extras.videoUrl !== undefined ? { videoUrl: extras.videoUrl } : {}),
+        ...(extras.featuredImageFocus !== undefined ? { featuredImageFocus: extras.featuredImageFocus } : {}),
       },
     });
+
+    await saveExtras(tx, id, extras);
 
     if (input.categoryIds !== undefined) {
       await tx.postCategory.deleteMany({ where: { postId: id } });
@@ -430,9 +456,9 @@ export async function updatePost(id: number, input: PostInput) {
       }
     }
 
-    return tx.post.findUniqueOrThrow({ where: { id }, include: postInclude });
   });
 
+  const post = await prisma.post.findUniqueOrThrow({ where: { id }, include: postInclude });
   return withPublicUrl(post);
 }
 
@@ -448,7 +474,7 @@ export async function deletePost(id: number) {
 export async function duplicatePost(id: number, authorId: string) {
   const original = await prisma.post.findUnique({
     where: { id },
-    include: { categories: true, tags: true },
+    include: { categories: true, tags: true, review: true, qna: true },
   });
   if (!original) throw new NotFoundError('Post not found');
 
@@ -480,9 +506,34 @@ export async function duplicatePost(id: number, authorId: string) {
       ogTitle: original.ogTitle,
       ogDescription: original.ogDescription,
       ogImage: original.ogImage,
+      articleType: original.articleType,
+      videoUrl: original.videoUrl,
+      featuredImageFocus: original.featuredImageFocus,
       authorId,
       categories: { create: original.categories.map((c) => ({ categoryId: c.categoryId })) },
       tags: { create: original.tags.map((t) => ({ tagId: t.tagId })) },
+      ...(original.review
+        ? {
+            review: {
+              create: (({ id: _id, postId: _postId, createdAt: _c, updatedAt: _u, ...r }) => ({
+                ...r,
+                highlights: r.highlights ?? Prisma.DbNull,
+                tracklist: r.tracklist ?? Prisma.DbNull,
+                streaming: r.streaming ?? Prisma.DbNull,
+              }))(original.review),
+            },
+          }
+        : {}),
+      ...(original.qna
+        ? {
+            qna: {
+              create: (({ id: _id, postId: _postId, createdAt: _c, updatedAt: _u, ...q }) => ({
+                ...q,
+                items: q.items ?? [],
+              }))(original.qna),
+            },
+          }
+        : {}),
     },
     include: postInclude,
   });

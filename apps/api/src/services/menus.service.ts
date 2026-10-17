@@ -1,5 +1,6 @@
 import { prisma } from '../config/database';
 import { ValidationError, NotFoundError, ConflictError } from '../utils/errors';
+import { normalizeIconName, normalizeIconSvg } from '../utils/iconSvg';
 
 const menuInclude = {
   items: {
@@ -80,6 +81,8 @@ export interface MenuItemInput {
   postId?: number;
   categoryId?: number;
   tagId?: number;
+  icon?: string | null;
+  iconSvg?: unknown;
   depth: number;
   position: number;
   isVisible: boolean;
@@ -120,6 +123,12 @@ export async function setMenuItems(menuId: number, items: MenuItemInput[]) {
           postId: item.postId || null,
           categoryId: item.categoryId || null,
           tagId: item.tagId || null,
+          // An icon is kept only with its shape, which is what the site draws.
+          ...(() => {
+            const icon = normalizeIconName(item.icon);
+            const iconSvg = icon ? normalizeIconSvg(item.iconSvg) ?? null : null;
+            return { icon: iconSvg ? icon : null, iconSvg };
+          })(),
           position: item.position,
           isVisible: item.isVisible ?? true,
         },

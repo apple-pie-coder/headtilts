@@ -9,6 +9,7 @@ export interface PostResult {
   excerpt: string | null;
   publishedAt: string | null;
   featuredImage: string | null;
+  featuredImageFocus: string | null;
   author: { username: string; firstName: string | null; lastName: string | null } | null;
   categories: { category: { name: string; slug: string } }[];
 }
@@ -108,7 +109,7 @@ async function searchPosts(q: string, limit: number, offset = 0): Promise<{ item
     const enriched = await prisma.post.findMany({
       where: { id: { in: ids } },
       select: {
-        id: true, title: true, slug: true, excerpt: true, publishedAt: true, featuredImage: true,
+        id: true, title: true, slug: true, excerpt: true, publishedAt: true, featuredImage: true, featuredImageFocus: true,
         author: { select: { username: true, firstName: true, lastName: true } },
         categories: { select: { category: { select: { name: true, slug: true } } } },
       },
@@ -140,7 +141,7 @@ async function searchPosts(q: string, limit: number, offset = 0): Promise<{ item
     prisma.post.findMany({
       where,
       select: {
-        id: true, title: true, slug: true, excerpt: true, publishedAt: true, featuredImage: true,
+        id: true, title: true, slug: true, excerpt: true, publishedAt: true, featuredImage: true, featuredImageFocus: true,
         author: { select: { username: true, firstName: true, lastName: true } },
         categories: { select: { category: { select: { name: true, slug: true } } } },
       },

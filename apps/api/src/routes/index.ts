@@ -23,6 +23,9 @@ import redirectRoutes from './redirects.routes';
 import backupRoutes from './backup.routes';
 import logsRoutes from './logs.routes';
 import healthRoutes from './health.routes';
+import feedbackRoutes from './feedback.routes';
+import issueRoutes from './issues.routes';
+import frontPageRoutes from './frontPage.routes';
 import publicRoutes from './public.routes';
 
 const router: IRouter = Router();
@@ -51,6 +54,9 @@ router.use('/redirects', redirectRoutes);
 router.use('/backups', backupRoutes);
 router.use('/logs', logsRoutes);
 router.use('/health', healthRoutes);
+router.use('/feedback', feedbackRoutes);
+router.use('/issues', issueRoutes);
+router.use('/front-page', frontPageRoutes);
 router.use('/public', publicRoutes);
 
 export default router;

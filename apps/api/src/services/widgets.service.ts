@@ -1,3 +1,4 @@
+import { withCardImages } from '../utils/cardImage';
 import { prisma } from '../config/database';
 import { ValidationError, NotFoundError, ConflictError } from '../utils/errors';
 import { getCalendarMonth } from './calendar.service';
@@ -262,32 +263,32 @@ export async function getPublicZone(zoneName: string) {
           .filter((item): item is { label: string; url: string } => item !== null);
       } else if (zww.widget.type === 'recent-posts') {
         const count = Math.min(Number(cfg.count) || 5, 20);
-        data = await prisma.post.findMany({
+        data = await withCardImages(await prisma.post.findMany({
           where: { status: 'published', type: 'post' },
           orderBy: { publishedAt: 'desc' },
           take: count,
-          select: { id: true, title: true, slug: true, publishedAt: true, excerpt: true, featuredImage: true },
-        });
+          select: { id: true, title: true, slug: true, publishedAt: true, excerpt: true, featuredImage: true, featuredImageFocus: true },
+        }));
       } else if (zww.widget.type === 'featured-posts') {
         const count = Math.min(Number(cfg.count) || 4, 12);
-        data = await prisma.post.findMany({
+        data = await withCardImages(await prisma.post.findMany({
           where: { status: 'published', type: 'post' },
           orderBy: [{ isFeatured: 'desc' }, { publishedAt: 'desc' }],
           take: count,
           select: {
             id: true, title: true, slug: true, publishedAt: true, excerpt: true,
-            featuredImage: true, isFeatured: true,
-            categories: { select: { category: { select: { id: true, name: true, slug: true } } } },
+            featuredImage: true, featuredImageFocus: true, isFeatured: true,
+            categories: { select: { category: { select: { id: true, name: true, slug: true, icon: true, iconSvg: true } } } },
           },
-        });
+        }));
       } else if (zww.widget.type === 'latest-posts-compact') {
         const count = Math.min(Number(cfg.count) || 5, 20);
-        data = await prisma.post.findMany({
+        data = await withCardImages(await prisma.post.findMany({
           where: { status: 'published', type: 'post' },
           orderBy: { publishedAt: 'desc' },
           take: count,
-          select: { id: true, title: true, slug: true, publishedAt: true, featuredImage: true },
-        });
+          select: { id: true, title: true, slug: true, publishedAt: true, featuredImage: true, featuredImageFocus: true },
+        }));
       } else if (zww.widget.type === 'category-posts-grid') {
         const count = Math.min(Number(cfg.count) || 4, 12);
         const categorySlug = cfg.categorySlug ? String(cfg.categorySlug) : '';
@@ -307,11 +308,11 @@ export async function getPublicZone(zoneName: string) {
           take: count,
           select: {
             id: true, title: true, slug: true, publishedAt: true, excerpt: true,
-            featuredImage: true, isFeatured: true,
-            categories: { select: { category: { select: { id: true, name: true, slug: true } } } },
+            featuredImage: true, featuredImageFocus: true, isFeatured: true,
+            categories: { select: { category: { select: { id: true, name: true, slug: true, icon: true, iconSvg: true } } } },
           },
         });
-        data = { category, posts };
+        data = { category, posts: await withCardImages(posts) };
       } else if (zww.widget.type === 'categories') {
         data = await prisma.category.findMany({
           orderBy: { name: 'asc' },
@@ -319,6 +320,8 @@ export async function getPublicZone(zoneName: string) {
             id: true,
             name: true,
             slug: true,
+            icon: true,
+            iconSvg: true,
             _count: { select: { posts: { where: { post: { status: 'published', type: 'post' } } } } },
           },
         });

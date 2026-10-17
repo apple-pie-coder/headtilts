@@ -243,7 +243,8 @@ export async function getPublicPoll(slug: string, voterIdentifier?: string) {
       },
     },
   });
-  if (!poll) throw new NotFoundError('Poll not found');
+  // Drafts aren't public, even to someone who knows the link.
+  if (!poll || poll.status === 'draft') throw new NotFoundError('Poll not found');
 
   // Auto-open/close by schedule
   const now = new Date();
@@ -281,6 +282,10 @@ export async function getPublicPoll(slug: string, voterIdentifier?: string) {
     isMyVote: myOptionIds.includes(opt.id),
   }));
 
+  const post = poll.postId
+    ? await prisma.post.findFirst({ where: { id: poll.postId, status: 'published' }, select: { id: true, title: true, slug: true, publishedAt: true } })
+    : null;
+
   return {
     id: poll.id,
     title: poll.title,
@@ -288,6 +293,7 @@ export async function getPublicPoll(slug: string, voterIdentifier?: string) {
     slug: poll.slug,
     description: poll.description,
     status: poll.status,
+    post,
     voteMode: poll.voteMode,
     resultVisibility: poll.resultVisibility,
     voterRestriction: poll.voterRestriction,
@@ -301,6 +307,57 @@ export async function getPublicPoll(slug: string, voterIdentifier?: string) {
     showResults,
     options,
   };
+}
+
+/** Open or close polls whose schedule has passed, so lists are accurate. */
+async function applySchedules() {
+  const now = new Date();
+  await prisma.poll.updateMany({ where: { status: 'scheduled', startsAt: { lte: now } }, data: { status: 'open' } });
+  await prisma.poll.updateMany({ where: { status: 'open', endsAt: { lt: now } }, data: { status: 'closed' } });
+}
+
+/**
+ * Polls for the public hub. Results are only included where the poll's own
+ * visibility rule allows it without a vote: always for closed polls, and for
+ * open polls set to show results "always" or "before voting".
+ */
+export async function listPublicPolls(status: 'open' | 'closed', page = 1, limit = 20) {
+  await applySchedules();
+  const where = { status };
+  const [rows, total] = await Promise.all([
+    prisma.poll.findMany({
+      where,
+      select: POLL_SELECT,
+      orderBy: status === 'closed' ? [{ endsAt: 'desc' as const }, { updatedAt: 'desc' as const }] : { createdAt: 'desc' as const },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.poll.count({ where }),
+  ]);
+  const items = rows.map((p) => {
+    const totalVotes = p._count.votes;
+    const reveal = p.status === 'closed' || p.resultVisibility === 'always' || p.resultVisibility === 'before_vote';
+    return {
+      id: p.id,
+      title: p.title,
+      question: p.question,
+      slug: p.slug,
+      description: p.description,
+      status: p.status,
+      voteMode: p.voteMode,
+      resultVisibility: p.resultVisibility,
+      featuredImage: p.featuredImage,
+      startsAt: p.startsAt,
+      endsAt: p.endsAt,
+      totalVotes,
+      optionCount: p.options.length,
+      options: reveal
+        ? p.options.map((o) => ({ text: o.text, votes: o._count.votes, percentage: totalVotes ? Math.round((o._count.votes / totalVotes) * 100) : 0 }))
+        : p.options.map((o) => ({ text: o.text, votes: null, percentage: null })),
+      _count: { votes: totalVotes },
+    };
+  });
+  return { items, total };
 }
 
 async function getPublicPollWithResults(slug: string, voterIdentifier: string) {

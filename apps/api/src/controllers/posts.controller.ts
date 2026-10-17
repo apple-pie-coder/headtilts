@@ -13,6 +13,8 @@ function handleError(res: Response, error: unknown): void {
   if (error instanceof ApiError) {
     sendError(res, error.code, error.message, error.statusCode, error.details);
   } else {
+    // Unexpected: keep the cause in the server log, the client only gets a generic 500.
+    console.error('[posts] unexpected error:', error);
     sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
   }
 }
@@ -85,6 +87,12 @@ function postInputFromBody(req: Request) {
     ogTitle,
     ogDescription,
     ogImage,
+    articleType,
+    videoUrl,
+    review,
+    qna,
+    seo,
+    featuredImageFocus,
   } = req.body;
 
   return {
@@ -122,6 +130,12 @@ function postInputFromBody(req: Request) {
     ogTitle,
     ogDescription,
     ogImage,
+    articleType,
+    videoUrl,
+    review,
+    qna,
+    seo,
+    featuredImageFocus,
   };
 }
 
@@ -138,6 +152,7 @@ export async function list(req: Request, res: Response): Promise<void> {
     const template = typeof req.query.template === 'string' ? req.query.template : undefined;
     const featuredRaw = typeof req.query.featured === 'string' ? req.query.featured : String(req.query.featured);
     const featured = featuredRaw === 'true' ? true : featuredRaw === 'false' ? false : undefined;
+    const articleType = typeof req.query.articleType === 'string' ? req.query.articleType : undefined;
     const SORT_BY_VALUES = ['title', 'publishedAt', 'updatedAt'] as const;
     type SortBy = (typeof SORT_BY_VALUES)[number];
     const sortByRaw = typeof req.query.sortBy === 'string' ? req.query.sortBy : undefined;
@@ -157,6 +172,7 @@ export async function list(req: Request, res: Response): Promise<void> {
       sortBy,
       sortOrder,
       type,
+      articleType,
     });
 
     const pages = Math.ceil(total / limit);

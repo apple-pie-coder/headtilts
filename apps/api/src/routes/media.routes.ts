@@ -12,7 +12,9 @@ router.use(authenticate);
 // Folders (static paths before /:id)
 router.get('/folders', requirePermission(PERMISSIONS.MEDIA_READ), asyncHandler(mediaController.listFolders));
 router.post('/folders', requirePermission(PERMISSIONS.MEDIA_UPLOAD), asyncHandler(mediaController.createFolder));
+router.put('/folders/:id', requirePermission(PERMISSIONS.MEDIA_UPLOAD), asyncHandler(mediaController.renameFolder));
 router.delete('/folders/:id', requirePermission(PERMISSIONS.MEDIA_DELETE), asyncHandler(mediaController.deleteFolder));
+router.get('/counts', requirePermission(PERMISSIONS.MEDIA_READ), asyncHandler(mediaController.counts));
 
 // Bulk delete
 router.post('/bulk-delete', requirePermission(PERMISSIONS.MEDIA_DELETE), asyncHandler(mediaController.bulkRemove));

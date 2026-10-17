@@ -11,6 +11,8 @@ interface CelebrationInput {
   day?: number;
   year?: number | null;
   photo?: string | null;
+  photoCredit?: string | null;
+  photoCreditUrl?: string | null;
   message?: string | null;
   isActive?: boolean;
 }
@@ -22,7 +24,8 @@ const MAX_DAY = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 function validate(input: CelebrationInput, partial = false) {
   const data: {
     name?: string; type?: string; month?: number; day?: number;
-    year?: number | null; photo?: string | null; message?: string | null; isActive?: boolean;
+    year?: number | null; photo?: string | null; photoCredit?: string | null; photoCreditUrl?: string | null;
+    message?: string | null; isActive?: boolean;
   } = {};
 
   if (input.name !== undefined || !partial) {
@@ -74,6 +77,12 @@ function validate(input: CelebrationInput, partial = false) {
   }
 
   if (input.photo !== undefined) data.photo = input.photo?.trim() || null;
+  if (input.photoCredit !== undefined) data.photoCredit = input.photoCredit?.trim().slice(0, 300) || null;
+  if (input.photoCreditUrl !== undefined) {
+    const url = input.photoCreditUrl?.trim() || null;
+    if (url && (!/^https?:\/\//i.test(url) || url.length > 500)) throw new ValidationError('Photo credit link must be an http(s) URL');
+    data.photoCreditUrl = url;
+  }
   if (input.message !== undefined) data.message = input.message?.trim() || null;
   if (input.isActive !== undefined) data.isActive = Boolean(input.isActive);
 
@@ -115,6 +124,8 @@ export async function createCelebration(input: CelebrationInput) {
       day: data.day!,
       year: data.year ?? null,
       photo: data.photo ?? null,
+      photoCredit: data.photoCredit ?? null,
+      photoCreditUrl: data.photoCreditUrl ?? null,
       message: data.message ?? null,
       isActive: data.isActive ?? true,
     },
@@ -160,7 +171,7 @@ export async function getTodaysCelebrations() {
   const items = await prisma.celebration.findMany({
     where: { isActive: true, month: today.month, day: today.day },
     orderBy: [{ type: 'asc' }, { name: 'asc' }],
-    select: { id: true, name: true, type: true, month: true, day: true, year: true, photo: true, message: true },
+    select: { id: true, name: true, type: true, month: true, day: true, year: true, photo: true, photoCredit: true, photoCreditUrl: true, message: true },
   });
   return { date: today.date, items };
 }

@@ -26,8 +26,9 @@ export async function list(req: Request, res: Response): Promise<void> {
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
     const search = typeof req.query.search === 'string' ? req.query.search : undefined;
     const folderId = parseFolderId(req.query.folderId);
+    const sort = typeof req.query.sort === 'string' ? req.query.sort : undefined;
 
-    const { items, total } = await mediaService.listMedia(page, limit, { search, folderId });
+    const { items, total } = await mediaService.listMedia(page, limit, { search, folderId, sort });
     sendPaginatedSuccess(res, items, total, page, limit);
   } catch (error) {
     handleError(res, error);
@@ -148,6 +149,22 @@ export async function createFolder(req: Request, res: Response): Promise<void> {
   try {
     const folder = await mediaService.createFolder(req.body?.name);
     sendSuccess(res, folder, 201, 'Folder created');
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function renameFolder(req: Request, res: Response): Promise<void> {
+  try {
+    sendSuccess(res, await mediaService.renameFolder(parseIntParam(req.params.id), req.body?.name), 200, 'Folder renamed');
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function counts(_req: Request, res: Response): Promise<void> {
+  try {
+    sendSuccess(res, await mediaService.mediaCounts());
   } catch (error) {
     handleError(res, error);
   }

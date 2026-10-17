@@ -36,8 +36,8 @@ export async function getOne(req: Request, res: Response): Promise<void> {
 
 export async function create(req: Request, res: Response): Promise<void> {
   try {
-    const { name, slug, description, parentId, icon, showSidebar } = req.body;
-    const category = await categoriesService.createCategory({ name, slug, description, parentId, icon, showSidebar });
+    const { name, slug, description, parentId, icon, iconSvg, showSidebar } = req.body;
+    const category = await categoriesService.createCategory({ name, slug, description, parentId, icon, iconSvg, showSidebar });
     sendSuccess(res, category, 201, 'Category created successfully');
   } catch (error) {
     handleError(res, error);
@@ -47,8 +47,8 @@ export async function create(req: Request, res: Response): Promise<void> {
 export async function update(req: Request, res: Response): Promise<void> {
   try {
     const id = parseIntParam(req.params.id);
-    const { name, slug, description, parentId, icon, showSidebar } = req.body;
-    const category = await categoriesService.updateCategory(id, { name, slug, description, parentId, icon, showSidebar });
+    const { name, slug, description, parentId, icon, iconSvg, showSidebar } = req.body;
+    const category = await categoriesService.updateCategory(id, { name, slug, description, parentId, icon, iconSvg, showSidebar });
     sendSuccess(res, category, 200, 'Category updated successfully');
   } catch (error) {
     handleError(res, error);

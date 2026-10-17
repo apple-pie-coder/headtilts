@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
@@ -298,10 +299,17 @@ export async function getUploadConfig() {
   return { allowedMime: s.allowedMime, maxBytes: s.maxBytes, format: s.format };
 }
 
+const MEDIA_SORT: Record<string, Prisma.MediaOrderByWithRelationInput[]> = {
+  newest: [{ createdAt: 'desc' }, { id: 'desc' }],
+  oldest: [{ createdAt: 'asc' }, { id: 'asc' }],
+  name: [{ originalName: 'asc' }, { id: 'asc' }],
+  largest: [{ size: 'desc' }, { id: 'desc' }],
+};
+
 export async function listMedia(
   page: number,
   limit: number,
-  filters: { search?: string; folderId?: number | null } = {},
+  filters: { search?: string; folderId?: number | null; sort?: string } = {},
 ) {
   const where = {
     ...(filters.search
@@ -320,7 +328,7 @@ export async function listMedia(
     prisma.media.findMany({
       where,
       include: uploaderInclude,
-      orderBy: { createdAt: 'desc' },
+      orderBy: MEDIA_SORT[filters.sort ?? ''] ?? MEDIA_SORT.newest,
       skip: (page - 1) * limit,
       take: limit,
     }),
@@ -490,6 +498,24 @@ export async function createFolder(name: string) {
   const conflict = await prisma.mediaFolder.findFirst({ where: { OR: [{ name: trimmed }, { slug }] } });
   if (conflict) throw new ConflictError('A folder with this name already exists');
   return prisma.mediaFolder.create({ data: { name: trimmed, slug } });
+}
+
+export async function renameFolder(id: number, name: string) {
+  const trimmed = name?.trim();
+  if (!trimmed) throw new ValidationError('Folder name is required');
+  const existing = await prisma.mediaFolder.findUnique({ where: { id } });
+  if (!existing) throw new NotFoundError('Folder not found');
+  const slug = slugify(trimmed);
+  if (!slug) throw new ValidationError('Could not derive a folder slug');
+  const conflict = await prisma.mediaFolder.findFirst({ where: { id: { not: id }, OR: [{ name: trimmed }, { slug }] } });
+  if (conflict) throw new ConflictError('A folder with this name already exists');
+  return prisma.mediaFolder.update({ where: { id }, data: { name: trimmed, slug } });
+}
+
+/** Totals for the library's "All media" and "Unfiled" entries. */
+export async function mediaCounts() {
+  const [all, unfiled] = await Promise.all([prisma.media.count(), prisma.media.count({ where: { folderId: null } })]);
+  return { all, unfiled };
 }
 
 export async function deleteFolder(id: number) {
