@@ -421,7 +421,8 @@ export async function getPollAnalytics() {
     },
     pollBreakdown,
     votesOverTime: rawVotesOverTime.map((r) => ({
-      date: String(r.date).slice(0, 10),
+      // MySQL DATE comes back as a Date; String() would give "Sat Oct 17", not 2026-10-17.
+      date: (r.date as unknown) instanceof Date ? (r.date as unknown as Date).toISOString().slice(0, 10) : String(r.date).slice(0, 10),
       votes: Number(r.votes),
     })),
   };

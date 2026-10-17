@@ -37,7 +37,7 @@ export function BackToTop() {
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
     // Keyboard and screen-reader users should land at the top too.
-    const target = document.querySelector<HTMLElement>('main h1, main') ?? document.body;
+    const target = document.querySelector<HTMLElement>('main h1') ?? document.querySelector<HTMLElement>('main') ?? document.body;
     if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
     target.focus({ preventScroll: true });
   }
