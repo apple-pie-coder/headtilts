@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { prisma } from '../config/database';
-import { NotFoundError, ValidationError } from '../utils/errors';
+import { ApiError, NotFoundError, ValidationError } from '../utils/errors';
 import { sendMail } from './mail.service';
 import * as notifications from './notifications.service';
 
@@ -262,7 +262,9 @@ export async function createPublicComment(input: CreateCommentInput) {
   };
 }
 
-export async function toggleReaction(commentId: number, emoji: string, visitorId?: string) {
+const MAX_REACTORS_PER_IP = 20;
+
+export async function toggleReaction(commentId: number, emoji: string, visitorId?: string, ipAddress?: string) {
   if (!REACTION_EMOJIS.includes(emoji as typeof REACTION_EMOJIS[number])) {
     throw new ValidationError('Unknown reaction');
   }
@@ -286,7 +288,14 @@ export async function toggleReaction(commentId: number, emoji: string, visitorId
   if (existing) {
     await prisma.commentReaction.delete({ where: { id: existing.id } });
   } else {
-    await prisma.commentReaction.create({ data: { commentId, emoji, visitorId: visitor } });
+    // visitorId is browser-generated; cap distinct "visitors" per network.
+    if (ipAddress) {
+      const fromIp = await prisma.commentReaction.groupBy({ by: ['visitorId'], where: { commentId, ipAddress } });
+      if (fromIp.length >= MAX_REACTORS_PER_IP && !fromIp.some((v) => v.visitorId === visitor)) {
+        throw new ApiError('RATE_LIMITED', 'Too many reactions from your network on this comment', 429);
+      }
+    }
+    await prisma.commentReaction.create({ data: { commentId, emoji, visitorId: visitor, ipAddress: ipAddress || null } });
   }
 
   const reactions = await prisma.commentReaction.findMany({

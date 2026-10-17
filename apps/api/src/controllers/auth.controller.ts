@@ -235,7 +235,8 @@ export async function mfaVerify(req: Request, res: Response): Promise<void> {
     const user = await import('../config/database').then((m) =>
       m.prisma.user.findUnique({ where: { id: payload.sub }, select: { mfaSecret: true, mfaEnabled: true } }),
     );
-    if (!user?.mfaSecret || !mfaService.verifyTotp(user.mfaSecret, code)) {
+    // Only a confirmed (enabled) secret counts, and each code works once.
+    if (!user?.mfaEnabled || !user.mfaSecret || !(await mfaService.verifyAndConsumeTotp(payload.sub, user.mfaSecret, String(code)))) {
       sendError(res, 'UNAUTHORIZED', 'Invalid authentication code', 401);
       return;
     }
@@ -311,12 +312,12 @@ export async function mfaEnable(req: Request, res: Response): Promise<void> {
 
 export async function mfaDisable(req: Request, res: Response): Promise<void> {
   try {
-    const { password } = req.body;
-    if (!password) {
-      sendError(res, 'VALIDATION_ERROR', 'Password is required', 400);
+    const { password, code } = req.body;
+    if (!password || !code) {
+      sendError(res, 'VALIDATION_ERROR', 'Password and an authentication (or backup) code are required', 400);
       return;
     }
-    await authService.disableMfa(req.user!.sub, password);
+    await authService.disableMfa(req.user!.sub, password, String(code));
     sendSuccess(res, { message: 'MFA disabled' });
   } catch (error) {
     if (error instanceof ApiError) {
@@ -331,6 +332,47 @@ export async function mfaStatus(req: Request, res: Response): Promise<void> {
   try {
     const result = await mfaService.getMfaStatus(req.user!.sub);
     sendSuccess(res, result);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      sendError(res, error.code, error.message, error.statusCode, error.details);
+    } else {
+      sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+    }
+  }
+}
+
+// ── Login-time MFA enrolment (role enforces MFA, user not enrolled yet) ──────
+
+export async function mfaEnrollStart(req: Request, res: Response): Promise<void> {
+  try {
+    const payload = typeof req.body?.mfaToken === 'string' ? verifyMfaToken(req.body.mfaToken) : null;
+    if (!payload) {
+      sendError(res, 'UNAUTHORIZED', 'Invalid or expired MFA token', 401);
+      return;
+    }
+    sendSuccess(res, await authService.startMfaEnrollment(payload.sub));
+  } catch (error) {
+    if (error instanceof ApiError) {
+      sendError(res, error.code, error.message, error.statusCode, error.details);
+    } else {
+      sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+    }
+  }
+}
+
+export async function mfaEnrollComplete(req: Request, res: Response): Promise<void> {
+  try {
+    const payload = typeof req.body?.mfaToken === 'string' ? verifyMfaToken(req.body.mfaToken) : null;
+    if (!payload) {
+      sendError(res, 'UNAUTHORIZED', 'Invalid or expired MFA token', 401);
+      return;
+    }
+    if (!req.body?.code) {
+      sendError(res, 'VALIDATION_ERROR', 'Authentication code is required', 400);
+      return;
+    }
+    const result = await authService.completeMfaEnrollment(payload.sub, String(req.body.code));
+    sendSuccess(res, deliverSession(req, res, result));
   } catch (error) {
     if (error instanceof ApiError) {
       sendError(res, error.code, error.message, error.statusCode, error.details);

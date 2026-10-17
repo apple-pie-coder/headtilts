@@ -21,6 +21,8 @@ router.get('/me', authenticate, asyncHandler(authController.me));
 // MFA — unauthenticated step-2 login
 router.post('/mfa/verify', authLimiter, asyncHandler(authController.mfaVerify));
 router.post('/mfa/verify-backup', authLimiter, asyncHandler(authController.mfaVerifyBackup));
+router.post('/mfa/enroll/start', authLimiter, asyncHandler(authController.mfaEnrollStart));
+router.post('/mfa/enroll/complete', authLimiter, asyncHandler(authController.mfaEnrollComplete));
 
 // MFA — authenticated setup/management
 router.get('/mfa/status', authenticate, asyncHandler(authController.mfaStatus));

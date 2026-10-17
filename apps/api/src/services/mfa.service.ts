@@ -23,6 +23,25 @@ export function verifyTotp(secret: string, token: string): boolean {
   return typeof result === 'object' ? result.valid : result;
 }
 
+/**
+ * Verifies a TOTP code and atomically records the time-step it matched, so the
+ * same code can never be accepted twice (e.g. one shoulder-surfed or phished
+ * moments after the user typed it).
+ */
+export async function verifyAndConsumeTotp(userId: string, secret: string, token: string): Promise<boolean> {
+  if (typeof token !== 'string' || !/^\d{6}$/.test(token)) return false;
+  const result = verifySync({ token, secret }) as unknown;
+  if (typeof result !== 'object' || result === null) return false;
+  const { valid, timeStep, delta } = result as { valid: boolean; timeStep?: number; delta?: number };
+  if (!valid || typeof timeStep !== 'number') return false;
+  const step = timeStep + (delta ?? 0);
+  const { count } = await prisma.user.updateMany({
+    where: { id: userId, OR: [{ mfaLastUsedStep: null }, { mfaLastUsedStep: { lt: step } }] },
+    data: { mfaLastUsedStep: step },
+  });
+  return count === 1;
+}
+
 function generateCode(): string {
   return crypto.randomBytes(5).toString('hex').toUpperCase();
 }
@@ -37,6 +56,7 @@ export function generateBackupCodes(): { plain: string[]; hashed: string[] } {
 }
 
 export async function consumeBackupCode(userId: string, inputCode: string): Promise<boolean> {
+  if (typeof inputCode !== 'string') return false;
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { mfaBackupCodes: true } });
   if (!user?.mfaBackupCodes) return false;
 
@@ -46,8 +66,12 @@ export async function consumeBackupCode(userId: string, inputCode: string): Prom
   if (idx === -1) return false;
 
   stored.splice(idx, 1);
-  await prisma.user.update({ where: { id: userId }, data: { mfaBackupCodes: JSON.stringify(stored) } });
-  return true;
+  // Compare-and-swap: if two requests race with the same code, only one wins.
+  const { count } = await prisma.user.updateMany({
+    where: { id: userId, mfaBackupCodes: user.mfaBackupCodes },
+    data: { mfaBackupCodes: JSON.stringify(stored) },
+  });
+  return count === 1;
 }
 
 export async function getMfaStatus(userId: string): Promise<{ enabled: boolean; backupCodesRemaining: number }> {
