@@ -15,6 +15,7 @@ import { applyRobotsPolicy } from '../utils/seo';
 import { SearchBar } from './SearchBar';
 import { BackgroundEffect } from './BackgroundEffect';
 import { isFrontPagePreview } from './FrontPage';
+import { BackToTop } from './BackToTop';
 
 const THEME_OPTIONS: { value: ThemeMode; icon: typeof faSun; label: string }[] = [
   { value: 'system', icon: faDesktop, label: 'System' },
@@ -99,6 +100,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
     {!isFrontPagePreview() && <BackgroundEffect />}
     <div className="site-wrap" style={{ position: 'relative', zIndex: 2 }}>
       {!isBlank && !isFrontPagePreview() && <CelebrationSpotlight />}
+      {!isFrontPagePreview() && <BackToTop />}
       {!isBlank && (
         <header className={`site-header${isFullBleed ? ' site-header--transparent' : ''}`}>
           <div className="container header-inner">
