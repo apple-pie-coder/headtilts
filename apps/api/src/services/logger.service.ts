@@ -228,3 +228,20 @@ export function inferAction(method: string, path: string): string {
   // Treat as a keyed entity update/delete — use the HTTP verb
   return `${cat}.${verb}`;
 }
+
+// The privacy policy promises that visitors' IP addresses and browser details
+// in these logs are kept for a limited time. After LOG_PII_DAYS they are
+// erased; the entries themselves stay, as the record of who changed what.
+const LOG_PII_DAYS = 90;
+
+export function startLogPrivacySweep(): NodeJS.Timeout {
+  const run = () => prisma.activityLog.updateMany({
+    where: {
+      timestamp: { lt: new Date(Date.now() - LOG_PII_DAYS * 86_400_000) },
+      OR: [{ ip: { not: null } }, { userAgent: { not: null } }],
+    },
+    data: { ip: null, userAgent: null },
+  }).catch((error) => console.error('Log privacy sweep failed:', error));
+  run();
+  return setInterval(run, 6 * 60 * 60 * 1000);
+}

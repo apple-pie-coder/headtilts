@@ -8,6 +8,7 @@ import { startBackupScheduler, } from './services/backupScheduler';
 import { heartbeat, startHealthSampler } from './services/healthMonitor';
 import { seedSmtpFromEnv } from './services/settings.service';
 import { reconcileBackupRecords } from './services/backup.service';
+import { startLogPrivacySweep } from './services/logger.service';
 
 const REQUIRED_ENV_VARS = ['DATABASE_URL', 'JWT_SECRET', 'JWT_REFRESH_SECRET'] as const;
 
@@ -79,12 +80,15 @@ async function start(): Promise<void> {
     console.log('✓ Scheduled post publisher running (every 60s)');
     // Once-a-minute health samples for the admin Health page (24h, in memory)
     const stopHealthSampler = startHealthSampler();
+    // Erase IPs and browser details from activity logs after 90 days
+    const logSweepTimer = startLogPrivacySweep();
 
     // Graceful shutdown
     process.on('SIGTERM', async () => {
       console.log('SIGTERM received, shutting down gracefully...');
       clearInterval(publisherTimer);
       clearInterval(backupTimer);
+      clearInterval(logSweepTimer);
       stopHealthSampler();
       await disconnectDatabase();
       process.exit(0);
@@ -94,6 +98,7 @@ async function start(): Promise<void> {
       console.log('SIGINT received, shutting down gracefully...');
       clearInterval(publisherTimer);
       clearInterval(backupTimer);
+      clearInterval(logSweepTimer);
       stopHealthSampler();
       await disconnectDatabase();
       process.exit(0);

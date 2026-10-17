@@ -8,6 +8,14 @@
 #   docker compose up -d --build
 #   docker compose exec api sh -c "cd apps/api && node_modules/.bin/prisma db seed"
 
+# Request logs hold visitors' IP addresses; keep them small and overwritten
+# (the privacy policy says access logs are rotated).
+x-logging: &rotated-logs
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   # ── Mailpit (local SMTP catcher; multi-arch MailHog replacement) ────────────
   mailpit:
@@ -48,6 +56,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.api
     restart: unless-stopped
+    logging: *rotated-logs
     depends_on:
       mysql:
         condition: service_healthy
@@ -85,6 +94,7 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-/api}
     restart: unless-stopped
+    logging: *rotated-logs
     depends_on:
       - api
     networks:
@@ -98,6 +108,7 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-/api}
     restart: unless-stopped
+    logging: *rotated-logs
     depends_on:
       - api
     networks:
@@ -109,6 +120,7 @@ services:
   nginx:
     image: nginx:stable-alpine
     restart: unless-stopped
+    logging: *rotated-logs
     ports:
       - "${HTTP_PORT:-80}:80"
     volumes:
