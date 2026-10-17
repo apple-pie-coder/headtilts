@@ -20,6 +20,7 @@ ENV VITE_API_URL=$VITE_API_URL
 COPY packages/shared ./packages/shared
 COPY apps/web        ./apps/web
 
+RUN pnpm --filter @headtilts/shared build
 RUN pnpm --filter @headtilts/web build
 
 # ── Stage 2: Serve with nginx ────────────────────────────────────────────────
