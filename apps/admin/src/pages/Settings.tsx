@@ -1,7 +1,14 @@
-import React, { FormEvent, useEffect, useState } from 'react';
+import React, { FormEvent, ReactNode, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
+import {
+  faSliders, faBookOpen, faComments, faImage, faLink, faChartLine, faEnvelope, faBell,
+} from '@fortawesome/free-solid-svg-icons';
 import { AxiosError } from 'axios';
 import { AdminLayout } from '../components/AdminLayout';
-import { MediaPickerInput } from '../components/MediaPickerInput';
+import { MediaLibraryModal } from '../components/MediaLibraryModal';
+import { resolveMediaUrl } from '../services/media';
 import { useToast } from '../components/ToastContext';
 import { fetchSettings, updateSettings, sendTestEmail } from '../services/settings';
 import { fetchPosts } from '../services/posts';
@@ -147,9 +154,9 @@ const MIME_OPTIONS: { group: string; items: [string, string][] }[] = [
 ];
 
 const AVATAR_OPTIONS = [
-  { value: 'mystery',          label: 'Mystery Person', desc: 'A silhouette outline' },
+  { value: 'mystery',          label: 'Mystery person', desc: 'A silhouette outline' },
   { value: 'blank',            label: 'Blank',          desc: 'A transparent image' },
-  { value: 'gravatar_default', label: 'Gravatar Logo',  desc: 'The Gravatar logo' },
+  { value: 'gravatar_default', label: 'Gravatar logo',  desc: 'The Gravatar logo' },
   { value: 'identicon',        label: 'Identicon',      desc: 'A geometric pattern based on email' },
   { value: 'wavatar',          label: 'Wavatar',        desc: 'Generated faces' },
   { value: 'retro',            label: 'Retro',          desc: 'Pixelated faces' },
@@ -177,6 +184,65 @@ function g(all: Setting[], key: string, fallback = '') {
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
+
+/**
+ * Pinned to the bottom of the screen inside each tab's form: says whether
+ * there's anything to save, and holds the Save button (⌘S / Ctrl+S too).
+ */
+function SaveBar({ dirty, saving, disabled, label = 'Save changes', onSave, children }: {
+  dirty?: boolean; saving: boolean; disabled: boolean; label?: string;
+  onSave?: () => void; children?: ReactNode;
+}) {
+  return (
+    <div className={`${styles.saveBar} ${dirty ? styles.saveBarDirty : ''}`} data-savebar>
+      <span className={styles.saveStatus} aria-live="polite">
+        {saving ? 'Saving…'
+          : dirty ? <><span className={styles.saveDot} />Unsaved changes<kbd className={styles.saveKbd}>{isMac ? '⌘S' : 'Ctrl+S'}</kbd></>
+          : dirty === false ? 'All changes saved' : null}
+      </span>
+      <div className={styles.saveActions}>
+        {children}
+        <button type={onSave ? 'button' : 'submit'} onClick={onSave} className={styles.saveButton} disabled={disabled} data-save>
+          {saving ? 'Saving…' : label}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** A logo or icon: preview on a checkerboard (dark for the dark-mode logo), choose or remove. */
+function ImageTile({ label, hint, value, onChange, disabled, dark }: {
+  label: string; hint: string; value: string; onChange: (url: string) => void; disabled?: boolean; dark?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={styles.imageTile}>
+      <div className={`${styles.imagePreview} ${dark ? styles.imagePreviewDark : ''}`}>
+        {value
+          ? <img src={resolveMediaUrl(value)} alt={`${label} preview`} onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
+          : <span className={styles.imageEmpty}>None</span>}
+      </div>
+      <div className={styles.imageBody}>
+        <span className={styles.imageLabel}>{label}</span>
+        <p className={styles.fieldHint}>{hint}</p>
+        <div className={styles.imageActions}>
+          <button type="button" className={styles.secondaryButton} onClick={() => setOpen(true)} disabled={disabled}>
+            {value ? 'Replace…' : 'Choose…'}
+          </button>
+          {value && (
+            <button type="button" className={styles.textButton} onClick={() => onChange('')} disabled={disabled}>Remove</button>
+          )}
+        </div>
+      </div>
+      {open && (
+        <MediaLibraryModal
+          onSelect={(media) => { onChange(media.url); setOpen(false); }}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
 
 function CheckField({
   id, label, hint, checked, onChange, disabled,
@@ -209,9 +275,25 @@ function CheckField({
 const TABS = ['General', 'Reading', 'Discussion', 'Media', 'Permalinks', 'Analytics', 'Email', 'Notifications'] as const;
 type Tab = (typeof TABS)[number];
 
+const TAB_META: Record<Tab, { icon: IconDefinition; desc: string; group: string }> = {
+  General:       { icon: faSliders,   group: 'Site',         desc: 'Name, logos, icons, date and time' },
+  Reading:       { icon: faBookOpen,  group: 'Site',         desc: 'Home page, feeds and search engines' },
+  Permalinks:    { icon: faLink,      group: 'Site',         desc: 'How post addresses look' },
+  Discussion:    { icon: faComments,  group: 'Content',      desc: 'Comments, moderation and avatars' },
+  Media:         { icon: faImage,     group: 'Content',      desc: 'Image sizes, uploads and formats' },
+  Analytics:     { icon: faChartLine, group: 'Integrations', desc: 'Google Analytics and visitor consent' },
+  Email:         { icon: faEnvelope,  group: 'Integrations', desc: 'Outgoing mail server (SMTP)' },
+  Notifications: { icon: faBell,      group: 'You',          desc: 'What you’re alerted about, and how' },
+};
+const TAB_GROUPS = ['Site', 'Content', 'Integrations', 'You'];
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+
 export default function SettingsPage() {
   const toast = useToast();
-  const [tab, setTab]     = useState<Tab>('General');
+  const [params, setParams] = useSearchParams();
+  const initialTab = TABS.find((t) => t.toLowerCase() === params.get('tab')) ?? 'General';
+  const [tab, setTab]     = useState<Tab>(initialTab);
+  const navRef = useRef<HTMLElement>(null);
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
 
@@ -317,6 +399,28 @@ export default function SettingsPage() {
     fetchPosts(1, 100, { type: 'page', status: 'published' })
       .then((r) => setPages(r.items))
       .catch(() => {});
+    // Opened straight on a tab that loads its own data (?tab=notifications)
+    if (initialTab === 'Notifications') switchTab('Notifications');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Phones show the tabs as one scrolling row: keep the current one in view.
+  useEffect(() => {
+    navRef.current?.querySelector<HTMLElement>('[aria-current="page"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  }, [tab]);
+
+  // ⌘S / Ctrl+S saves the open tab.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 's') return;
+      const button = document.querySelector<HTMLButtonElement>('[data-savebar] [data-save]');
+      if (!button) return;
+      e.preventDefault();
+      if (!button.disabled) button.click();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   async function load() {
@@ -450,6 +554,11 @@ export default function SettingsPage() {
 
   async function switchTab(t: Tab) {
     setTab(t);
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (t === 'General') next.delete('tab'); else next.set('tab', t.toLowerCase());
+      return next;
+    }, { replace: true });
     if (t === 'Notifications' && notifPrefs.length === 0 && !notifLoadError) {
       setNotifLoading(true);
       setNotifLoadError(null);
@@ -577,21 +686,38 @@ export default function SettingsPage() {
       />
 
       <div className={styles.layout}>
-        <nav className={styles.tabs}>
-          {TABS.map((t) => (
-            <button
-              key={t}
-              type="button"
-              className={t === tab ? styles.tabActive : styles.tab}
-              onClick={() => switchTab(t)}
-            >
-              {t}
-              {tabDirty[t] && <span className={styles.tabDot} title="Unsaved changes" aria-label="(unsaved changes)" />}
-            </button>
+        <nav className={styles.tabs} ref={navRef} aria-label="Settings sections">
+          {TAB_GROUPS.map((group) => (
+            <div key={group} className={styles.tabGroup}>
+              <span className={styles.tabGroupLabel}>{group}</span>
+              {TABS.filter((t) => TAB_META[t].group === group).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className={t === tab ? styles.tabActive : styles.tab}
+                  aria-current={t === tab ? 'page' : undefined}
+                  onClick={() => switchTab(t)}
+                >
+                  <FontAwesomeIcon icon={TAB_META[t].icon} className={styles.tabIcon} fixedWidth />
+                  <span className={styles.tabText}>
+                    <span className={styles.tabName}>{t}</span>
+                    <span className={styles.tabDesc}>{TAB_META[t].desc}</span>
+                  </span>
+                  {tabDirty[t] && <span className={styles.tabDot} title="Unsaved changes" aria-label="(unsaved changes)" />}
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
 
         <div className={styles.content}>
+          <header className={styles.tabHeader}>
+            <span className={styles.tabHeaderIcon}><FontAwesomeIcon icon={TAB_META[tab].icon} /></span>
+            <div>
+              <h2 className={styles.tabTitle}>{tab}</h2>
+              <p className={styles.tabSubtitle}>{TAB_META[tab].desc}</p>
+            </div>
+          </header>
       {loading ? (
         <div className={styles.panel}><p className={styles.loadingText}>Loading…</p></div>
       ) : tab === 'General' ? (
@@ -602,9 +728,9 @@ export default function SettingsPage() {
         }}>
 
           <div className={styles.panel}>
-            <h3 className={styles.sectionTitle}>Site Identity</h3>
+            <h3 className={styles.sectionTitle}>Site identity</h3>
             <div className={styles.formTable}>
-              <label className={styles.formLabel} htmlFor="site_title">Site Title</label>
+              <label className={styles.formLabel} htmlFor="site_title">Site title</label>
               <div className={styles.formField}>
                 <input id="site_title" type="text" className={styles.regularText} value={siteTitle}
                   onChange={(e) => setSiteTitle(e.target.value)} disabled={saving} />
@@ -624,69 +750,55 @@ export default function SettingsPage() {
                 />
               </div>
 
-              <label className={styles.formLabel}>Logo</label>
-              <div className={styles.formField}>
-                <MediaPickerInput value={siteLogo} onChange={setSiteLogo} disabled={saving} />
-                <p className={styles.fieldHint}>Shown in the site header, admin sidebar and login. Leave empty to use the site title text.</p>
-              </div>
-
-              <label className={styles.formLabel}>Dark Mode Logo</label>
-              <div className={styles.formField}>
-                <MediaPickerInput value={siteLogoDark} onChange={setSiteLogoDark} disabled={saving} />
-                <p className={styles.fieldHint}>Used in the site header when a visitor has dark mode enabled. Leave empty to reuse the logo above.</p>
-              </div>
-
-              <label className={styles.formLabel}>Site Favicon</label>
-              <div className={styles.formField}>
-                <MediaPickerInput value={siteFavicon} onChange={setSiteFavicon} disabled={saving} />
-                <p className={styles.fieldHint}>Browser tab icon for the public site. Use a square image (PNG, ICO, SVG) — 32×32 px recommended.</p>
-              </div>
-
-              <label className={styles.formLabel}>Admin Favicon</label>
-              <div className={styles.formField}>
-                <MediaPickerInput value={adminFavicon} onChange={setAdminFavicon} disabled={saving} />
-                <p className={styles.fieldHint}>Browser tab icon for the admin panel. Leave empty to use the same as the site favicon.</p>
-              </div>
-
-              <label className={styles.formLabel} htmlFor="site_logo_height">Public Logo Height</label>
-              <div className={styles.formField}>
-                <input
-                  id="site_logo_height" type="number" min="16" max="200" step="1"
-                  className={styles.regularText} style={{ width: '120px' }}
-                  placeholder="32"
-                  value={siteLogoHeight}
-                  onChange={(e) => setSiteLogoHeight(e.target.value)}
-                  disabled={saving}
-                />
-                <p className={styles.fieldHint}>Logo height in pixels for the public site header. Leave empty for the default (32 px).</p>
-              </div>
-
-              <label className={styles.formLabel} htmlFor="admin_logo_height">Admin Logo Height</label>
-              <div className={styles.formField}>
-                <input
-                  id="admin_logo_height" type="number" min="16" max="200" step="1"
-                  className={styles.regularText} style={{ width: '120px' }}
-                  placeholder="32"
-                  value={adminLogoHeight}
-                  onChange={(e) => setAdminLogoHeight(e.target.value)}
-                  disabled={saving}
-                />
-                <p className={styles.fieldHint}>Logo height in pixels for the admin sidebar. Leave empty for the default (32 px).</p>
-              </div>
-
-              <label className={styles.formLabel} htmlFor="site_description">Site Description</label>
+              <label className={styles.formLabel} htmlFor="site_description">Site description</label>
               <div className={styles.formField}>
                 <textarea id="site_description" className={styles.largeText} value={siteDescription}
                   onChange={(e) => setSiteDescription(e.target.value)} rows={3} disabled={saving} />
-                <p className={styles.fieldHint}>A brief description used in meta tags and RSS feeds.</p>
+                <p className={styles.fieldHint}>A sentence or two about the site, used by search engines, link previews and the RSS feed.</p>
               </div>
+            </div>
+          </div>
+
+          <div className={styles.panel}>
+            <h3 className={styles.sectionTitle}>Logos &amp; icons</h3>
+            <div className={styles.imageGrid}>
+              <ImageTile label="Logo" value={siteLogo} onChange={setSiteLogo} disabled={saving}
+                hint="Site header, admin sidebar and login. Without one, the site title is shown as text." />
+              <ImageTile label="Dark mode logo" value={siteLogoDark} onChange={setSiteLogoDark} disabled={saving} dark
+                hint="For readers using dark mode. Without one, the logo above is used." />
+              <ImageTile label="Site favicon" value={siteFavicon} onChange={setSiteFavicon} disabled={saving}
+                hint="The public site's browser tab icon. A square image, 32 × 32 px or larger." />
+              <ImageTile label="Admin favicon" value={adminFavicon} onChange={setAdminFavicon} disabled={saving}
+                hint="The admin panel's tab icon. Without one, the site favicon is used." />
+            </div>
+            <div className={styles.sizeRow}>
+              <span className={styles.sizeRowLabel}>Logo height</span>
+              <label className={styles.sizeField} htmlFor="site_logo_height">
+                Public site
+                <span className={styles.inlineField}>
+                  <input id="site_logo_height" type="number" min="16" max="200" step="1"
+                    className={styles.smallText} placeholder="32" value={siteLogoHeight}
+                    onChange={(e) => setSiteLogoHeight(e.target.value)} disabled={saving} />
+                  <span className={styles.inputSuffix}>px</span>
+                </span>
+              </label>
+              <label className={styles.sizeField} htmlFor="admin_logo_height">
+                Admin sidebar
+                <span className={styles.inlineField}>
+                  <input id="admin_logo_height" type="number" min="16" max="200" step="1"
+                    className={styles.smallText} placeholder="32" value={adminLogoHeight}
+                    onChange={(e) => setAdminLogoHeight(e.target.value)} disabled={saving} />
+                  <span className={styles.inputSuffix}>px</span>
+                </span>
+              </label>
+              <span className={styles.fieldHint}>Leave empty for the default, 32 px.</span>
             </div>
           </div>
 
           <div className={styles.panel}>
             <h3 className={styles.sectionTitle}>Administration</h3>
             <div className={styles.formTable}>
-              <label className={styles.formLabel} htmlFor="admin_email">Administration Email Address</label>
+              <label className={styles.formLabel} htmlFor="admin_email">Administration email</label>
               <div className={styles.formField}>
                 <input id="admin_email" type="email" className={styles.regularText} value={adminEmail}
                   onChange={(e) => setAdminEmail(e.target.value)} disabled={saving} />
@@ -708,9 +820,9 @@ export default function SettingsPage() {
           </div>
 
           <div className={styles.panel}>
-            <h3 className={styles.sectionTitle}>Visual Effects</h3>
+            <h3 className={styles.sectionTitle}>Visual effects</h3>
             <div className={styles.formTable}>
-              <label className={styles.formLabel} htmlFor="background_effect">Public Site Background</label>
+              <label className={styles.formLabel} htmlFor="background_effect">Public site background</label>
               <div className={styles.formField}>
                 <select
                   id="background_effect"
@@ -733,7 +845,7 @@ export default function SettingsPage() {
           </div>
 
           <div className={styles.panel}>
-            <h3 className={styles.sectionTitle}>Date &amp; Time</h3>
+            <h3 className={styles.sectionTitle}>Date &amp; time</h3>
             <div className={styles.formTable}>
               <label className={styles.formLabel} htmlFor="timezone">Timezone</label>
               <div className={styles.formField}>
@@ -749,7 +861,7 @@ export default function SettingsPage() {
                 </select>
               </div>
 
-              <span className={styles.formLabel}>Date Format</span>
+              <span className={styles.formLabel}>Date format</span>
               <div className={styles.formField}>
                 <div className={styles.formatList}>
                   {DATE_FORMAT_PRESETS.map((fmt) => (
@@ -775,7 +887,7 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <span className={styles.formLabel}>Time Format</span>
+              <span className={styles.formLabel}>Time format</span>
               <div className={styles.formField}>
                 <div className={styles.formatList}>
                   {TIME_FORMAT_PRESETS.map((fmt) => (
@@ -804,7 +916,7 @@ export default function SettingsPage() {
                 </p>
               </div>
 
-              <label className={styles.formLabel} htmlFor="week_starts_on">Week Starts On</label>
+              <label className={styles.formLabel} htmlFor="week_starts_on">Week starts on</label>
               <div className={styles.formField}>
                 <select id="week_starts_on" className={styles.selectInput} value={weekStartsOn}
                   onChange={(e) => setWeekStartsOn(e.target.value)} disabled={saving}>
@@ -814,12 +926,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className={styles.submitRow}>
-            <button type="submit" className={styles.saveButton}
-              disabled={saving || !isDirty(curGeneral, savedGeneral)}>
-              {saving ? 'Saving…' : 'Save Changes'}
-            </button>
-          </div>
+          <SaveBar dirty={tabDirty.General} saving={saving} disabled={saving || !isDirty(curGeneral, savedGeneral)} />
         </form>
 
       ) : tab === 'Reading' ? (
@@ -830,7 +937,7 @@ export default function SettingsPage() {
         }}>
 
           <div className={styles.panel}>
-            <h3 className={styles.sectionTitle}>Front Page Displays</h3>
+            <h3 className={styles.sectionTitle}>Home page</h3>
             <div className={styles.formTable}>
               <span className={styles.formLabel}>Your homepage shows</span>
               <div className={styles.formField}>
@@ -885,7 +992,7 @@ export default function SettingsPage() {
                 </span>
               </div>
 
-              <label className={styles.formLabel} htmlFor="posts_per_rss">Syndication feeds show the most recent</label>
+              <label className={styles.formLabel} htmlFor="posts_per_rss">RSS feeds show the latest</label>
               <div className={styles.formField}>
                 <span className={styles.inlineField}>
                   <input id="posts_per_rss" type="number" className={styles.smallText} min={1} max={999}
@@ -915,17 +1022,17 @@ export default function SettingsPage() {
           </div>
 
           <div className={styles.panel}>
-            <h3 className={styles.sectionTitle}>Special Pages</h3>
+            <h3 className={styles.sectionTitle}>Special pages</h3>
             <p className={styles.fieldHint} style={{ marginBottom: '1rem' }}>
               Designate which pages serve specific roles across the site (navigation links, routing, etc.).
             </p>
             <div className={styles.formTable}>
               {(
                 [
-                  { label: 'Contact Page',        value: contactPageId,  set: setContactPageId  },
-                  { label: 'About Page',          value: aboutPageId,    set: setAboutPageId    },
-                  { label: 'Privacy Policy Page', value: privacyPageId,  set: setPrivacyPageId  },
-                  { label: 'Terms Page',          value: termsPageId,    set: setTermsPageId    },
+                  { label: 'Contact page',        value: contactPageId,  set: setContactPageId  },
+                  { label: 'About page',          value: aboutPageId,    set: setAboutPageId    },
+                  { label: 'Privacy policy page', value: privacyPageId,  set: setPrivacyPageId  },
+                  { label: 'Terms page',          value: termsPageId,    set: setTermsPageId    },
                 ] as { label: string; value: string; set: (v: string) => void }[]
               ).map(({ label, value, set }) => (
                 <React.Fragment key={label}>
@@ -945,9 +1052,9 @@ export default function SettingsPage() {
           </div>
 
           <div className={styles.panel}>
-            <h3 className={styles.sectionTitle}>Table of Contents</h3>
+            <h3 className={styles.sectionTitle}>Table of contents</h3>
             <div className={styles.formTable}>
-              <span className={styles.formLabel}>Show Table of Contents</span>
+              <span className={styles.formLabel}>On posts</span>
               <div className={styles.formField}>
                 <CheckField
                   id="toc_enabled"
@@ -962,9 +1069,9 @@ export default function SettingsPage() {
           </div>
 
           <div className={styles.panel}>
-            <h3 className={styles.sectionTitle}>Search Engine Visibility</h3>
+            <h3 className={styles.sectionTitle}>Search engines</h3>
             <div className={styles.formTable}>
-              <span className={styles.formLabel}>Search engines</span>
+              <span className={styles.formLabel}>Visibility</span>
               <div className={styles.formField}>
                 <CheckField
                   id="search_engine_visibility"
@@ -978,12 +1085,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className={styles.submitRow}>
-            <button type="submit" className={styles.saveButton}
-              disabled={saving || !isDirty(curReading, savedReading)}>
-              {saving ? 'Saving…' : 'Save Changes'}
-            </button>
-          </div>
+          <SaveBar dirty={tabDirty.Reading} saving={saving} disabled={saving || !isDirty(curReading, savedReading)} />
         </form>
 
       ) : tab === 'Discussion' ? (
@@ -994,7 +1096,7 @@ export default function SettingsPage() {
         }}>
 
           <div className={styles.panel}>
-            <h3 className={styles.sectionTitle}>Default Post Settings</h3>
+            <h3 className={styles.sectionTitle}>New posts</h3>
             <div className={styles.checkStack}>
               <CheckField id="default_comment_status"
                 label="Allow people to submit comments on new posts"
@@ -1005,7 +1107,7 @@ export default function SettingsPage() {
           </div>
 
           <div className={styles.panel}>
-            <h3 className={styles.sectionTitle}>Other Comment Settings</h3>
+            <h3 className={styles.sectionTitle}>Comment rules</h3>
             <div className={styles.checkStack}>
               <CheckField id="require_name_email"
                 label="Comment author must fill out name and email"
@@ -1040,7 +1142,7 @@ export default function SettingsPage() {
           </div>
 
           <div className={styles.panel}>
-            <h3 className={styles.sectionTitle}>Email Me Whenever</h3>
+            <h3 className={styles.sectionTitle}>Email me when</h3>
             <div className={styles.checkStack}>
               <CheckField id="notify_author"
                 label="Anyone posts a comment"
@@ -1056,7 +1158,7 @@ export default function SettingsPage() {
           <div className={styles.panel}>
             <h3 className={styles.sectionTitle}>Avatars</h3>
             <div className={styles.formTable}>
-              <span className={styles.formLabel}>Avatar Display</span>
+              <span className={styles.formLabel}>Show avatars</span>
               <div className={styles.formField}>
                 <CheckField id="show_avatars"
                   label="Show Avatars"
@@ -1064,7 +1166,7 @@ export default function SettingsPage() {
                   onChange={(v) => setShowAvatars(v ? 'yes' : 'no')} disabled={saving} />
               </div>
 
-              <span className={styles.formLabel}>Maximum Rating</span>
+              <span className={styles.formLabel}>Maximum rating</span>
               <div className={styles.formField}>
                 <div className={styles.radioStack}>
                   {AVATAR_RATINGS.map((r) => (
@@ -1078,7 +1180,7 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <span className={styles.formLabel}>Default Avatar</span>
+              <span className={styles.formLabel}>Default avatar</span>
               <div className={styles.formField}>
                 <div className={styles.avatarGrid}>
                   {AVATAR_OPTIONS.map((a) => (
@@ -1096,12 +1198,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className={styles.submitRow}>
-            <button type="submit" className={styles.saveButton}
-              disabled={saving || !isDirty(curDiscussion, savedDiscussion)}>
-              {saving ? 'Saving…' : 'Save Changes'}
-            </button>
-          </div>
+          <SaveBar dirty={tabDirty.Discussion} saving={saving} disabled={saving || !isDirty(curDiscussion, savedDiscussion)} />
         </form>
 
       ) : tab === 'Media' ? (
@@ -1112,94 +1209,79 @@ export default function SettingsPage() {
         }}>
 
           <div className={styles.panel}>
-            <h3 className={styles.sectionTitle}>Image Sizes</h3>
+            <h3 className={styles.sectionTitle}>Image sizes</h3>
             <p className={styles.fieldHint} style={{ marginBottom: '1.25rem' }}>
               The sizes listed below determine the maximum dimensions in pixels to use when inserting an image into the body of a post. Enter <strong>0</strong> for no resizing.
             </p>
 
-            {/* Thumbnail */}
-            <div className={styles.imageSizeBlock}>
-              <div className={styles.imageSizeTitle}>Thumbnail size</div>
-              <div className={styles.formTable}>
-                <label className={styles.formLabel} htmlFor="thumb_w">Width</label>
-                <div className={styles.formField}>
-                  <span className={styles.inlineField}>
-                    <input id="thumb_w" type="number" className={styles.smallText} min={0}
-                      value={thumbW} onChange={(e) => setThumbW(e.target.value)} disabled={saving} />
-                    <span className={styles.inputSuffix}>px</span>
-                  </span>
+            <div className={styles.sizeCards}>
+              <div className={styles.sizeCard}>
+                <span className={styles.sizeCardTitle}>Thumbnail</span>
+                <div className={styles.sizeInputs}>
+                  <label htmlFor="thumb_w">Width
+                    <span className={styles.inlineField}>
+                      <input id="thumb_w" type="number" className={styles.smallText} min={0}
+                        value={thumbW} onChange={(e) => setThumbW(e.target.value)} disabled={saving} />
+                      <span className={styles.inputSuffix}>px</span>
+                    </span>
+                  </label>
+                  <label htmlFor="thumb_h">Height
+                    <span className={styles.inlineField}>
+                      <input id="thumb_h" type="number" className={styles.smallText} min={0}
+                        value={thumbH} onChange={(e) => setThumbH(e.target.value)} disabled={saving} />
+                      <span className={styles.inputSuffix}>px</span>
+                    </span>
+                  </label>
                 </div>
-
-                <label className={styles.formLabel} htmlFor="thumb_h">Height</label>
-                <div className={styles.formField}>
-                  <span className={styles.inlineField}>
-                    <input id="thumb_h" type="number" className={styles.smallText} min={0}
-                      value={thumbH} onChange={(e) => setThumbH(e.target.value)} disabled={saving} />
-                    <span className={styles.inputSuffix}>px</span>
-                  </span>
-                </div>
-
-                <span className={styles.formLabel}>Crop</span>
-                <div className={styles.formField}>
-                  <CheckField id="thumbnail_crop"
-                    label="Crop thumbnail to exact dimensions (normally thumbnails are proportional)"
-                    checked={thumbCrop === 'yes'}
-                    onChange={(v) => setThumbCrop(v ? 'yes' : 'no')} disabled={saving} />
+                <CheckField id="thumbnail_crop"
+                  label="Crop to exactly this size"
+                  hint="Otherwise thumbnails keep their proportions."
+                  checked={thumbCrop === 'yes'}
+                  onChange={(v) => setThumbCrop(v ? 'yes' : 'no')} disabled={saving} />
+              </div>
+              <div className={styles.sizeCard}>
+                <span className={styles.sizeCardTitle}>Medium</span>
+                <div className={styles.sizeInputs}>
+                  <label htmlFor="medium_w">Max width
+                    <span className={styles.inlineField}>
+                      <input id="medium_w" type="number" className={styles.smallText} min={0}
+                        value={mediumW} onChange={(e) => setMediumW(e.target.value)} disabled={saving} />
+                      <span className={styles.inputSuffix}>px</span>
+                    </span>
+                  </label>
+                  <label htmlFor="medium_h">Max height
+                    <span className={styles.inlineField}>
+                      <input id="medium_h" type="number" className={styles.smallText} min={0}
+                        value={mediumH} onChange={(e) => setMediumH(e.target.value)} disabled={saving} />
+                      <span className={styles.inputSuffix}>px</span>
+                    </span>
+                  </label>
                 </div>
               </div>
-            </div>
-
-            {/* Medium */}
-            <div className={styles.imageSizeBlock}>
-              <div className={styles.imageSizeTitle}>Medium size</div>
-              <div className={styles.formTable}>
-                <label className={styles.formLabel} htmlFor="medium_w">Max Width</label>
-                <div className={styles.formField}>
-                  <span className={styles.inlineField}>
-                    <input id="medium_w" type="number" className={styles.smallText} min={0}
-                      value={mediumW} onChange={(e) => setMediumW(e.target.value)} disabled={saving} />
-                    <span className={styles.inputSuffix}>px</span>
-                  </span>
-                </div>
-
-                <label className={styles.formLabel} htmlFor="medium_h">Max Height</label>
-                <div className={styles.formField}>
-                  <span className={styles.inlineField}>
-                    <input id="medium_h" type="number" className={styles.smallText} min={0}
-                      value={mediumH} onChange={(e) => setMediumH(e.target.value)} disabled={saving} />
-                    <span className={styles.inputSuffix}>px</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Large */}
-            <div className={styles.imageSizeBlock}>
-              <div className={styles.imageSizeTitle}>Large size</div>
-              <div className={styles.formTable}>
-                <label className={styles.formLabel} htmlFor="large_w">Max Width</label>
-                <div className={styles.formField}>
-                  <span className={styles.inlineField}>
-                    <input id="large_w" type="number" className={styles.smallText} min={0}
-                      value={largeW} onChange={(e) => setLargeW(e.target.value)} disabled={saving} />
-                    <span className={styles.inputSuffix}>px</span>
-                  </span>
-                </div>
-
-                <label className={styles.formLabel} htmlFor="large_h">Max Height</label>
-                <div className={styles.formField}>
-                  <span className={styles.inlineField}>
-                    <input id="large_h" type="number" className={styles.smallText} min={0}
-                      value={largeH} onChange={(e) => setLargeH(e.target.value)} disabled={saving} />
-                    <span className={styles.inputSuffix}>px</span>
-                  </span>
+              <div className={styles.sizeCard}>
+                <span className={styles.sizeCardTitle}>Large</span>
+                <div className={styles.sizeInputs}>
+                  <label htmlFor="large_w">Max width
+                    <span className={styles.inlineField}>
+                      <input id="large_w" type="number" className={styles.smallText} min={0}
+                        value={largeW} onChange={(e) => setLargeW(e.target.value)} disabled={saving} />
+                      <span className={styles.inputSuffix}>px</span>
+                    </span>
+                  </label>
+                  <label htmlFor="large_h">Max height
+                    <span className={styles.inlineField}>
+                      <input id="large_h" type="number" className={styles.smallText} min={0}
+                        value={largeH} onChange={(e) => setLargeH(e.target.value)} disabled={saving} />
+                      <span className={styles.inputSuffix}>px</span>
+                    </span>
+                  </label>
                 </div>
               </div>
             </div>
           </div>
 
           <div className={styles.panel}>
-            <h3 className={styles.sectionTitle}>Uploading Files</h3>
+            <h3 className={styles.sectionTitle}>Uploads</h3>
             <div className={styles.formTable}>
               <label className={styles.formLabel} htmlFor="max_upload_size">Maximum upload size</label>
               <div className={styles.formField}>
@@ -1221,7 +1303,7 @@ export default function SettingsPage() {
           </div>
 
           <div className={styles.panel}>
-            <h3 className={styles.sectionTitle}>Allowed File Types</h3>
+            <h3 className={styles.sectionTitle}>Allowed file types</h3>
             <p className={styles.fieldHint} style={{ marginBottom: '1rem' }}>
               Choose which file types contributors may upload. Unchecking a type blocks new uploads of it.
             </p>
@@ -1242,7 +1324,7 @@ export default function SettingsPage() {
           </div>
 
           <div className={styles.panel}>
-            <h3 className={styles.sectionTitle}>Image Delivery</h3>
+            <h3 className={styles.sectionTitle}>Image delivery</h3>
             <div className={styles.formTable}>
               <label className={styles.formLabel} htmlFor="media_format">Delivery format</label>
               <div className={styles.formField}>
@@ -1268,23 +1350,20 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className={styles.submitRow}>
-            <button type="submit" className={styles.saveButton}
-              disabled={saving || !isDirty(curMedia, savedMedia)}>
-              {saving ? 'Saving…' : 'Save Changes'}
-            </button>
-          </div>
+          <SaveBar dirty={tabDirty.Media} saving={saving} disabled={saving || !isDirty(curMedia, savedMedia)} />
         </form>
 
       ) : tab === 'Permalinks' ? (
         /* ═══════════════ PERMALINKS ═══════════════ */
-        <div className={styles.panel}>
-          <form onSubmit={(e: FormEvent) => {
-            e.preventDefault();
-            save({ permalink_structure: structure }, () => setSavedStructure(structure));
-          }}>
-            <p className={styles.intro}>
-              Choose the structure used to build URLs for your posts.
+        <form onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          save({ permalink_structure: structure }, () => setSavedStructure(structure));
+        }}>
+          <div className={styles.panel}>
+            <h3 className={styles.sectionTitle}>Post address structure</h3>
+            <p className={styles.sectionDesc}>
+              Choose how the addresses of your posts are built. Changing this later breaks links people have shared,
+              unless you add redirects.
             </p>
 
             <div className={styles.options}>
@@ -1304,7 +1383,7 @@ export default function SettingsPage() {
                 <input type="radio" name="permalink-structure" checked={isCustomPermalink}
                   onChange={() => { setStructure(customStructure); }} disabled={saving} />
                 <div className={styles.customRow}>
-                  <div className={styles.optionLabel}>Custom Structure</div>
+                  <div className={styles.optionLabel}>Custom structure</div>
                   <input type="text" className={styles.customInput} value={customStructure}
                     onChange={(e) => { setCustomStructure(e.target.value); setStructure(e.target.value); }}
                     onFocus={() => { setStructure(customStructure); }}
@@ -1325,14 +1404,9 @@ export default function SettingsPage() {
               ))}
             </div>
 
-            <div className={styles.actions}>
-              <button type="submit" className={styles.saveButton}
-                disabled={saving || structure === savedStructure || !structure}>
-                {saving ? 'Saving…' : 'Save Changes'}
-              </button>
-            </div>
-          </form>
-        </div>
+          </div>
+          <SaveBar dirty={tabDirty.Permalinks} saving={saving} disabled={saving || structure === savedStructure || !structure} />
+        </form>
       ) : tab === 'Analytics' ? (
         /* ═══════════════ ANALYTICS ═══════════════ */
         <form onSubmit={(e: FormEvent) => {
@@ -1421,12 +1495,7 @@ export default function SettingsPage() {
             <p className={styles.fieldHint}>To check it works, open Reports → Realtime in Google Analytics and visit the site in another browser.</p>
           </div>
 
-          <div className={styles.submitRow}>
-            <button type="submit" className={styles.saveButton}
-              disabled={saving || !gaIdValid || !isDirty(curAnalytics, savedAnalytics)}>
-              {saving ? 'Saving…' : 'Save Changes'}
-            </button>
-          </div>
+          <SaveBar dirty={tabDirty.Analytics} saving={saving} disabled={saving || !gaIdValid || !isDirty(curAnalytics, savedAnalytics)} />
         </form>
 
       ) : tab === 'Email' ? (
@@ -1438,7 +1507,7 @@ export default function SettingsPage() {
 
           {/* Toggle */}
           <div className={styles.panel}>
-            <h3 className={styles.sectionTitle}>Email Sending</h3>
+            <h3 className={styles.sectionTitle}>Sending</h3>
             <div className={styles.emailToggleRow}>
               <p className={styles.sectionDesc}>
                 When disabled, password resets and notifications are suppressed and logged to console instead.
@@ -1475,7 +1544,7 @@ export default function SettingsPage() {
                     disabled={saving || smtpEnabled !== 'true'} />
                 </div>
 
-                <label className={styles.formLabel} htmlFor="smtp_port">Port &amp; Security</label>
+                <label className={styles.formLabel} htmlFor="smtp_port">Port &amp; security</label>
                 <div className={styles.formField}>
                   <div className={styles.inlineRow}>
                     <input id="smtp_port" type="number" className={styles.smallText}
@@ -1531,40 +1600,34 @@ export default function SettingsPage() {
 
           </div>
 
-          <div className={styles.emailActions}>
-            <button type="submit" className={styles.saveButton}
-              disabled={saving || !isDirty(curEmail, savedEmail)}>
-              {saving ? 'Saving…' : 'Save Changes'}
-            </button>
-            <button
-              type="button"
-              className={styles.testEmailButton}
-              disabled={testingEmail || saving || smtpEnabled !== 'true' || !smtpHost}
-              onClick={async () => {
-                setTestingEmail(true);
-                try {
-                  const result = await sendTestEmail();
-                  toast.success(`Test email sent to ${result.to}`);
-                } catch {
-                  toast.error('Failed to send test email. Check your SMTP credentials.');
-                } finally {
-                  setTestingEmail(false);
-                }
-              }}
-            >
-              {testingEmail ? 'Sending…' : 'Send Test Email'}
-            </button>
-          </div>
-          <p className={styles.fieldHint} style={{ paddingBottom: '1.5rem' }}>
-            Save first, then test. Test email goes to your account email address.
-          </p>
+          <SaveBar dirty={tabDirty.Email} saving={saving} disabled={saving || !isDirty(curEmail, savedEmail)}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                title="Save first, then test. The test email goes to your account email address."
+                disabled={testingEmail || saving || smtpEnabled !== 'true' || !smtpHost}
+                onClick={async () => {
+                  setTestingEmail(true);
+                  try {
+                    const result = await sendTestEmail();
+                    toast.success(`Test email sent to ${result.to}`);
+                  } catch {
+                    toast.error('Failed to send test email. Check your SMTP credentials.');
+                  } finally {
+                    setTestingEmail(false);
+                  }
+                }}
+              >
+                {testingEmail ? 'Sending…' : 'Send test email'}
+              </button>
+          </SaveBar>
 
         </form>
       ) : tab === 'Notifications' ? (
         /* ═══════════════ NOTIFICATIONS ═══════════════ */
         <div>
           <div className={styles.panel}>
-            <h3 className={styles.sectionTitle}>Notification Preferences</h3>
+            <h3 className={styles.sectionTitle}>Notification preferences</h3>
             <p className={styles.sectionDesc}>
               Choose how you want to be notified for each event type.
               <strong> In-App</strong> notifications appear in the bell menu.
@@ -1645,17 +1708,8 @@ export default function SettingsPage() {
               </div>
             )}
 
-            <div className={styles.actions} style={{ marginTop: '1.5rem' }}>
-              <button
-                type="button"
-                className={styles.saveButton}
-                onClick={saveNotifPrefs}
-                disabled={savingNotif || notifPrefs.length === 0}
-              >
-                {savingNotif ? 'Saving…' : 'Save Preferences'}
-              </button>
-            </div>
           </div>
+          <SaveBar saving={savingNotif} disabled={savingNotif || notifPrefs.length === 0} label="Save preferences" onSave={saveNotifPrefs} />
         </div>
       ) : null}
         </div>

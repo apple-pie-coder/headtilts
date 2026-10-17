@@ -38,7 +38,7 @@
 
 .typeSwitch { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 .typeOptions {
-  display: inline-flex; padding: 3px; gap: 3px;
+  display: inline-flex; max-width: 100%; padding: 3px; gap: 3px;
   border-radius: var(--r-sm); background: var(--ghost); border: 1px solid var(--border);
 }
 .typeOption {
@@ -52,6 +52,13 @@
 .typeOption:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .typeHint { font-size: 0.8125rem; color: var(--t2); }
 .typeHint code { font-size: 0.75rem; padding: 0.0625rem 0.3rem; border-radius: 4px; background: var(--ghost); color: var(--t1); }
+/* Phones: the four types as an even row that always fits, icon over label. */
+@media (max-width: 600px) {
+  .typeSwitch { gap: 0.5rem; }
+  .typeOptions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; box-sizing: border-box; }
+  .typeOption { flex-direction: column; justify-content: center; gap: 0.2rem; min-height: 3rem; padding: 0.4rem 0.25rem; font-size: 0.75rem; }
+  .typeOption svg { font-size: 0.9375rem; }
+}
 
 /* ── Review panel ── */
 

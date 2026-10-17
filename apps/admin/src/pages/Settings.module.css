@@ -1,77 +1,101 @@
-
-
-/* ── Two-column layout ── */
+/* ── Layout: section nav + content ──
+   Desktop: a sticky, grouped nav on the left. Phones and small tablets: one
+   scrolling row of tabs pinned under the top bar. */
 
 .layout {
   display: grid;
-  grid-template-columns: 200px 1fr;
-  gap: 1.5rem;
+  grid-template-columns: 15.5rem minmax(0, 1fr);
+  gap: 2rem;
   align-items: start;
+  max-width: 76rem;
 }
 
-@media (max-width: 768px) {
-  .layout { grid-template-columns: 1fr; }
-}
-
-/* ── Sidebar nav ── */
+/* ── Section nav ── */
 
 .tabs {
-  background: var(--surface);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow), var(--glass-shine);
-  border-radius: var(--r);
-  padding: 0.375rem;
+  position: sticky;
+  top: 4.5rem;            /* clears the sticky top bar */
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
-  position: sticky;
-  top: 1rem;
+  gap: 1rem;
 }
 
-@media (max-width: 768px) {
-  .tabs {
-    flex-direction: row;
-    flex-wrap: wrap;
-    position: static;
-  }
+.tabGroup { display: flex; flex-direction: column; gap: 0.125rem; }
+
+.tabGroupLabel {
+  padding: 0 0.75rem 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t3);
 }
 
 .tab,
 .tabActive {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
   width: 100%;
-  text-align: left;
-  padding: 0.5rem 0.875rem;
+  padding: 0.5rem 0.75rem;
   border: none;
-  border-radius: calc(var(--r) - 4px);
+  border-radius: var(--r-sm);
   background: none;
+  text-align: left;
   cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
   color: var(--t2);
   transition: background var(--ease), color var(--ease);
-  white-space: nowrap;
 }
 
-.tab:hover {
-  background: var(--ghost);
-  color: var(--t1);
+.tab:hover { background: var(--ghost); color: var(--t1); }
+.tab:focus-visible, .tabActive:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.tabActive { background: var(--accent-bg); color: var(--accent-text); }
+
+.tabIcon { margin-top: 0.2rem; font-size: 0.9375rem; opacity: 0.85; }
+.tabText { display: flex; flex-direction: column; min-width: 0; }
+.tabName { font-size: 0.9375rem; font-weight: 600; line-height: 1.35; }
+.tabDesc { font-size: 0.75rem; line-height: 1.35; color: var(--t3); }
+.tabActive .tabDesc { color: inherit; opacity: 0.8; }
+
+.tabDot {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.75rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--warning);
 }
 
-.tabActive {
+/* ── Content column ── */
+
+.content { min-width: 0; max-width: 56rem; }
+
+.tabHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  margin-bottom: 1.25rem;
+}
+
+.tabHeaderIcon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--r-sm);
   background: var(--accent-bg);
   color: var(--accent-text);
-  font-weight: 600;
+  font-size: 1.0625rem;
 }
 
-/* ── Right content column ── */
+.tabTitle { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--t1); letter-spacing: -0.01em; }
+.tabSubtitle { margin: 0.125rem 0 0; font-size: 0.875rem; color: var(--t3); }
 
-.content {
-  min-width: 0;
-}
-
-/* ── Panels ── */
+/* ── Cards ── */
 
 .panel {
   background: var(--surface);
@@ -80,48 +104,243 @@
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow), var(--glass-shine);
   border-radius: var(--r);
-  padding: 1.5rem 2rem;
-  margin-bottom: 1.25rem;
+  padding: 1.25rem 1.5rem 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .sectionTitle {
-  margin: 0 0 1.25rem;
-  padding-bottom: 0.625rem;
-  border-bottom: 1px solid var(--sep);
+  margin: 0 0 1rem;
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 650;
   color: var(--t1);
 }
 
-/* ── Form table ── */
+.sectionTitle + .sectionDesc { margin-top: -0.625rem; }
+
+/* ── Label | field rows ── */
 
 .formTable {
   display: grid;
-  grid-template-columns: 220px 1fr;
-  row-gap: 1.125rem;
+  grid-template-columns: 12.5rem minmax(0, 1fr);
   column-gap: 1.5rem;
   align-items: start;
 }
 
-@media (max-width: 700px) {
-  .formTable { grid-template-columns: 1fr; }
-}
+/* Rows are label/field pairs; a hairline between them keeps long cards tidy. */
+.formTable > * { padding: 0.875rem 0; }
+.formTable > :nth-child(-n + 2) { padding-top: 0.25rem; }
+.formTable > :nth-child(n + 3) { border-top: 1px solid var(--sep); }
+.formTable > :nth-last-child(-n + 2) { padding-bottom: 0; }
 
 .formLabel {
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--t1);
-  padding-top: 0.5rem;
   line-height: 1.4;
+  padding-top: calc(0.875rem + 0.45rem);
 }
+.formTable > .formLabel:nth-child(-n + 2) { padding-top: calc(0.25rem + 0.45rem); }
 
 .formField { min-width: 0; }
+
+@media (max-width: 1100px) {
+  .formTable { grid-template-columns: 1fr; }
+  .formTable > * { padding: 0; }
+  .formTable > .formLabel,
+  .formTable > .formLabel:nth-child(-n + 2) { padding: 1rem 0 0.4rem; }
+  .formTable > .formLabel:first-child { padding-top: 0; border-top: none; }
+  .formTable > .formField { border-top: none; padding-bottom: 1rem; }
+  .formTable > .formField:last-child { padding-bottom: 0; }
+}
+
+/* ── Save bar: pinned to the bottom while you scroll the tab ── */
+
+.saveBar {
+  position: relative;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.5rem 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r);
+  background: var(--surface-overlay, var(--surface));
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.06);
+}
+
+/* Only pinned while there's something to save. */
+.saveBarDirty { position: sticky; border-color: color-mix(in srgb, var(--warning) 45%, var(--glass-border)); }
+
+.saveStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  font-size: 0.875rem;
+  color: var(--t3);
+}
+.saveBarDirty .saveStatus { color: var(--t1); font-weight: 600; }
+.saveDot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--warning); flex-shrink: 0; }
+.saveKbd {
+  padding: 0.0625rem 0.375rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--t3);
+}
+
+.saveActions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+
+/* ── Logos & icons ── */
+
+.imageGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(19rem, 100%), 1fr));
+  gap: 0.75rem;
+}
+
+.imageTile {
+  display: flex;
+  gap: 0.875rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  min-width: 0;
+}
+
+.imagePreview {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 6.5rem;
+  height: 5rem;
+  padding: 0.5rem;
+  border-radius: var(--r-xs);
+  /* checkerboard, so transparent logos read clearly */
+  /* fixed light colours: this is how the logo looks on the light site */
+  background: repeating-conic-gradient(#ffffff 0% 25%, #ececf0 0% 50%) 50% / 14px 14px;
+  border: 1px solid var(--sep);
+  box-sizing: border-box;
+}
+.imagePreviewDark { background: repeating-conic-gradient(#1d1d1f 0% 25%, #26262a 0% 50%) 50% / 14px 14px; }
+.imagePreview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.imageEmpty { font-size: 0.75rem; color: #6e6e73; }
+.imagePreviewDark .imageEmpty { color: #a1a1a6; }
+
+.imageBody { display: flex; flex-direction: column; min-width: 0; }
+.imageLabel { font-size: 0.875rem; font-weight: 600; color: var(--t1); }
+.imageBody .fieldHint { margin-top: 0.125rem; }
+.imageActions { display: flex; align-items: center; gap: 0.75rem; margin-top: auto; padding-top: 0.5rem; }
+
+.sizeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.5rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--sep);
+}
+.sizeRowLabel { font-size: 0.875rem; font-weight: 600; color: var(--t1); }
+.sizeField { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--t2); }
+.sizeRow .fieldHint { margin: 0; }
+
+/* ── Buttons ── */
+
+.secondaryButton {
+  padding: 0.4rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--t1);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--ease), border-color var(--ease);
+}
+.secondaryButton:hover:not(:disabled) { background: var(--ghost); border-color: var(--border-strong); }
+.secondaryButton:disabled { opacity: 0.55; cursor: not-allowed; }
+.secondaryButton:focus-visible, .textButton:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.textButton {
+  padding: 0.25rem 0;
+  border: none;
+  background: none;
+  color: var(--danger-t, var(--danger));
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.textButton:hover:not(:disabled) { text-decoration: underline; }
+
+/* ── Tablets and phones ── */
+
+@media (max-width: 1024px) {
+  .layout { grid-template-columns: 1fr; gap: 0; }
+
+  /* One scrolling row of tabs, pinned under the top bar */
+  .tabs {
+    position: sticky;
+    top: 3.5rem;
+    z-index: 20;
+    flex-direction: row;
+    gap: 0;
+    margin: 0 -2rem 1.25rem;
+    padding: 0.5rem 2rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+    background: var(--header-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border-bottom: 1px solid var(--sep);
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabGroup { flex-direction: row; gap: 0.25rem; }
+  .tabGroup + .tabGroup { margin-left: 0.25rem; padding-left: 0.25rem; border-left: 1px solid var(--sep); }
+  .tabGroupLabel, .tabDesc { display: none; }
+  .tab, .tabActive {
+    align-items: center;
+    gap: 0.4rem;
+    width: auto;
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .tabIcon { margin-top: 0; font-size: 0.8125rem; }
+  .tabName { font-size: 0.875rem; }
+  .tabDot { position: static; margin-left: 0.125rem; }
+  .content { max-width: none; }
+}
+
+@media (max-width: 768px) {
+  .tabs { margin: 0 -1rem 1rem; padding: 0.5rem 1rem; }
+  .tabHeader { margin-bottom: 1rem; }
+  .tabHeaderIcon { width: 2.25rem; height: 2.25rem; font-size: 1rem; }
+  .tabTitle { font-size: 1.125rem; }
+  .panel { padding: 1rem 1rem 1.125rem; border-radius: var(--r-sm); }
+  .saveBar {
+    margin: 0.5rem -1rem 0;
+    padding: 0.625rem 1rem calc(0.625rem + env(safe-area-inset-bottom));
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+  .saveKbd { display: none; }
+}
 
 /* ── Input variants ── */
 
 .regularText {
   width: 100%;
-  max-width: 400px;
+  max-width: 32rem;
   padding: 0.4375rem 0.75rem;
   background: var(--input-bg);
   border: 1px solid var(--input-border);
@@ -140,7 +359,7 @@
 
 .largeText {
   width: 100%;
-  max-width: 500px;
+  max-width: 40rem;
   padding: 0.4375rem 0.75rem;
   background: var(--input-bg);
   border: 1px solid var(--input-border);
@@ -188,7 +407,8 @@
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
   cursor: pointer;
-  min-width: 200px;
+  min-width: min(200px, 100%);
+  max-width: 100%;
   transition: border-color var(--ease), box-shadow var(--ease);
 }
 
@@ -289,13 +509,6 @@
   outline: none;
 }
 
-/* ── Submit row ── */
-
-.submitRow {
-  display: flex;
-  justify-content: flex-start;
-  padding: 0.25rem 0 1.5rem;
-}
 
 /* ── Notices ── */
 
@@ -584,6 +797,27 @@
   margin-bottom: 1rem;
 }
 
+/* ── Media: image size cards ── */
+
+.sizeCards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.sizeCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  min-width: 0;
+}
+.sizeCardTitle { font-size: 0.875rem; font-weight: 650; color: var(--t1); }
+.sizeInputs { display: flex; flex-wrap: wrap; gap: 0.625rem 1rem; }
+.sizeInputs label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.8125rem; color: var(--t2); }
+@media (max-width: 1100px) { .sizeCards { grid-template-columns: 1fr; } }
+
 /* ── Discussion: avatar grid ── */
 
 .avatarGrid {
@@ -856,6 +1090,12 @@
   min-width: 140px;
 }
 
+@media (max-width: 700px) {
+  .notifRow { flex-direction: column; gap: 0.75rem; padding: 0.875rem 1rem; }
+  .notifControls { width: 100%; }
+  .notifControls .selectInput { flex: 1; min-width: 0; }
+}
+
 /* Compact toggle for notification rows */
 .notifToggle {
   position: relative;
@@ -919,12 +1159,3 @@
 
 .testNotifButton:disabled { opacity: 0.45; cursor: not-allowed; }
 
-/* Unsaved-changes marker on a settings tab */
-.tabDot {
-  float: right;
-  width: 7px;
-  height: 7px;
-  margin: 0.45rem 0 0 0.5rem;
-  border-radius: 50%;
-  background: var(--warning);
-}
