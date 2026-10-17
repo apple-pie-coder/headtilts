@@ -56,7 +56,7 @@
 
 .brandIcon {
   font-size: 1.25rem;
-  color: var(--accent);
+  color: var(--accent-text);
   flex-shrink: 0;
 }
 
@@ -157,7 +157,7 @@
 
 .navActive {
   background: var(--nav-active) !important;
-  color: var(--accent) !important;
+  color: var(--accent-text) !important;
   font-weight: 600;
 }
 
@@ -215,6 +215,8 @@
 }
 
 /* ── Sidebar footer ── */
+
+.sidebarFooter .feedbackNav { display: none; }
 
 .sidebarFooter {
   padding: 0.5rem;
@@ -385,7 +387,7 @@
   height: 2rem;
   border-radius: 50%;
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 0.8rem;
   font-weight: 700;
   display: flex;
@@ -450,7 +452,7 @@
 .dropdownItem:hover { background: var(--nav-hover); }
 .dropdownIcon { color: var(--t2); font-size: 0.85rem; }
 .dropdownDanger { color: var(--danger-t); }
-.dropdownDanger .dropdownIcon { color: var(--danger); }
+.dropdownDanger .dropdownIcon { color: var(--danger-t); }
 .dropdownDanger:hover { background: var(--danger-bg); }
 
 .dropdownSep { border: none; border-top: 1px solid var(--sep); margin: 0.35rem 0.2rem; }
@@ -521,9 +523,10 @@
 .content {
   flex: 1;
   width: 100%;
-  max-width: 1440px;
   margin: 0 auto;
-  padding: 1.5rem 2rem 2rem;
+  /* Bottom room so the end of every page (pagination, save bars) can scroll
+     clear of the floating feedback button. */
+  padding: 1.5rem 2rem 5rem;
 }
 
 /* ── Admin footer ── */
@@ -596,8 +599,8 @@
   .layoutCollapsed {
     grid-template-columns: 1fr;
   }
-  .adminFooter { grid-column: 1; }
-  .footerHint { display: none; }
+  /* Phones: the status footer just takes space; Health is in the menu. */
+  .adminFooter { display: none; }
 
   .sidebar {
     position: fixed;
@@ -623,7 +626,8 @@
   .layoutCollapsed .sectionHeader { display: flex; }
   .layoutCollapsed .navLink { justify-content: flex-start; padding: 0 0.75rem; }
   .layoutCollapsed .navDot { display: none; }
-  .sidebarFooter { display: none; }
+  .sidebarFooter .collapseBtn:not(.feedbackNav) { display: none; }
+  .sidebarFooter .feedbackNav { display: flex; }
 
   .overlay {
     display: block;
@@ -658,7 +662,7 @@
   }
 
   .content {
-    padding: 1.25rem 1rem 1.5rem;
+    padding: 1.25rem 1rem 5rem;
   }
 }
 

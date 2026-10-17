@@ -26,7 +26,7 @@
 
 .backButton:hover {
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-bg);
 }
 
@@ -96,7 +96,7 @@
   border: none;
   border-bottom: 1px dashed var(--border);
   background: transparent;
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 0.8125rem;
   padding: 0.125rem 0.25rem;
 }
@@ -137,7 +137,7 @@
 .editorTabActive {
   background: var(--accent-bg);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* ── Markdown split pane ── */
@@ -201,7 +201,7 @@
 
 .markdownPreview :global(p) { margin: 0 0 1rem; }
 
-.markdownPreview :global(a) { color: var(--accent); }
+.markdownPreview :global(a) { color: var(--accent-text); }
 
 .markdownPreview :global(img) {
   max-width: 100%;
@@ -397,7 +397,7 @@
   align-items: center;
   gap: 0.25rem;
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--accent-text);
   border: 1px solid rgba(var(--accent-rgb, 0,113,227), 0.25);
   border-radius: 999px;
   font-size: 0.8125rem;
@@ -411,7 +411,7 @@
   border: none;
   padding: 0;
   cursor: pointer;
-  color: var(--danger);
+  color: var(--danger-t);
   font-size: 1rem;
   line-height: 1;
   opacity: 0.7;
@@ -487,7 +487,7 @@
 .addCatToggle:hover {
   background: var(--accent-bg);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .addCatForm {
@@ -597,7 +597,7 @@
 
 .imageActions button:hover { background: var(--ghost-h); }
 
-.imageRemoveButton { color: var(--danger) !important; }
+.imageRemoveButton { color: var(--danger-t) !important; }
 
 /* ── Shortcode reference ── */
 
@@ -680,7 +680,7 @@
 .scTag {
   font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
   font-size: 0.75rem;
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
   grid-column: 1;
   cursor: default;
@@ -722,7 +722,7 @@
 .scInsert:hover {
   background: var(--accent-bg);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .scFormatRef {
@@ -758,7 +758,7 @@
 .scFormatToken {
   font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-text);
   min-width: 1.25rem;
 }
 
@@ -820,7 +820,7 @@
 
 .revLogToggle {
   font-size: 0.75rem;
-  color: var(--accent);
+  color: var(--accent-text);
   background: none;
   border: none;
   cursor: pointer;
@@ -854,7 +854,7 @@
   height: 32px;
   border-radius: 50%;
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 0.75rem;
   font-weight: 700;
   display: flex;
@@ -926,14 +926,14 @@
 
 .revChange strong { color: var(--t1); font-weight: 600; }
 
-.revChange em { color: var(--accent); font-style: normal; }
+.revChange em { color: var(--accent-text); font-style: normal; }
 
 .revRestoreBtn {
   background: none;
   border: 1px solid var(--accent);
   border-radius: var(--r-sm);
   font-size: 0.6875rem;
-  color: var(--accent);
+  color: var(--accent-text);
   cursor: pointer;
   padding: 0.125rem 0.5rem;
   flex-shrink: 0;
@@ -963,7 +963,7 @@
 }
 
 .revArchiveBtn:hover {
-  color: var(--danger);
+  color: var(--danger-t);
   border-color: var(--danger);
   background: rgba(255, 59, 48, 0.06);
 }
@@ -1015,7 +1015,7 @@
   padding: 0;
   font-size: 0.8125rem;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-text);
   cursor: pointer;
   text-decoration: none;
 }

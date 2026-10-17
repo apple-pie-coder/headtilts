@@ -3,11 +3,11 @@ import {
   faGaugeHigh, faPenToSquare, faFileLines, faImages, faComments, faLayerGroup,
   faTags, faBars, faPuzzlePiece, faUsers, faUserShield, faSitemap, faEnvelope,
   faSliders, faCakeCandles, faChartBar, faKey, faArrowRight, faChartLine, faChartPie,
-  faBoxArchive, faClipboardList, faCalendarAlt, faHeartPulse, faUpload, faFileImport,
+  faBoxArchive, faClipboardList, faCalendarAlt, faHeartPulse, faUpload, faFileImport, faCommentDots, faListCheck, faTableCellsLarge
 } from '@fortawesome/free-solid-svg-icons';
 import { PERMISSIONS } from '@headtilts/shared';
 
-export type BadgeKey = 'comments' | 'contact';
+export type BadgeKey = 'comments' | 'contact' | 'feedback' | 'issues';
 
 export interface NavItem {
   label: string;
@@ -64,6 +64,7 @@ export const NAV_SECTIONS: NavSection[] = [
     id: 'appearance',
     label: 'Appearance',
     items: [
+      { label: 'Front page', to: '/admin/front-page', icon: faTableCellsLarge, permission: PERMISSIONS.WIDGET_READ },
       { label: 'Menus', to: '/admin/menus', icon: faBars, permission: PERMISSIONS.MENU_READ },
       { label: 'Widgets', to: '/admin/widgets', icon: faPuzzlePiece, permission: PERMISSIONS.WIDGET_READ },
     ],
@@ -86,7 +87,9 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: 'Redirects', to: '/admin/redirects', icon: faArrowRight, permission: PERMISSIONS.REDIRECT_READ },
       { label: 'Backups', to: '/admin/backups', icon: faBoxArchive, permission: PERMISSIONS.SYSTEM_BACKUP },
       { label: 'Activity Logs', to: '/admin/logs', icon: faClipboardList, permission: PERMISSIONS.LOG_READ },
-      { label: 'Health', to: '/admin/health', icon: faHeartPulse },
+      { label: 'Health', to: '/admin/health', icon: faHeartPulse, permission: PERMISSIONS.SETTING_READ },
+      { label: 'Feedback', to: '/admin/feedback', icon: faCommentDots, permission: PERMISSIONS.SETTING_READ, badge: 'feedback' },
+      { label: 'Issues', to: '/admin/issues', icon: faListCheck, permission: PERMISSIONS.SETTING_READ, badge: 'issues' },
     ],
   },
 ];

@@ -1,6 +1,5 @@
 .page {
   padding: 1.5rem 2rem;
-  max-width: 1400px;
 }
 
 /* Header */
@@ -24,7 +23,7 @@
   gap: 0.6rem;
 }
 
-.titleIcon { color: var(--accent); }
+.titleIcon { color: var(--accent-text); }
 
 .subtitle {
   margin: 0;
@@ -138,7 +137,7 @@
   align-items: center;
   justify-content: center;
   font-size: 1rem;
-  color: var(--accent);
+  color: var(--accent-text);
   flex-shrink: 0;
 }
 
@@ -256,10 +255,13 @@
 
 .heatLabel {
   font-size: 0.55rem;
-  color: #fff;
+  color: var(--t1);
   font-weight: 600;
   display: none;
 }
+
+/* Dense cells carry white labels; pale ones keep body text colour. */
+.heatCellStrong .heatLabel { color: #fff; }
 
 @media (min-width: 700px) { .heatLabel { display: block; } }
 

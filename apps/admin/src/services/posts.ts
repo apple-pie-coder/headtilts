@@ -1,6 +1,6 @@
 import { PaginatedResponse } from '@headtilts/shared';
 import { apiClient } from './api';
-import { Post } from '../types';
+import { ArticleType, Post, QnaSession, Review } from '../types';
 
 export interface PostInput {
   title: string;
@@ -14,6 +14,7 @@ export interface PostInput {
   /** Original publish date — only honoured when creating a published post. */
   publishedAt?: string | null;
   featuredImage?: string;
+  featuredImageFocus?: string | null;
   template?: string | null;
   isFeatured?: boolean;
   showSidebar?: boolean;
@@ -30,6 +31,12 @@ export interface PostInput {
   ogTitle?: string;
   ogDescription?: string;
   ogImage?: string;
+  articleType?: ArticleType;
+  videoUrl?: string | null;
+  /** Object = save, null = remove, omitted = leave as is. */
+  review?: Review | null;
+  qna?: QnaSession | null;
+  seo?: { focusKeyword: string | null; seoScore: number | null; readabilityScore: number | null };
 }
 
 export interface AuthorListItem {
@@ -57,6 +64,7 @@ export interface FetchPostsFilters {
   featured?: boolean;
   type?: string;
   template?: string;
+  articleType?: string;
   sortBy?: 'publishedAt' | 'updatedAt' | 'title';
   sortOrder?: 'asc' | 'desc';
 }
@@ -76,6 +84,7 @@ export async function fetchPosts(
       authorId: filters.authorId || undefined,
       featured: filters.featured !== undefined ? String(filters.featured) : undefined,
       template: filters.template || undefined,
+      articleType: filters.articleType || undefined,
       sortBy: filters.sortBy || undefined,
       sortOrder: filters.sortOrder || undefined,
       type: filters.type || 'post',

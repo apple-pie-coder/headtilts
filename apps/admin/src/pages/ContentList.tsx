@@ -80,6 +80,8 @@ function dateInfo(post: Post): { label: string; value?: string | null } {
   return { label: 'Modified', value: post.updatedAt };
 }
 
+const KIND_LABELS: Record<string, string> = { article: 'Article', news: 'News', review: 'Review', qna: 'Q&A' };
+
 export default function ContentList({ type }: { type: ContentType }) {
   const isPost = type === 'post';
   const noun = isPost ? 'post' : 'page';
@@ -102,6 +104,7 @@ export default function ContentList({ type }: { type: ContentType }) {
     category: '',
     template: '',
     featured: '',
+    kind: '',
     sort: isPost ? 'publishedAt:desc' : 'updatedAt:desc',
     page: '1',
     per: '20',
@@ -134,6 +137,7 @@ export default function ContentList({ type }: { type: ContentType }) {
         categoryId: q.category ? Number(q.category) : undefined,
         template: q.template || undefined,
         featured: q.featured === 'yes' ? true : q.featured === 'no' ? false : undefined,
+        articleType: isPost ? q.kind || undefined : undefined,
         sortBy,
         sortOrder,
       });
@@ -147,7 +151,7 @@ export default function ContentList({ type }: { type: ContentType }) {
     } finally {
       if (id === reqId.current) setLoading(false);
     }
-  }, [type, page, perPage, q.search, q.status, q.author, q.category, q.template, q.featured, sortBy, sortOrder]);
+  }, [type, page, perPage, q.search, q.status, q.author, q.category, q.template, q.featured, q.kind, sortBy, sortOrder]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -379,11 +383,12 @@ export default function ContentList({ type }: { type: ContentType }) {
     activeFilters.push({ key: 'category', label: `Category: ${c?.name ?? '…'}`, onRemove: () => setQ({ category: '' }) });
   }
   if (q.template) activeFilters.push({ key: 'template', label: `Template: ${TEMPLATE_LABELS[q.template] ?? q.template}`, onRemove: () => setQ({ template: '' }) });
+  if (q.kind) activeFilters.push({ key: 'kind', label: `Type: ${KIND_LABELS[q.kind] ?? q.kind}`, onRemove: () => setQ({ kind: '' }) });
   if (q.featured) activeFilters.push({ key: 'featured', label: q.featured === 'yes' ? 'Featured only' : 'Not featured', onRemove: () => setQ({ featured: '' }) });
   const panelFilterCount = activeFilters.filter((f) => f.key !== 'search').length;
 
   function clearFilters() {
-    setQ({ search: '', author: '', category: '', template: '', featured: '' });
+    setQ({ search: '', author: '', category: '', template: '', featured: '', kind: '' });
   }
 
   // The API's unfiltered list includes trashed items, so "All" counts them too.
@@ -449,6 +454,17 @@ export default function ContentList({ type }: { type: ContentType }) {
               <select value={q.category} onChange={(e) => setQ({ category: e.target.value })}>
                 <option value="">Any category</option>
                 {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </Field>
+          )}
+          {isPost && (
+            <Field label="Post type">
+              <select value={q.kind} onChange={(e) => setQ({ kind: e.target.value })}>
+                <option value="">All types</option>
+                <option value="article">Articles</option>
+                <option value="news">News</option>
+                <option value="review">Reviews</option>
+                <option value="qna">Q&amp;As</option>
               </select>
             </Field>
           )}
@@ -532,11 +548,25 @@ export default function ContentList({ type }: { type: ContentType }) {
                           </span>
                         )}
                         <div className={t.stack}>
-                          {post.status === 'trash' || !canEdit ? (
-                            <span className={t.primary}>{post.title || '(untitled)'}</span>
-                          ) : (
-                            <Link to={`${base}/${post.id}/edit`} className={t.primary}>{post.title || '(untitled)'}</Link>
-                          )}
+                          <span className={styles.titleLine}>
+                            {post.status === 'trash' || !canEdit ? (
+                              <span className={t.primary}>{post.title || '(untitled)'}</span>
+                            ) : (
+                              <Link to={`${base}/${post.id}/edit`} className={t.primary}>{post.title || '(untitled)'}</Link>
+                            )}
+                            {isPost && post.articleType && post.articleType !== 'article' && (
+                              <span className={`${styles.kindTag} ${styles[`kind_${post.articleType}`]}`}>
+                                {KIND_LABELS[post.articleType]}
+                                {post.articleType === 'review' && post.review?.rating != null && ` · ${post.review.rating}/10`}
+                              </span>
+                            )}
+                            {post.seoMetadata?.seoScore != null && (
+                              <span className={`${styles.seoTag} ${styles[`seo_${post.seoMetadata.seoScore >= 80 ? 'good' : post.seoMetadata.seoScore >= 50 ? 'improve' : 'problem'}`]}`}
+                                title={`SEO score ${post.seoMetadata.seoScore}/100${post.seoMetadata.focusKeyword ? ` · “${post.seoMetadata.focusKeyword}”` : ''}`}>
+                                SEO {post.seoMetadata.seoScore}
+                              </span>
+                            )}
+                          </span>
                           {locks.get(post.id) && (
                             <span className={styles.lockTag} title={`Opened ${new Date(locks.get(post.id)!.since).toLocaleTimeString()}`}>
                               <FontAwesomeIcon icon={faLock} /> {locks.get(post.id)!.user.name} is editing

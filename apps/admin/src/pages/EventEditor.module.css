@@ -32,7 +32,7 @@
 
 .backButton:hover {
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-bg);
 }
 
@@ -114,7 +114,7 @@
 .tabActive {
   background: var(--accent-bg);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* ── Panel (glass card) ── */
@@ -213,7 +213,7 @@
   white-space: nowrap;
   transition: border-color var(--ease), color var(--ease);
 }
-.slugBtn:hover { border-color: var(--accent); color: var(--accent); }
+.slugBtn:hover { border-color: var(--accent); color: var(--accent-text); }
 
 /* ── Quill editor wrapper ── */
 
@@ -267,7 +267,7 @@
   border: 1px dashed var(--input-border);
   border-radius: var(--r-sm);
   background: none;
-  color: var(--accent);
+  color: var(--accent-text);
   cursor: pointer;
   font-size: 0.875rem;
   font-weight: 500;
@@ -289,7 +289,7 @@
   border-radius: var(--r-sm);
   transition: color var(--ease), background var(--ease);
 }
-.removeBtn:hover { color: var(--danger); background: rgba(255,59,48,0.08); }
+.removeBtn:hover { color: var(--danger-t); background: rgba(255,59,48,0.08); }
 
 /* ── Price field ── */
 

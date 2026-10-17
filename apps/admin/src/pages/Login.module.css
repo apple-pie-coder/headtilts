@@ -31,7 +31,7 @@
 
 .logoIcon {
   font-size: 2.25rem;
-  color: var(--accent);
+  color: var(--accent-text);
   margin-bottom: 0.5rem;
 }
 
@@ -131,7 +131,7 @@
   margin-top: 1rem;
   text-align: center;
   font-size: 0.875rem;
-  color: var(--accent, #0071e3);
+  color: var(--accent-text);
   text-decoration: none;
 }
 
@@ -152,7 +152,7 @@
 
 .forgotRow a {
   font-size: 0.8125rem;
-  color: var(--accent, #0071e3);
+  color: var(--accent-text);
   text-decoration: none;
 }
 
@@ -198,7 +198,7 @@
   margin-top: 0.875rem;
   text-align: center;
   font-size: 0.8125rem;
-  color: var(--accent);
+  color: var(--accent-text);
   cursor: pointer;
   background: none;
   border: none;

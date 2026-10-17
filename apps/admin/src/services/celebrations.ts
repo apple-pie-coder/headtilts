@@ -9,6 +9,8 @@ export interface CelebrationInput {
   day: number;
   year?: number | null;
   photo?: string | null;
+  photoCredit?: string | null;
+  photoCreditUrl?: string | null;
   message?: string | null;
   isActive?: boolean;
 }

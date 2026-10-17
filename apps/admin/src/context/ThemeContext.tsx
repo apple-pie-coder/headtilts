@@ -72,13 +72,79 @@ export const ACCENT_PRESETS: Record<AccentColor, AccentPreset> = {
   },
 };
 
+/* ── Contrast-safe accents ───────────────────────────────────
+   A preset's raw colour is often too light for white button text (orange,
+   teal, mint…) or too dark/light to read as link text on the theme's
+   surfaces. We nudge it towards black or white just far enough to reach
+   WCAG AA (4.5:1), keeping the hue:
+     --accent       fills that carry white text (buttons, badges, toggles)
+     --accent-h     hover fill: a visibly darker step, still AA with white
+     --accent-text  accent-coloured text and icons on surfaces and tints */
+
+type Rgb = [number, number, number];
+
+function parseColor(c: string): { rgb: Rgb; a: number } {
+  if (c.startsWith('#')) {
+    const h = c.slice(1);
+    return { rgb: [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) as Rgb, a: 1 };
+  }
+  const p = c.replace(/rgba?\(|\)/g, '').split(',').map(Number);
+  return { rgb: [p[0], p[1], p[2]], a: p[3] ?? 1 };
+}
+
+const toHex = (rgb: Rgb) => `#${rgb.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
+const mix = (a: Rgb, b: Rgb, t: number): Rgb => [0, 1, 2].map((i) => a[i] + (b[i] - a[i]) * t) as Rgb;
+
+function luminance(rgb: Rgb): number {
+  const [r, g, b] = rgb.map((v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrast(a: Rgb, b: Rgb): number {
+  const [x, y] = [luminance(a), luminance(b)];
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+
+/** Smallest step of `color` towards `target` that reaches `min` contrast against every background. */
+function reach(color: Rgb, target: Rgb, against: Rgb[], min = 4.5): Rgb {
+  for (let t = 0; t <= 1; t += 0.02) {
+    const c = mix(color, target, t);
+    if (against.every((bg) => contrast(c, bg) >= min)) return c;
+  }
+  return target;
+}
+
+const WHITE: Rgb = [255, 255, 255];
+const BLACK: Rgb = [0, 0, 0];
+// Opaque backgrounds accent text sits on: page, surfaces, raised/hovered surfaces.
+const SURFACES: Record<ResolvedTheme, Rgb[]> = {
+  light: [[255, 255, 255], [242, 242, 247], [229, 229, 234]],
+  dark: [[28, 28, 30], [44, 44, 46], [58, 58, 60]],
+};
+
+function accentTokens(accent: AccentColor, theme: ResolvedTheme) {
+  const t = ACCENT_PRESETS[accent][theme];
+  const base = parseColor(t.accent).rgb;
+  const fill = reach(base, BLACK, [WHITE]);
+  const hover = reach(mix(fill, BLACK, 0.12), BLACK, [WHITE]);
+  // Text must also read on the accent tints used for active/selected states.
+  const tints = [t.accentBg, t.navActive].map(parseColor);
+  const grounds = SURFACES[theme].flatMap((s) => [s, ...tints.map(({ rgb, a }) => mix(s, rgb, a))]);
+  const text = reach(base, theme === 'dark' ? WHITE : BLACK, grounds);
+  return { accent: toHex(fill), accentH: toHex(hover), accentText: toHex(text) };
+}
+
 function applyAccentTokens(accent: AccentColor, theme: ResolvedTheme): void {
   const t = ACCENT_PRESETS[accent][theme];
+  const safe = accentTokens(accent, theme);
   const s = document.documentElement.style;
-  s.setProperty('--accent',     t.accent);
-  s.setProperty('--accent-h',   t.accentH);
+  s.setProperty('--accent',     safe.accent);
+  s.setProperty('--accent-h',   safe.accentH);
   s.setProperty('--accent-bg',  t.accentBg);
-  s.setProperty('--accent-text', t.accent);
+  s.setProperty('--accent-text', safe.accentText);
   s.setProperty('--nav-active', t.navActive);
   s.setProperty('--input-ring', t.ring);
 }

@@ -14,7 +14,7 @@
   cursor: pointer;
   transition: color var(--ease), border-color var(--ease), background var(--ease);
 }
-.settingsToggle:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); }
+.settingsToggle:hover { color: var(--accent-text); border-color: var(--accent); background: var(--accent-bg); }
 .chevron { font-size: 0.75rem; }
 
 /* ── Settings Panel ── */
@@ -126,7 +126,7 @@
 .optional { color: var(--t3); font-weight: 400; }
 
 .hint { font-size: 0.875rem; color: var(--t3); margin: 0 0 1rem; line-height: 1.5; }
-.hint code { background: var(--ghost); padding: 0.1em 0.35em; border-radius: 3px; font-size: 0.8125rem; color: var(--accent); }
+.hint code { background: var(--ghost); padding: 0.1em 0.35em; border-radius: 3px; font-size: 0.8125rem; color: var(--accent-text); }
 
 .input, .select {
   width: 100%;
@@ -157,8 +157,8 @@
 }
 .primaryButton { background: var(--accent); color: #fff; }
 .primaryButton:hover:not(:disabled) { background: var(--accent-h); }
-.dangerButton { background: var(--danger) !important; }
-.dangerButton:hover:not(:disabled) { opacity: 0.9; }
+.dangerButton { background: var(--danger-fill) !important; }
+.dangerButton:hover:not(:disabled) { background: var(--danger-fill-h) !important; }
 .secondaryButton { background: var(--ghost); color: var(--t1); border: 1px solid var(--border); }
 .secondaryButton:hover:not(:disabled) { background: var(--ghost-h); }
 .primaryButton:disabled, .secondaryButton:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -204,11 +204,11 @@
   text-decoration: none; transition: color var(--ease), border-color var(--ease), background var(--ease);
   font-size: 0.875rem;
 }
-.actionBtn:hover { color: var(--accent);  border-color: var(--accent);                    background: var(--accent-bg); }
+.actionBtn:hover { color: var(--accent-text);  border-color: var(--accent);                    background: var(--accent-bg); }
 .actionBtn:disabled { opacity: 0.4; cursor: not-allowed; }
 .verifyBtn:hover { color: #0a7aba;         border-color: rgba(10,122,186,0.5);             background: rgba(10,122,186,0.08); }
 .restoreBtn:hover { color: #1a7a38;         border-color: rgba(52,199,89,0.5);              background: rgba(52,199,89,0.08); }
-.deleteBtn { color: var(--danger);   border-color: var(--danger); }
+.deleteBtn { color: var(--danger-t);   border-color: var(--danger); }
 .deleteBtn:hover { background: var(--danger-bg); }
 
 /* ── Restore Modal ── */
@@ -231,7 +231,7 @@
 }
 .modalTitle { margin: 0 0 0.5rem; font-size: 1.125rem; font-weight: 700; color: var(--t1); }
 .modalDesc { margin: 0 0 1.25rem; font-size: 0.9375rem; color: var(--t2); }
-.modalWarn { margin: 0.75rem 0 0; font-size: 0.875rem; color: var(--danger); }
+.modalWarn { margin: 0.75rem 0 0; font-size: 0.875rem; color: var(--danger-t); }
 .modalActions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.25rem; }
 
 .scopeGroup { display: flex; flex-direction: column; gap: 0.5rem; }

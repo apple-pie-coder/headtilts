@@ -28,10 +28,10 @@
   background: var(--surface-overlay);
   color: var(--t2);
 }
-.step_current { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+.step_current { background: var(--accent-bg); color: var(--accent-text); font-weight: 600; }
 .step_current .stepNum { background: var(--accent); color: #fff; }
 .step_done { color: var(--success-t); }
-.step_done .stepNum { background: transparent; color: var(--success); font-size: 1rem; }
+.step_done .stepNum { background: transparent; color: var(--success-t); font-size: 1rem; }
 
 /* ── Upload ── */
 .uploadGrid {
@@ -61,7 +61,7 @@
 .drop:hover:not(:disabled), .dropOn { border-color: var(--accent); background: var(--accent-bg); }
 .drop:focus-visible { outline: none; box-shadow: var(--input-ring); }
 .drop:disabled { cursor: progress; }
-.dropIcon { font-size: 2.25rem; color: var(--accent); margin-bottom: 0.25rem; }
+.dropIcon { font-size: 2.25rem; color: var(--accent-text); margin-bottom: 0.25rem; }
 
 .noteBox {
   margin: 0.75rem 0;
@@ -79,6 +79,7 @@
 .howCard { margin-top: 1rem; }
 .cardTitle { display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; font-weight: 700; color: var(--t1); margin-bottom: 0.85rem; }
 .cardTitle svg { color: #2b579a; }
+[data-theme='dark'] .cardTitle svg { color: #7aa5e6; }
 
 /* A tiny sketch of the document layout. */
 .anatomy {
@@ -93,7 +94,7 @@
   font-size: 0.75rem;
 }
 .anH1 { font-size: 0.95rem; font-weight: 700; color: var(--t1); }
-.anH1 em { margin-left: 0.4rem; font-style: normal; font-size: 0.6875rem; font-weight: 600; color: var(--accent); background: var(--accent-bg); padding: 0.05rem 0.4rem; border-radius: 4px; }
+.anH1 em { margin-left: 0.4rem; font-style: normal; font-size: 0.6875rem; font-weight: 600; color: var(--accent-text); background: var(--accent-bg); padding: 0.05rem 0.4rem; border-radius: 4px; }
 .anTable {
   display: grid;
   grid-template-columns: 6rem 1fr;
@@ -166,7 +167,7 @@
   font-weight: 600;
   text-align: left;
 }
-.postTitle:hover { color: var(--accent); }
+.postTitle:hover { color: var(--accent-text); }
 .postTitle:focus-visible { outline: none; box-shadow: var(--input-ring); border-radius: 4px; }
 .chev { font-size: 0.65rem; color: var(--t3); width: 0.7rem; }
 .exampleTag { font-size: 0.6875rem; font-weight: 600; padding: 0.05rem 0.45rem; border-radius: 999px; background: var(--warning-bg); color: var(--warning-t); }
@@ -204,7 +205,7 @@
 .prose h4, .prose h5, .prose h6 { font-size: 0.95rem; font-weight: 700; }
 .prose ul, .prose ol { padding-left: 1.4rem; }
 .prose li + li { margin-top: 0.25rem; }
-.prose a { color: var(--accent); text-decoration: underline; }
+.prose a { color: var(--accent-text); text-decoration: underline; }
 .prose blockquote { border-left: 3px solid var(--accent); padding-left: 0.9rem; color: var(--t2); font-style: italic; }
 .prose img { max-width: 100%; height: auto; border-radius: var(--r-xs); }
 .prose table { border-collapse: collapse; font-size: 0.85rem; }
@@ -242,16 +243,16 @@
 .runItem { display: flex; align-items: center; gap: 0.85rem; padding: 0.7rem 1rem; border-bottom: 1px solid var(--sep); }
 .runItem:last-child { border-bottom: none; }
 .runIcon { font-size: 1rem; width: 1.1rem; flex-shrink: 0; color: var(--t3); }
-.run_done .runIcon { color: var(--success); }
-.run_failed .runIcon { color: var(--danger); }
-.run_working .runIcon { color: var(--accent); }
-.run_skipped .runIcon { color: var(--warning); }
+.run_done .runIcon { color: var(--success-t); }
+.run_failed .runIcon { color: var(--danger-t); }
+.run_working .runIcon { color: var(--accent-text); }
+.run_skipped .runIcon { color: var(--warning-t); }
 .runText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
 .runText strong { font-size: 0.875rem; color: var(--t1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .runText span { font-size: 0.78rem; color: var(--t2); }
 .run_failed .runText span { color: var(--danger-t); }
 .runLinks { display: flex; gap: 0.75rem; font-size: 0.8125rem; flex-shrink: 0; }
-.runLinks a { color: var(--accent); display: inline-flex; gap: 0.3rem; align-items: center; }
+.runLinks a { color: var(--accent-text); display: inline-flex; gap: 0.3rem; align-items: center; }
 .runLinks a:hover { text-decoration: underline; }
 
 @media (max-width: 960px) {

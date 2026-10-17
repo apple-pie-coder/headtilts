@@ -4,19 +4,22 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBars, faChevronDown, faFeather, faRightFromBracket, faSun, faMoon, faDesktop,
   faMagnifyingGlass, faPlus, faArrowUpRightFromSquare, faAnglesLeft, faAnglesRight,
-  faUser, faKeyboard, faPalette,
+  faUser, faKeyboard, faPalette, faCommentDots,
 } from '@fortawesome/free-solid-svg-icons';
 import { useSpotlight } from '../context/SpotlightContext';
 import type { ThemeMode, AccentColor, AccentPreset } from '../context/ThemeContext';
 import { ACCENT_PRESETS, useTheme } from '../context/ThemeContext';
 import { useAuth } from '../hooks/useAuth';
+import { PERMISSIONS } from '@headtilts/shared';
 import { useHotkeys } from '../hooks/useHotkeys';
 import { useNavBadges } from '../hooks/useNavBadges';
 import { useOutsideClose } from '../hooks/useOutsideClose';
+import { useCardTables } from '../hooks/useCardTables';
 import { NAV_SECTIONS, DASHBOARD_ITEM, CREATE_ACTIONS, NavItem } from '../nav';
 import { NotificationBell } from './NotificationBell';
 import { Breadcrumb } from './Breadcrumb';
 import { ShortcutsDialog } from './ShortcutsDialog';
+import { FeedbackButton } from './FeedbackButton';
 import { fetchPublicSettings } from '../services/settings';
 import { resolveMediaUrl } from '../services/media';
 import { apiClient } from '../services/api';
@@ -59,6 +62,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   const createRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  useCardTables(contentRef);
   const closeMenu = useCallback(() => setMenu(null), []);
   useOutsideClose(createRef, menu === 'create', closeMenu);
   useOutsideClose(userRef, menu === 'user', closeMenu);
@@ -84,7 +89,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   const checkHealth = useCallback(async () => {
     try {
-      const res = await apiClient.get('/health');
+      const res = await apiClient.get('/health/status');
       setHealthStatus(res.data.data?.status ?? 'ok');
     } catch {
       setHealthStatus('down');
@@ -229,6 +234,15 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             <FontAwesomeIcon icon={collapsed ? faAnglesRight : faAnglesLeft} />
             <span className={styles.navLabel}>Collapse</span>
           </button>
+          {/* On phones the floating feedback button is hidden; it lives here instead. */}
+          <button
+            type="button"
+            className={`${styles.collapseBtn} ${styles.feedbackNav}`}
+            onClick={() => { setSidebarOpen(false); window.dispatchEvent(new Event('admin:open-feedback')); }}
+          >
+            <FontAwesomeIcon icon={faCommentDots} />
+            <span className={styles.navLabel}>Send feedback</span>
+          </button>
         </div>
       </aside>
 
@@ -363,7 +377,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           </div>
         </header>
         <Breadcrumb show={showBreadcrumbs} />
-        <div className={styles.content}>{children}</div>
+        <div className={styles.content} ref={contentRef}>{children}</div>
       </main>
 
       <footer className={styles.adminFooter}>
@@ -374,25 +388,30 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           </button>
         </span>
         <div className={styles.footerRight}>
-          <Link
-            to="/admin/health"
-            className={styles.healthLink}
-            title={`System status: ${healthStatus}`}
-          >
-            <span className={`${styles.healthDot} ${
-              healthStatus === 'ok'       ? styles.healthDotOk       :
-              healthStatus === 'degraded' ? styles.healthDotDegraded :
-              healthStatus === 'down'     ? styles.healthDotDown     :
-                                            styles.healthDotUnknown
-            }`} />
-            {healthStatus === 'ok' ? 'Operational' :
-             healthStatus === 'degraded' ? 'Degraded' :
-             healthStatus === 'down' ? 'Down' : 'Checking…'}
-          </Link>
+          {(() => {
+            const status = (
+              <>
+                <span className={`${styles.healthDot} ${
+                  healthStatus === 'ok'       ? styles.healthDotOk       :
+                  healthStatus === 'degraded' ? styles.healthDotDegraded :
+                  healthStatus === 'down'     ? styles.healthDotDown     :
+                                                styles.healthDotUnknown
+                }`} />
+                {healthStatus === 'ok' ? 'Operational' :
+                 healthStatus === 'degraded' ? 'Degraded' :
+                 healthStatus === 'down' ? 'Down' : 'Checking…'}
+              </>
+            );
+            // Only operators can open the Health page; everyone else just sees the status.
+            return hasPermission(PERMISSIONS.SETTING_READ)
+              ? <Link to="/admin/health" className={styles.healthLink} title={`System status: ${healthStatus}`}>{status}</Link>
+              : <span className={styles.healthLink} title={`System status: ${healthStatus}`}>{status}</span>;
+          })()}
         </div>
       </footer>
 
       {showShortcuts && <ShortcutsDialog onClose={() => setShowShortcuts(false)} />}
+      <FeedbackButton />
     </div>
   );
 }

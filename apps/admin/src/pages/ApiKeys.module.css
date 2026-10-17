@@ -284,7 +284,7 @@ tr:hover td { background: var(--ghost); }
   padding: 0.15rem 0.45rem;
   border-radius: 999px;
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--accent-text);
   white-space: nowrap;
 }
 
@@ -295,7 +295,7 @@ tr:hover td { background: var(--ghost); }
 }
 
 .never { color: var(--t3); font-style: italic; }
-.expired { color: var(--danger); }
+.expired { color: var(--danger-t); }
 
 .actionBtn {
   display: inline-flex;
@@ -312,8 +312,8 @@ tr:hover td { background: var(--ghost); }
   transition: background var(--ease), color var(--ease);
 }
 
-.actionBtn:hover { background: var(--ghost-h); color: var(--accent); }
-.danger:hover { color: var(--danger) !important; }
+.actionBtn:hover { background: var(--ghost-h); color: var(--accent-text); }
+.danger:hover { color: var(--danger-t) !important; }
 
 .empty {
   padding: 3rem;
@@ -353,7 +353,7 @@ tr:hover td { background: var(--ghost); }
   background: var(--ghost);
   padding: 0.1em 0.35em;
   border-radius: 4px;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .codeBlock {

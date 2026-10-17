@@ -40,6 +40,8 @@ export interface Category {
   parentId?: number | null;
   parent?: { id: number; name: string } | null;
   icon?: string | null;
+  /** JSON { w, h, d } of the picked Font Awesome icon (see CategoryIcon). */
+  iconSvg?: string | null;
   showSidebar?: boolean;
   _count?: { posts: number };
 }
@@ -62,6 +64,8 @@ export interface Celebration {
   day: number;
   year: number | null;
   photo: string | null;
+  photoCredit?: string | null;
+  photoCreditUrl?: string | null;
   message: string | null;
   isActive: boolean;
   createdAt?: string;
@@ -89,6 +93,8 @@ export interface Post {
   publishedAt?: string | null;
   scheduledFor?: string | null;
   featuredImage?: string | null;
+  /** CSS object-position, e.g. "50% 30%"; null = centre. */
+  featuredImageFocus?: string | null;
   template?: string | null;
   isFeatured?: boolean;
   showSidebar?: boolean;
@@ -107,8 +113,53 @@ export interface Post {
   ogTitle?: string | null;
   ogDescription?: string | null;
   ogImage?: string | null;
+  articleType?: ArticleType;
+  videoUrl?: string | null;
+  review?: Review | null;
+  qna?: QnaSession | null;
+  seoMetadata?: { focusKeyword: string | null; seoScore: number | null; readabilityScore: number | null } | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export type ArticleType = 'article' | 'news' | 'review' | 'qna';
+
+export interface QnaItem {
+  question: string;
+  askedBy?: string | null;
+  answer: string;
+  answeredBy?: string | null;
+}
+
+/** Q&A session details (posts with articleType = 'qna'). */
+export interface QnaSession {
+  subject: string;
+  subjectType: 'band' | 'artist' | 'person';
+  sessionDate: string | null;
+  host: string | null;
+  items: QnaItem[];
+}
+export type ReviewSubject = 'album' | 'ep' | 'single';
+
+export interface ReviewTrack {
+  title: string;
+  duration?: string | null;
+}
+
+/** Music review details (posts with articleType = 'review'). */
+export interface Review {
+  subjectType: ReviewSubject;
+  subjectTitle: string;
+  artist: string;
+  releaseDate: string | null;
+  label: string | null;
+  genre: string | null;
+  coverImage: string | null;
+  rating: number | null;
+  verdict: string | null;
+  highlights: string[] | null;
+  tracklist: ReviewTrack[] | null;
+  streaming: Record<string, string> | null;
 }
 
 export interface MediaUploader {
@@ -241,6 +292,8 @@ export interface MenuItem {
   isVisible: boolean;
   createdAt: string;
   updatedAt: string;
+  icon?: string | null;
+  iconSvg?: string | null;
 }
 
 export interface Menu {

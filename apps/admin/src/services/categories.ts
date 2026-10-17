@@ -8,6 +8,7 @@ export interface CreateCategoryInput {
   description?: string;
   parentId?: number | null;
   icon?: string;
+  iconSvg?: string | null;
   showSidebar?: boolean;
 }
 
@@ -17,6 +18,7 @@ export interface UpdateCategoryInput {
   description?: string;
   parentId?: number | null;
   icon?: string;
+  iconSvg?: string | null;
   showSidebar?: boolean;
 }
 

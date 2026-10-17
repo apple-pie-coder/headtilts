@@ -74,15 +74,15 @@
   color: #fff;
 }
 
-.confirmButton:hover { filter: brightness(1.08); }
+.confirmButton:hover { background: var(--accent-h); }
 
 .dangerButton {
-  background: var(--danger);
+  background: var(--danger-fill);
   border: 1px solid var(--danger);
   color: #fff;
 }
 
-.dangerButton:hover { filter: brightness(1.08); }
+.dangerButton:hover { background: var(--danger-fill-h); }
 
 @keyframes confirmFadeIn {
   from { opacity: 0; }

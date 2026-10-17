@@ -79,17 +79,17 @@
 .head { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; font-size: 0.85rem; }
 .name { color: var(--t1); font-weight: 600; }
 .email { background: none; padding: 0; color: var(--t2); font-size: 0.8rem; }
-.email:hover { color: var(--accent); text-decoration: underline; }
+.email:hover { color: var(--accent-text); text-decoration: underline; }
 .dot { color: var(--t3); }
 .time { color: var(--t2); font-size: 0.8rem; }
 
 .context { margin-top: 0.2rem; font-size: 0.8rem; color: var(--t2); display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
 .context strong { color: var(--t1); font-weight: 600; }
-.postLink { color: var(--accent); font-weight: 500; }
+.postLink { color: var(--accent-text); font-weight: 500; }
 .postLink:hover { text-decoration: underline; }
 .filterLink { background: none; padding: 0; font-size: 0.75rem; color: var(--t3); }
-.filterLink:hover { color: var(--accent); text-decoration: underline; }
-.reactions { margin-left: 0.4rem; color: var(--danger); }
+.filterLink:hover { color: var(--accent-text); text-decoration: underline; }
+.reactions { margin-left: 0.4rem; color: var(--danger-t); }
 
 .content {
   margin-top: 0.5rem;
@@ -105,7 +105,7 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.more { margin-top: 0.25rem; background: none; padding: 0; color: var(--accent); font-size: 0.8rem; font-weight: 500; }
+.more { margin-top: 0.25rem; background: none; padding: 0; color: var(--accent-text); font-size: 0.8rem; font-weight: 500; }
 
 .actions { display: flex; gap: 0.3rem; flex-wrap: wrap; justify-content: flex-end; }
 
@@ -125,7 +125,7 @@
 .act:hover { background: var(--ghost-h); color: var(--t1); }
 .act:focus-visible { outline: none; box-shadow: var(--input-ring); }
 .actApprove { background: var(--success-bg); color: var(--success-t); }
-.actApprove:hover { background: var(--success); color: #fff; }
+.actApprove:hover { background: var(--success-fill); color: #fff; }
 .actDanger:hover { background: var(--danger-bg); color: var(--danger-t); }
 
 .skeletons { padding: 0.5rem 1rem; }

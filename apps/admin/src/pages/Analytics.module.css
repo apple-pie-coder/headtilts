@@ -1,7 +1,6 @@
 /* ── Page ────────────────────────────────────────────────────────────────────── */
 .page {
   padding: 1.75rem 2rem 3rem;
-  max-width: 1400px;
 }
 
 /* ── Page header ─────────────────────────────────────────────────────────────── */
@@ -25,7 +24,7 @@
   gap: 0.6rem;
 }
 
-.pageTitleIcon { color: var(--accent); }
+.pageTitleIcon { color: var(--accent-text); }
 
 .pageSubtitle {
   margin: 0;
@@ -81,7 +80,7 @@
 .iconBtn:disabled { opacity: 0.45; cursor: not-allowed; }
 .iconBtnOn {
   background: color-mix(in srgb, var(--accent) 12%, var(--surface1)) !important;
-  color: var(--accent) !important;
+  color: var(--accent-text) !important;
   border-color: color-mix(in srgb, var(--accent) 35%, transparent) !important;
 }
 
@@ -147,7 +146,7 @@
 }
 .tabBtn:hover { color: var(--t1); }
 .tabBtnActive {
-  color: var(--accent);
+  color: var(--accent-text);
   border-bottom-color: var(--accent);
 }
 
@@ -201,7 +200,7 @@
   height: 2.1rem;
   border-radius: var(--r-sm);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent);
+  color: var(--accent-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -583,7 +582,7 @@
   height: 2rem;
   border-radius: 50%;
   background: color-mix(in srgb, var(--accent) 14%, var(--surface2));
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 0.8rem;
   font-weight: 700;
   display: flex;
@@ -606,7 +605,7 @@
   white-space: nowrap;
   text-decoration: none;
 }
-a.recentTitle:hover { color: var(--accent); }
+a.recentTitle:hover { color: var(--accent-text); }
 
 .recentMeta {
   display: block;
@@ -690,7 +689,7 @@ a.recentTitle:hover { color: var(--accent); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.pollResultTitle:hover { color: var(--accent); }
+.pollResultTitle:hover { color: var(--accent-text); }
 
 .pollChip {
   font-size: 0.65rem;
@@ -703,7 +702,7 @@ a.recentTitle:hover { color: var(--accent); }
 }
 .pollChip_open      { background: color-mix(in srgb, #22c55e 15%, transparent); color: #22c55e; }
 .pollChip_closed    { background: color-mix(in srgb, #94a3b8 15%, transparent); color: #94a3b8; }
-.pollChip_draft     { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+.pollChip_draft     { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent-text); }
 .pollChip_scheduled { background: color-mix(in srgb, #f59e0b 15%, transparent); color: #f59e0b; }
 
 .pollResultVotes {

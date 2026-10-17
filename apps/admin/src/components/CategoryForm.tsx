@@ -4,6 +4,7 @@ import { slugify } from '@headtilts/shared';
 import { Category } from '../types';
 import { createCategory, updateCategory } from '../services/categories';
 import { useToast } from './ToastContext';
+import { IconPicker } from './IconPicker';
 import styles from './CategoryForm.module.css';
 
 interface CategoryFormProps {
@@ -21,7 +22,10 @@ export function CategoryForm({ category, categories, onSaved, onCancel }: Catego
   const [slugTouched, setSlugTouched] = useState(isEditing);
   const [description, setDescription] = useState(category?.description || '');
   const [parentId, setParentId] = useState<string>(category?.parentId ? String(category.parentId) : '');
-  const [icon, setIcon] = useState(category?.icon || '');
+  const [icon, setIcon] = useState<{ icon: string | null; iconSvg: string | null }>({
+    icon: category?.icon || null,
+    iconSvg: category?.iconSvg || null,
+  });
   const [showSidebar, setShowSidebar] = useState(category?.showSidebar ?? false);
   const [saving, setSaving] = useState(false);
   const toast = useToast();
@@ -44,7 +48,8 @@ export function CategoryForm({ category, categories, onSaved, onCancel }: Catego
       slug: slug || undefined,
       description: description || undefined,
       parentId: parentId ? Number(parentId) : null,
-      icon: icon || undefined,
+      icon: icon.icon ?? '',
+      iconSvg: icon.iconSvg,
       showSidebar,
     };
 
@@ -120,13 +125,7 @@ export function CategoryForm({ category, categories, onSaved, onCancel }: Catego
 
         <div className={styles.formGroup}>
           <label>Icon</label>
-          <input
-            type="text"
-            value={icon}
-            onChange={(e) => setIcon(e.target.value)}
-            placeholder="e.g. 📰 or icon class name"
-            disabled={saving}
-          />
+          <IconPicker value={icon} onChange={setIcon} disabled={saving} />
         </div>
 
         <div className={styles.formGroup}>

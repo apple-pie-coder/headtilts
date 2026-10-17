@@ -1,13 +1,29 @@
-import { useEffect, useState } from 'react';
+import { KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
+import {
+  faArrowLeft, faPlus, faTrash, faGripVertical, faArrowUpRightFromSquare, faFileCsv, faRotateLeft, faListUl,
+} from '@fortawesome/free-solid-svg-icons';
 import { AdminLayout } from '../components/AdminLayout';
 import { MediaPickerInput } from '../components/MediaPickerInput';
 import { useToast } from '../components/ToastContext';
-import { fetchPoll, createPoll, updatePoll, PollInput, PollOption } from '../services/polls';
+import { fetchPoll, createPoll, updatePoll, resetPollVotes, exportPollUrl, PollInput, PollOption } from '../services/polls';
+import { useConfirm } from '../components/ConfirmDialog';
 import { slugify } from '@headtilts/shared';
 import styles from './PollEditor.module.css';
+
+const STATUS_LABEL: Record<string, string> = { draft: 'Draft', open: 'Open', closed: 'Closed', scheduled: 'Scheduled' };
+const RESTRICTION_HELP: Record<string, string> = {
+  anonymous: 'Anyone can vote once per browser. Easiest for readers.',
+  ip_limited: 'Also caps votes from one network, to stop ballot stuffing.',
+  authenticated: 'Only signed-in users can vote.',
+};
+const VISIBILITY_HELP: Record<string, string> = {
+  after_vote: 'Readers see the results right after voting — the most engaging choice.',
+  before_vote: 'Results are visible to everyone, even before they vote.',
+  after_close: 'Results stay hidden until the poll closes — best for contests.',
+  always: 'Results are always visible.',
+};
 
 export default function PollEditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +50,15 @@ export default function PollEditorPage() {
     { text: '', order: 0 },
     { text: '', order: 1 },
   ]);
+  const confirm = useConfirm();
+  // Saved vote counts per option id (for the results panel and option rows).
+  const [votes, setVotes] = useState<Record<number, number>>({});
+  const [totalVotes, setTotalVotes] = useState(0);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [pasting, setPasting] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  const [previewPick, setPreviewPick] = useState<number[]>([]);
+  const optionRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
     if (!isEdit) return;
@@ -54,6 +79,8 @@ export default function PollEditorPage() {
         setEndsAt(poll.endsAt ? new Date(poll.endsAt).toISOString().slice(0, 16) : '');
         setFeaturedImage(poll.featuredImage || '');
         setOptions(poll.options.map((o) => ({ id: o.id, text: o.text, order: o.order })));
+        setVotes(Object.fromEntries(poll.options.filter((o) => o.id != null).map((o) => [o.id as number, o._count?.votes ?? 0])));
+        setTotalVotes(poll._count?.votes ?? 0);
       })
       .catch(() => { toast.error('Failed to load poll'); navigate('/admin/polls'); });
   }, [id]);
@@ -73,6 +100,51 @@ export default function PollEditorPage() {
 
   function updateOption(i: number, text: string) {
     setOptions((prev) => prev.map((o, idx) => idx === i ? { ...o, text } : o));
+  }
+
+  /** Drag a row onto another to reorder. */
+  function dropOption(to: number) {
+    if (dragIdx === null || dragIdx === to) { setDragIdx(null); return; }
+    const next = [...options];
+    const [row] = next.splice(dragIdx, 1);
+    next.splice(to, 0, row);
+    setOptions(next.map((o, idx) => ({ ...o, order: idx })));
+    setDragIdx(null);
+  }
+
+  /** Enter in the last answer adds another and moves to it. */
+  function optionKeyDown(e: KeyboardEvent<HTMLInputElement>, i: number) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (i === options.length - 1) {
+      addOption();
+      setTimeout(() => optionRefs.current[i + 1]?.focus(), 0);
+    } else {
+      optionRefs.current[i + 1]?.focus();
+    }
+  }
+
+  function addPasted() {
+    const lines = pasteText.split('\n').map((l) => l.replace(/^\s*([-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean);
+    if (!lines.length) { setPasting(false); return; }
+    setOptions((prev) => {
+      const kept = prev.filter((o) => o.text.trim() || o.id);
+      return [...kept, ...lines.map((text) => ({ text, order: 0 }))].map((o, idx) => ({ ...o, order: idx }));
+    });
+    setPasteText('');
+    setPasting(false);
+  }
+
+  async function handleReset() {
+    if (!(await confirm({ title: 'Reset all votes?', message: `This permanently deletes all ${totalVotes} votes on this poll.`, confirmLabel: 'Reset votes', danger: true }))) return;
+    try {
+      await resetPollVotes(Number(id));
+      setVotes({});
+      setTotalVotes(0);
+      toast.success('Votes reset');
+    } catch {
+      toast.error('Couldn’t reset the votes');
+    }
   }
 
   function moveOption(i: number, dir: -1 | 1) {
@@ -128,10 +200,21 @@ export default function PollEditorPage() {
   return (
     <AdminLayout>
       <div className={styles.header}>
-        <h2 className={styles.title}>{isEdit ? 'Edit Poll' : 'Add New Poll'}</h2>
-        <button className={styles.backButton} onClick={() => navigate('/admin/polls')}>
-          <FontAwesomeIcon icon={faArrowLeft} /> Back to Polls
-        </button>
+        <div className={styles.headTitle}>
+          <h2 className={styles.title}>{isEdit ? 'Edit poll' : 'New poll'}</h2>
+          <span className={`${styles.statusPill} ${styles[`status_${status}`] ?? ''}`}>{STATUS_LABEL[status] ?? status}</span>
+          {isEdit && <span className={styles.voteCount}>{totalVotes.toLocaleString()} vote{totalVotes === 1 ? '' : 's'}</span>}
+        </div>
+        <div className={styles.headActions}>
+          {isEdit && status !== 'draft' && slug && (
+            <a className={styles.backButton} href={`/polls/${slug}`} target="_blank" rel="noopener noreferrer">
+              <FontAwesomeIcon icon={faArrowUpRightFromSquare} /> View on site
+            </a>
+          )}
+          <button className={styles.backButton} onClick={() => navigate('/admin/polls')}>
+            <FontAwesomeIcon icon={faArrowLeft} /> Back to polls
+          </button>
+        </div>
       </div>
 
       <div className={styles.layout}>
@@ -176,33 +259,122 @@ export default function PollEditorPage() {
           </div>
 
           <div className={styles.panel}>
-            <h3>Answer options</h3>
+            <h3>Answers <span className={styles.panelHint}>Drag to reorder · Enter adds another</span></h3>
             <div className={styles.optionList}>
               {options.map((opt, i) => (
-                <div key={i} className={styles.optionRow}>
-                  <div className={styles.optionHandle}>
-                    <button onClick={() => moveOption(i, -1)} disabled={i === 0} className={styles.moveBtn}>▲</button>
-                    <button onClick={() => moveOption(i, 1)} disabled={i === options.length - 1} className={styles.moveBtn}>▼</button>
-                  </div>
+                <div
+                  key={opt.id ?? `new-${i}`}
+                  className={`${styles.optionRow} ${dragIdx === i ? styles.optionDragging : ''}`}
+                  onDragOver={(e) => { if (dragIdx !== null) e.preventDefault(); }}
+                  onDrop={() => dropOption(i)}
+                >
+                  <span
+                    className={styles.optionGrip}
+                    draggable
+                    onDragStart={(e) => { setDragIdx(i); e.dataTransfer.effectAllowed = 'move'; }}
+                    onDragEnd={() => setDragIdx(null)}
+                    title="Drag to reorder"
+                    aria-hidden="true"
+                  >
+                    <FontAwesomeIcon icon={faGripVertical} />
+                  </span>
+                  <span className={styles.optionLetter} aria-hidden="true">{String.fromCharCode(65 + (i % 26))}</span>
                   <input
+                    ref={(el) => { optionRefs.current[i] = el; }}
                     className={styles.optionInput}
                     value={opt.text}
                     onChange={(e) => updateOption(i, e.target.value)}
-                    placeholder={`Option ${i + 1}`}
+                    onKeyDown={(e) => optionKeyDown(e, i)}
+                    placeholder={`Answer ${i + 1}`}
+                    aria-label={`Answer ${i + 1}`}
                   />
-                  <button className={styles.removeOptBtn} onClick={() => removeOption(i)} disabled={options.length <= 2}>
+                  {isEdit && opt.id != null && <span className={styles.optionVotes} title="Votes so far">{(votes[opt.id] ?? 0).toLocaleString()}</span>}
+                  <span className={styles.optionMove}>
+                    <button onClick={() => moveOption(i, -1)} disabled={i === 0} className={styles.moveBtn} aria-label={`Move answer ${i + 1} up`}>▲</button>
+                    <button onClick={() => moveOption(i, 1)} disabled={i === options.length - 1} className={styles.moveBtn} aria-label={`Move answer ${i + 1} down`}>▼</button>
+                  </span>
+                  <button className={styles.removeOptBtn} onClick={() => removeOption(i)} disabled={options.length <= 2} aria-label={`Remove answer ${i + 1}`}>
                     <FontAwesomeIcon icon={faTrash} />
                   </button>
                 </div>
               ))}
             </div>
-            <button className={styles.addOptBtn} onClick={addOption}>
-              <FontAwesomeIcon icon={faPlus} /> Add option
-            </button>
+            {pasting ? (
+              <div className={styles.pasteBox}>
+                <textarea autoFocus rows={5} value={pasteText} onChange={(e) => setPasteText(e.target.value)} placeholder={'One answer per line, e.g.\nThrash\nDeath metal\nDoom'} />
+                <div className={styles.pasteActions}>
+                  <button className={styles.draftButton} onClick={() => { setPasting(false); setPasteText(''); }}>Cancel</button>
+                  <button className={styles.primaryButton} onClick={addPasted} disabled={!pasteText.trim()}>Add answers</button>
+                </div>
+              </div>
+            ) : (
+              <div className={styles.addRow}>
+                <button className={styles.addOptBtn} onClick={addOption}>
+                  <FontAwesomeIcon icon={faPlus} /> Add answer
+                </button>
+                <button className={styles.addOptBtn} onClick={() => setPasting(true)}>
+                  <FontAwesomeIcon icon={faListUl} /> Paste a list
+                </button>
+              </div>
+            )}
           </div>
+
+          {isEdit && (
+            <div className={styles.panel}>
+              <h3>Results <span className={styles.panelHint}>{totalVotes.toLocaleString()} vote{totalVotes === 1 ? '' : 's'}</span></h3>
+              {totalVotes === 0 ? (
+                <p className={styles.hint}>No votes yet. Results appear here as soon as people start voting.</p>
+              ) : (
+                <ol className={styles.resultList}>
+                  {(() => {
+                    const max = Math.max(...options.map((o) => (o.id != null ? votes[o.id] ?? 0 : 0)));
+                    return options.filter((o) => o.id != null).map((o) => {
+                      const v = votes[o.id as number] ?? 0;
+                      const pct = totalVotes ? Math.round((v / totalVotes) * 100) : 0;
+                      return (
+                        <li key={o.id} className={`${styles.resultRow} ${v === max && max > 0 ? styles.resultLead : ''}`}>
+                          <span className={styles.resultBar} style={{ width: `${pct}%` }} />
+                          <span className={styles.resultText}>{o.text}</span>
+                          <span className={styles.resultNum}><strong>{pct}%</strong> {v.toLocaleString()}</span>
+                        </li>
+                      );
+                    });
+                  })()}
+                </ol>
+              )}
+              <div className={styles.resultActions}>
+                <a className={styles.draftButton} href={exportPollUrl(Number(id))} target="_blank" rel="noopener noreferrer"><FontAwesomeIcon icon={faFileCsv} /> Export CSV</a>
+                {totalVotes > 0 && <button className={styles.dangerLink} onClick={handleReset}><FontAwesomeIcon icon={faRotateLeft} /> Reset votes</button>}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className={styles.sidebar}>
+          <div className={`${styles.panel} ${styles.previewPanel}`}>
+            <h3>Preview <span className={styles.panelHint}>as readers see it</span></h3>
+            <div className={styles.preview}>
+              <span className={styles.previewPill}>{status === 'closed' ? 'Final results' : 'Open poll'}</span>
+              <p className={styles.previewQ}>{question.trim() || 'Your question appears here'}</p>
+              {description.trim() && <p className={styles.previewDesc}>{description}</p>}
+              <p className={styles.previewHint}>{voteMode === 'multiple' ? 'Pick all that apply' : 'Pick one'}</p>
+              <div className={styles.previewChoices}>
+                {options.filter((o) => o.text.trim()).map((o, i) => {
+                  const on = previewPick.includes(i);
+                  return (
+                    <button key={i} type="button" className={`${styles.previewChoice} ${on ? styles.previewOn : ''}`}
+                      onClick={() => setPreviewPick((p) => (voteMode === 'multiple' ? (on ? p.filter((x) => x !== i) : [...p, i]) : [i]))}>
+                      <span className={styles.previewMark}>{voteMode === 'multiple' ? (on ? '✓' : '') : String.fromCharCode(65 + i)}</span>
+                      {o.text}
+                    </button>
+                  );
+                })}
+                {options.filter((o) => o.text.trim()).length < 2 && <p className={styles.hint}>Add at least two answers.</p>}
+              </div>
+              <span className={styles.previewVote}>Vote</span>
+            </div>
+          </div>
+
           <div className={styles.panel}>
             <h3>Publish</h3>
             <div className={styles.formGroup}>
@@ -261,6 +433,7 @@ export default function PollEditorPage() {
                 <option value="ip_limited">IP-limited</option>
                 <option value="authenticated">Authenticated users only</option>
               </select>
+              <p className={styles.hint}>{RESTRICTION_HELP[voterRestriction]}</p>
             </div>
             <div className={styles.formGroup}>
               <label>Results visibility</label>
@@ -270,6 +443,7 @@ export default function PollEditorPage() {
                 <option value="after_close">After poll closes</option>
                 <option value="always">Always</option>
               </select>
+              <p className={styles.hint}>{VISIBILITY_HELP[resultVisibility]}</p>
             </div>
             <label className={styles.toggle}>
               <input type="checkbox" checked={allowVoteChange} onChange={(e) => setAllowVoteChange(e.target.checked)} />

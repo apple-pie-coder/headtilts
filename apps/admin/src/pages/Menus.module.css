@@ -9,9 +9,9 @@
   font-size: 0.8rem;
   transition: border-color var(--ease), background var(--ease), color var(--ease);
 }
-.loc:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.loc:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-text); }
 .loc:disabled { opacity: 0.4; cursor: not-allowed; text-decoration: line-through; }
 .loc:focus-visible { outline: none; box-shadow: var(--input-ring); }
-.locOn { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.locOn { background: var(--accent-bg); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
 
 .emptyWarn { color: var(--warning-t); font-size: 0.8rem; font-weight: 600; }

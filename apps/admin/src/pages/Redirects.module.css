@@ -16,7 +16,7 @@
 .typeOpt:hover { border-color: var(--border-strong); }
 .typeOpt:focus-visible { outline: none; box-shadow: var(--input-ring); }
 .typeOptOn { border-color: var(--accent); background: var(--accent-bg); }
-.typeOptOn strong { color: var(--accent); }
+.typeOptOn strong { color: var(--accent-text); }
 
 .preview {
   display: flex;

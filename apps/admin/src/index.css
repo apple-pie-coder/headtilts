@@ -22,8 +22,8 @@
 
   /* — Text — */
   --t1: #1d1d1f;
-  --t2: #6e6e73;
-  --t3: #aeaeb2;
+  --t2: #55555a;
+  --t3: #636368;
 
   /* — Borders — */
   --border: rgba(0, 0, 0, 0.1);
@@ -32,9 +32,9 @@
 
   /* — Accent (Apple blue) — */
   --accent: #0071e3;
-  --accent-h: #0080ff;
+  --accent-h: #0063c8;
   --accent-bg: rgba(0, 113, 227, 0.1);
-  --accent-text: #0071e3;
+  --accent-text: #005dba;
 
   /* — Danger — */
   --danger: #ff3b30;
@@ -44,12 +44,20 @@
 
   /* — Success — */
   --success: #34c759;
-  --success-t: #197832;
+  --success-t: #166a2b;
   --success-bg: rgba(52, 199, 89, 0.1);
 
   /* — Warning — */
   --warning: #ff9500;
-  --warning-t: #a05900;
+  --warning-t: #965300;
+  /* Solid status fills that carry white text/icons (AA 4.5:1; warning 3:1 for icons) */
+  --danger-fill: #de332a;
+  --danger-fill-h: #c32d25;
+  --success-fill: #23873d;
+  --warning-fill: #d97f00;
+  --purple-t: #5856d6;
+  --purple-bg: rgba(88, 86, 214, 0.1);
+  --star: #9c7000;
   --warning-bg: rgba(255, 149, 0, 0.1);
 
   /* — Inputs — */
@@ -107,21 +115,21 @@
   --modal-bg: rgb(44, 44, 46);
 
   --t1: #f5f5f7;
-  --t2: #aeaeb2;
-  --t3: #48484a;
+  --t2: #b4b4b9;
+  --t3: #a1a1a6;
 
   --border: rgba(255, 255, 255, 0.1);
   --border-strong: rgba(255, 255, 255, 0.16);
   --sep: rgba(255, 255, 255, 0.06);
 
-  --accent: #0a84ff;
-  --accent-h: #409cff;
+  --accent: #0974e0;
+  --accent-h: #0866c6;
   --accent-bg: rgba(10, 132, 255, 0.15);
-  --accent-text: #0a84ff;
+  --accent-text: #6cb5ff;
 
   --danger: #ff453a;
   --danger-h: #e03d33;
-  --danger-t: #ff6961;
+  --danger-t: #ff7f78;
   --danger-bg: rgba(255, 69, 58, 0.15);
 
   --success: #30d158;
@@ -130,6 +138,14 @@
 
   --warning: #ffd60a;
   --warning-t: #ffd60a;
+  /* Solid status fills that carry white text/icons (AA 4.5:1; warning 3:1 for icons) */
+  --danger-fill: #d93b31;
+  --danger-fill-h: #bf342b;
+  --success-fill: #1f8839;
+  --warning-fill: #d97f00;
+  --purple-t: #b4b2ff;
+  --purple-bg: rgba(125, 122, 255, 0.15);
+  --star: #ffd60a;
   --warning-bg: rgba(255, 214, 10, 0.12);
 
   --input-bg: rgba(58, 58, 60, 0.7);
@@ -159,6 +175,11 @@
 
 html {
   color-scheme: light;
+}
+
+::placeholder {
+  color: var(--t3);
+  opacity: 1;
 }
 
 [data-theme='dark'] {
@@ -245,12 +266,17 @@ select {
 
 [data-theme='dark'] .ql-toolbar button:hover .ql-stroke,
 [data-theme='dark'] .ql-toolbar button.ql-active .ql-stroke {
-  stroke: var(--accent) !important;
+  stroke: var(--accent-text) !important;
 }
 
 [data-theme='dark'] .ql-toolbar button:hover .ql-fill,
 [data-theme='dark'] .ql-toolbar button.ql-active .ql-fill {
-  fill: var(--accent) !important;
+  fill: var(--accent-text) !important;
+}
+
+[data-theme='dark'] .ql-snow.ql-toolbar button:hover,
+[data-theme='dark'] .ql-snow.ql-toolbar button.ql-active {
+  color: var(--accent-text);
 }
 
 [data-theme='dark'] .ql-snow .ql-tooltip {
@@ -287,4 +313,98 @@ select {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
   }
+}
+
+/* ═══ Phones: data tables become cards ═══════════════════════════════════
+   useCardTables() labels each cell from its column heading. Each row turns
+   into a card: checkbox + title + row actions on top, then one labelled line
+   per remaining column. */
+@media (max-width: 640px) {
+  table[data-cards],
+  table[data-cards] tbody { display: block; width: 100% !important; min-width: 0 !important; }
+  table[data-cards] thead { display: none; }
+  table[data-cards] tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 0.75rem;
+    row-gap: 0.3rem;
+    padding: 0.8rem 0.9rem;
+    border-bottom: 1px solid var(--sep);
+  }
+  table[data-cards] tr[data-has-check] { grid-template-columns: auto minmax(0, 1fr) auto; }
+  table[data-cards] tbody tr:last-child { border-bottom: none; }
+  table[data-cards] td {
+    grid-column: 1 / 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    padding: 0 !important;
+    border: none !important;
+    text-align: right !important;
+    white-space: normal !important;
+    font-size: 0.875rem;
+  }
+  table[data-cards] tr[data-has-check] td { grid-column: 2 / 3; }
+  table[data-cards] td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-size: 0.6875rem;
+    font-weight: 650;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--t3);
+    text-align: left;
+  }
+  table[data-cards] td[data-label=""]::before,
+  table[data-cards] td[data-cell]::before { content: none; }
+  table[data-cards] td:empty { display: none; }
+  table[data-cards] td[data-cell="check"] { grid-column: 1 / 2 !important; grid-row: 1; align-self: start; padding-top: 0.15rem !important; }
+  table[data-cards] td[data-cell="primary"] {
+    grid-row: 1;
+    display: block;
+    text-align: left !important;
+    font-size: 0.9375rem;
+  }
+  table[data-cards] td[data-cell="actions"] {
+    grid-column: -2 / -1 !important;
+    grid-row: 1;
+    align-self: start;
+    justify-content: flex-end;
+  }
+  table[data-cards] td[data-cell="full"] { grid-column: 1 / -1 !important; display: block; text-align: left !important; }
+  table[data-cards] td[data-cell="tool"] { justify-content: flex-end; }
+  /* The card is the scroll unit now; table wrappers needn't scroll sideways. */
+  table[data-cards] td > * { max-width: 100%; }
+}
+
+/* Phones: every tab strip scrolls sideways, with a fade hinting at more. */
+@media (max-width: 640px) {
+  [role="tablist"] {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+  [role="tablist"]::-webkit-scrollbar { display: none; }
+  [role="tablist"] > * { flex-shrink: 0; }
+}
+
+/* Phones: 16px text in fields stops iOS zooming the page on focus. */
+@media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select,
+  textarea { font-size: 16px !important; }
+}
+
+/* Touch screens: small icon buttons get a finger-sized hit area. */
+@media (pointer: coarse) {
+  table[data-cards] td[data-cell="actions"] button,
+  table[data-cards] td[data-cell="actions"] a,
+  table[data-cards] td[data-cell="tool"] button { min-width: 2.25rem; min-height: 2.25rem; }
 }

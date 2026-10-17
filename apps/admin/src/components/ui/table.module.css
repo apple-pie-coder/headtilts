@@ -74,7 +74,7 @@
   text-align: left;
 }
 a.primary:hover,
-button.primary:hover { color: var(--accent); }
+button.primary:hover { color: var(--accent-text); }
 a.primary:focus-visible,
 button.primary:focus-visible { outline: none; box-shadow: var(--input-ring); border-radius: 4px; }
 
@@ -116,7 +116,7 @@ button.primary:focus-visible { outline: none; box-shadow: var(--input-ring); bor
   transition: background var(--ease), color var(--ease);
 }
 button.chip:hover,
-a.chip:hover { background: var(--accent-bg); color: var(--accent); }
+a.chip:hover { background: var(--accent-bg); color: var(--accent-text); }
 .chipAccent { background: var(--accent-bg); color: var(--accent-text); }
 .more { font-size: 0.75rem; color: var(--t3); cursor: default; }
 
@@ -126,7 +126,7 @@ a.chip:hover { background: var(--accent-bg); color: var(--accent); }
   justify-content: flex-end;
   padding: 0.1rem 0.4rem;
   border-radius: var(--r-xs);
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
 }
 .countLink:hover { background: var(--accent-bg); }
@@ -141,7 +141,7 @@ a.chip:hover { background: var(--accent-bg); color: var(--accent); }
   align-items: center;
   justify-content: center;
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 0.75rem;
   font-weight: 700;
 }
@@ -163,7 +163,7 @@ a.chip:hover { background: var(--accent-bg); color: var(--accent); }
   opacity: 0;
   transition: opacity var(--ease), background var(--ease), color var(--ease);
 }
-.quickAction:hover { background: var(--ghost-h); color: var(--accent); }
+.quickAction:hover { background: var(--ghost-h); color: var(--accent-text); }
 .table tbody tr:hover .quickAction,
 .quickAction:focus-visible { opacity: 1; }
 .quickAction:focus-visible { outline: none; box-shadow: var(--input-ring); }

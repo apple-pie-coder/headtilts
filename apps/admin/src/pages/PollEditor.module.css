@@ -31,7 +31,7 @@
 
 .backButton:hover {
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-bg);
 }
 
@@ -97,7 +97,7 @@
   border: none;
   border-bottom: 1px dashed var(--border);
   background: transparent;
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 0.8125rem;
   padding: 0.125rem 0.25rem;
 }
@@ -278,7 +278,7 @@
   background: transparent;
   border: 1px solid var(--danger);
   border-radius: var(--r-sm);
-  color: var(--danger);
+  color: var(--danger-t);
   cursor: pointer;
   flex-shrink: 0;
   transition: color var(--ease), border-color var(--ease), background var(--ease);
@@ -309,7 +309,64 @@
 }
 
 .addOptBtn:hover {
-  color: var(--accent);
+  color: var(--accent-text);
   border-color: var(--accent);
   background: var(--ghost);
 }
+
+/* ── Redesign: header, answers, results, preview ── */
+.headTitle { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.headActions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.headActions a.backButton { text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem; }
+.statusPill { padding: 0.2rem 0.65rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; background: var(--ghost); color: var(--t2); }
+.status_open { background: var(--success-bg); color: var(--success-t); }
+.status_closed { background: var(--danger-bg); color: var(--danger-t); }
+.status_scheduled { background: var(--accent-bg); color: var(--accent-text); }
+.voteCount { font-size: 0.875rem; color: var(--t3); font-variant-numeric: tabular-nums; }
+.panelHint { margin-left: 0.4rem; font-size: 0.75rem; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--t3); }
+
+.optionRow { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem; border-radius: var(--r-sm); transition: background var(--ease), opacity var(--ease); }
+.optionRow:hover { background: var(--ghost); }
+.optionDragging { opacity: 0.4; }
+.optionGrip { display: grid; place-items: center; width: 1.5rem; color: var(--t3); cursor: grab; }
+.optionGrip:active { cursor: grabbing; }
+.optionLetter {
+  display: grid; place-items: center; flex-shrink: 0; width: 1.9rem; height: 1.9rem; border-radius: 50%;
+  border: 1.5px solid var(--border-strong); font-size: 0.75rem; font-weight: 800; color: var(--t2);
+}
+.optionVotes { flex-shrink: 0; min-width: 2.5rem; padding: 0.15rem 0.5rem; border-radius: 999px; background: var(--accent-bg); color: var(--accent-text); font-size: 0.75rem; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.optionMove { display: flex; flex-direction: column; }
+.addRow { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.addRow .addOptBtn { flex: 1; }
+.pasteBox { display: flex; flex-direction: column; gap: 0.5rem; }
+.pasteActions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+
+.resultList { list-style: none; margin: 0 0 0.75rem; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.resultRow { position: relative; display: flex; justify-content: space-between; gap: 1rem; padding: 0.55rem 0.75rem; border-radius: var(--r-sm); background: var(--ghost); overflow: hidden; font-size: 0.875rem; }
+.resultBar { position: absolute; inset: 0 auto 0 0; background: var(--accent-bg); transition: width 0.4s ease; }
+.resultLead .resultBar { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+.resultText, .resultNum { position: relative; }
+.resultText { font-weight: 600; }
+.resultNum { white-space: nowrap; color: var(--t2); font-variant-numeric: tabular-nums; }
+.resultNum strong { color: var(--t1); margin-right: 0.35rem; }
+.resultActions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.resultActions a { display: inline-flex; align-items: center; gap: 0.4rem; text-decoration: none; }
+.dangerLink { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0; border: none; background: none; color: var(--danger-t); font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
+
+.previewPanel { position: sticky; top: 4.5rem; z-index: 1; }
+.preview { padding: 1rem; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-raised, var(--surface)); }
+.previewPill { display: inline-block; margin-bottom: 0.6rem; padding: 0.15rem 0.55rem; border-radius: 999px; background: var(--success-bg); color: var(--success-t); font-size: 0.6875rem; font-weight: 700; }
+.previewQ { margin: 0 0 0.35rem; font-size: 1.0625rem; font-weight: 800; line-height: 1.25; color: var(--t1); }
+.previewDesc { margin: 0 0 0.4rem; font-size: 0.8125rem; color: var(--t2); }
+.previewHint { margin: 0 0 0.6rem; font-size: 0.75rem; font-weight: 600; color: var(--t3); }
+.previewChoices { display: flex; flex-direction: column; gap: 0.4rem; }
+.previewChoice {
+  display: flex; align-items: center; gap: 0.6rem; width: 100%; padding: 0.55rem 0.65rem; text-align: left;
+  border: 1.5px solid var(--border); border-radius: 10px; background: none; color: var(--t1); font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer;
+}
+.previewChoice:hover { border-color: var(--accent); }
+.previewOn { border-color: var(--accent); background: var(--accent-bg); }
+.previewMark { display: grid; place-items: center; flex-shrink: 0; width: 1.5rem; height: 1.5rem; border-radius: 50%; border: 1.5px solid var(--border-strong); font-size: 0.6875rem; font-weight: 800; color: var(--t2); }
+.previewOn .previewMark { background: var(--accent); border-color: var(--accent); color: #fff; }
+.previewVote { display: inline-block; margin-top: 0.75rem; padding: 0.45rem 1.2rem; border-radius: 980px; background: var(--accent); color: #fff; font-size: 0.8125rem; font-weight: 700; }
+@media (max-width: 1100px) { .previewPanel { position: static; } }

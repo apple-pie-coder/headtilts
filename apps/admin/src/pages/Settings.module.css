@@ -61,7 +61,7 @@
 
 .tabActive {
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
 }
 
@@ -221,7 +221,7 @@
 }
 
 .fieldHint a {
-  color: var(--accent);
+  color: var(--accent-text);
   text-decoration: none;
 }
 
@@ -390,7 +390,7 @@
   margin-bottom: 0.1875rem;
 }
 
-.structure { color: var(--accent); font-size: 0.875rem; }
+.structure { color: var(--accent-text); font-size: 0.875rem; }
 
 .customRow { flex: 1; min-width: 0; }
 
@@ -447,7 +447,7 @@
 
 .tag {
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--accent-text);
   border-radius: var(--r-xs);
   padding: 0.125rem 0.4375rem;
   font-size: 0.8125rem;
@@ -776,7 +776,7 @@
 .testEmailButton:hover:not(:disabled) {
   background: var(--ghost-h);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .testEmailButton:disabled { opacity: 0.55; cursor: not-allowed; }
@@ -910,7 +910,7 @@
 
 .testNotifButton:hover:not(:disabled) {
   background: var(--ghost-h);
-  color: var(--accent);
+  color: var(--accent-text);
   border-color: var(--accent);
 }
 

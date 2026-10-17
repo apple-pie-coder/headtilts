@@ -43,14 +43,13 @@
   border-radius: 50%;
   background: transparent;
   color: var(--t3);
-  opacity: 0.45;
   font-size: 0.85rem;
   transition: color var(--ease), opacity var(--ease), transform var(--ease), background var(--ease);
 }
-.star:hover:not(:disabled) { opacity: 1; background: var(--warning-bg); color: var(--warning); }
+.star:hover:not(:disabled) { background: var(--warning-bg); color: var(--star); }
 .star:active:not(:disabled) { transform: scale(0.85); }
 .star:disabled { cursor: default; }
-.starOn { color: #ffb800; opacity: 1; }
+.starOn { color: var(--star); }
 
 @media (max-width: 768px) {
   .titleCell { min-width: 200px; }
@@ -70,3 +69,23 @@
   font-size: 0.72rem;
   font-weight: 600;
 }
+
+/* Post type and SEO score tags beside the title (visible in every density) */
+.titleLine { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; min-width: 0; }
+.kindTag,
+.seoTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.kind_news { background: var(--danger-bg); color: var(--danger-t); }
+.kind_review { background: var(--accent-bg); color: var(--accent-text); }
+.kind_qna { background: var(--purple-bg); color: var(--purple-t); }
+.seo_good { background: var(--success-bg); color: var(--success-t); }
+.seo_improve { background: var(--warning-bg); color: var(--warning-t); }
+.seo_problem { background: var(--danger-bg); color: var(--danger-t); }

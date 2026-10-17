@@ -248,7 +248,7 @@ tbody tr:hover td { background: var(--ghost); }
 .pagination button:hover:not(:disabled) {
   background: var(--ghost-h);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* ── Events list (rebuilt) ── */
@@ -264,7 +264,7 @@ tbody tr:hover td { background: var(--ghost); }
   align-items: center;
   justify-content: center;
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--accent-text);
   line-height: 1;
 }
 .dateTile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: brightness(0.55); }
@@ -284,7 +284,7 @@ tbody tr:hover td { background: var(--ghost); }
   color: var(--t1);
   font-weight: 600;
 }
-.regs:hover { background: var(--accent-bg); color: var(--accent); }
+.regs:hover { background: var(--accent-bg); color: var(--accent-text); }
 .capacity { display: block; width: 4.5rem; height: 4px; border-radius: 2px; background: var(--ghost-h); overflow: hidden; }
 .capacity > span { display: block; height: 100%; background: var(--success); border-radius: 2px; }
 .capacity > .near { background: var(--warning); }

@@ -31,7 +31,7 @@
 .option { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.45rem 0.6rem; border-radius: var(--r-xs); cursor: pointer; }
 .optionActive { background: var(--accent-bg); }
 .label { font-size: 0.875rem; color: var(--t1); font-weight: 500; }
-.optionActive .label { color: var(--accent); }
+.optionActive .label { color: var(--accent-text); }
 .where { font-size: 0.72rem; color: var(--t3); }
 .none { padding: 0.6rem; font-size: 0.85rem; color: var(--t3); }
 

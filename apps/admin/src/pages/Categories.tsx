@@ -7,6 +7,7 @@ import { faPen, faTrashCan, faLayerGroup, faMagnifyingGlass, faArrowUpRightFromS
 import { AdminLayout } from '../components/AdminLayout';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/ToastContext';
+import { CategoryIcon } from '../components/CategoryIcon';
 import { CategoryForm } from '../components/CategoryForm';
 import {
   Button, Card, DensityToggle, EmptyState, LoadingBar, MenuItem, PageHeader, RowMenu, SearchInput, TableSkeleton,
@@ -163,7 +164,7 @@ export default function CategoriesPage() {
                         <td className={t.primaryCell}>
                           <div className={t.primaryWrap} style={{ paddingLeft: `${depth * 1.25}rem` }}>
                             {depth > 0 && <span className={t.faint} aria-hidden="true">└</span>}
-                            {c.icon && <span aria-hidden="true">{c.icon}</span>}
+                            <CategoryIcon icon={c.icon} iconSvg={c.iconSvg} />
                             <div className={t.stack}>
                               {canEdit
                                 ? <button type="button" className={t.primary} onClick={() => edit(c)}>{c.name}</button>

@@ -80,8 +80,9 @@ function HourHeatmap({ data }: { data: PeakHour[] }) {
         return (
           <div
             key={d.hour}
-            className={styles.heatCell}
-            style={{ opacity: 0.15 + intensity * 0.85 }}
+            // Fade only the fill: fading the whole cell would fade its label too.
+            className={`${styles.heatCell} ${intensity > 0.55 ? styles.heatCellStrong : ''}`}
+            style={{ background: `color-mix(in srgb, var(--accent) ${Math.round(15 + intensity * 85)}%, transparent)` }}
             title={`${d.hour}:00 — ${d.calls} calls`}
           >
             <span className={styles.heatLabel}>{d.hour}</span>

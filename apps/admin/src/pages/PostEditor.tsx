@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AxiosError } from 'axios';
 import ReactQuill, { Quill } from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import { marked } from 'marked';
 import TurndownService from 'turndown';
-import { slugify, PERMISSIONS } from '@headtilts/shared';
+import { slugify, PERMISSIONS, youtubeId } from '@headtilts/shared';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faArrowUpRightFromSquare, faPlus, faMinus, faBold, faCode, faTag, faHistory, faArchive } from '@fortawesome/free-solid-svg-icons';
 import { fetchRevisions, archiveRevision, restoreRevision } from '../services/revisions';
@@ -15,9 +15,20 @@ import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/ToastContext';
 import { ImageToolbar } from '../components/ImageToolbar';
 import { MediaLibraryModal } from '../components/MediaLibraryModal';
-import { MediaPickerInput } from '../components/MediaPickerInput';
 import { useAuth } from '../hooks/useAuth';
-import { Category, Post } from '../types';
+import { ArticleType, Category, Post, QnaSession, Review } from '../types';
+import { PostTypeSwitch } from '../components/editor/PostTypeSwitch';
+import { EMPTY_REVIEW, ReviewPanel } from '../components/editor/ReviewPanel';
+import { EMPTY_QNA, QnaPanel } from '../components/editor/QnaPanel';
+import { suggestSeo } from '../utils/seoSuggest';
+import { qnaToHtml } from '../utils/qnaParse';
+import { VideoField } from '../components/editor/VideoField';
+import { FocusPicker } from '../components/FocusPicker';
+import { CategoryIcon } from '../components/CategoryIcon';
+import { SeoFields, SeoPanel } from '../components/editor/SeoPanel';
+import { analyzeSeo } from '../utils/seoAnalysis';
+import type { CheckTarget } from '../utils/seoAnalysis';
+import { fetchPublicSettings } from '../services/settings';
 import { fetchCategories, createCategory } from '../services/categories';
 import { fetchPolls, Poll } from '../services/polls';
 import { resolveMediaUrl } from '../services/media';
@@ -276,7 +287,8 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   const contentDirtyRef = useRef(false);
   const savedFieldsRef = useRef('');
   const allowLeaveRef = useRef(false);
-  const fieldsKey = (input: PostInput) => JSON.stringify({ ...input, content: undefined });
+  // Content is tracked separately; SEO scores are derived, so only the keyword counts as an edit.
+  const fieldsKey = (input: PostInput) => JSON.stringify({ ...input, content: undefined, seo: input.seo?.focusKeyword ?? null });
 
   /** A save refused with 423 means someone else took the lock. */
   function lockHolderFrom(err: unknown): LockUser | null {
@@ -296,6 +308,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   const [status, setStatus] = useState('draft');
   const [scheduledFor, setScheduledFor] = useState('');
   const [featuredImage, setFeaturedImage] = useState('');
+  const [featuredImageFocus, setFeaturedImageFocus] = useState<string | null>(null);
   const [template, setTemplate] = useState<string>('');
   const [isFeatured, setIsFeatured] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -323,7 +336,6 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   const [ogTitle, setOgTitle] = useState('');
   const [ogDescription, setOgDescription] = useState('');
   const [ogImage, setOgImage] = useState('');
-  const [seoOpen, setSeoOpen] = useState(false);
 
   const [editorMode, setEditorMode] = useState<'visual' | 'markdown'>('visual');
   const [markdownSource, setMarkdownSource] = useState('');
@@ -343,6 +355,40 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const buildInputRef = useRef<((s: string) => PostInput) | null>(null);
+
+  const [articleType, setArticleType] = useState<ArticleType>('article');
+  const [videoUrl, setVideoUrl] = useState('');
+  const [review, setReview] = useState<Review>(EMPTY_REVIEW);
+  const [qna, setQna] = useState<QnaSession>(EMPTY_QNA);
+  const [focusKeyword, setFocusKeyword] = useState('');
+  const [site, setSite] = useState<{ title: string; favicon: string | null }>({ title: '', favicon: null });
+
+  useEffect(() => {
+    fetchPublicSettings()
+      .then((s) => setSite({ title: s.site_title ?? '', favicon: s.site_favicon || null }))
+      .catch(() => {});
+  }, []);
+
+  // Typing stays snappy: the analysis reads a deferred copy of the content.
+  const deferredContent = useDeferredValue(content);
+  const effectiveType: ArticleType = isPage ? 'article' : articleType;
+  const activeReview = effectiveType === 'review' ? review : null;
+  const activeQna = effectiveType === 'qna' ? qna : null;
+  // A Q&A's questions and answers are page content too: analyse them with the text.
+  const analysedHtml = useMemo(() => deferredContent + (activeQna ? qnaToHtml(activeQna.items) : ''), [deferredContent, activeQna]);
+  const seoInputFor = (o: { metaTitle: string; metaDescription: string; focusKeyword: string; excerpt: string }) => ({
+    title, slug: slug || slugify(title), contentHtml: analysedHtml, ...o,
+    featuredImage, articleType: effectiveType, review: activeReview, qna: activeQna,
+    videoUrl: isPage ? '' : videoUrl, categoryCount: categoryIds.length, tagCount: tagsInput.split(',').filter((t) => t.trim()).length,
+    siteTitle: site.title, siteOrigin: window.location.origin,
+  });
+  const seoResult = useMemo(() => analyzeSeo(seoInputFor({ metaTitle, metaDescription, focusKeyword, excerpt })),
+    [title, slug, analysedHtml, excerpt, metaTitle, metaDescription, focusKeyword, featuredImage, effectiveType, activeReview, activeQna,
+     videoUrl, categoryIds.length, tagsInput, site.title, isPage]);
+  const seoSuggestions = useMemo(() => suggestSeo({
+    title, contentHtml: analysedHtml, excerpt, articleType: effectiveType, review: activeReview, qna: activeQna,
+    siteTitle: site.title, existingTags: tagsInput.split(',').map((t) => t.trim()).filter(Boolean),
+  }), [title, analysedHtml, excerpt, effectiveType, activeReview, activeQna, site.title, tagsInput]);
   const postRef = useRef<Post | null>(null);
   const savingRef = useRef(false);
 
@@ -379,6 +425,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
 
   const handleFeaturedImageSelect = useCallback((media: { url: string }) => {
     setFeaturedImage(media.url);
+    setFeaturedImageFocus(null); // a new image needs its own focus point
     setMediaModalOpen(false);
   }, []);
 
@@ -520,6 +567,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
     setStatus(loaded.status === 'trash' ? 'draft' : loaded.status);
     setScheduledFor(toDatetimeLocal(loaded.scheduledFor));
     setFeaturedImage(loaded.featuredImage || '');
+    setFeaturedImageFocus(loaded.featuredImageFocus ?? null);
     setTemplate(loaded.template || '');
     setIsFeatured(loaded.isFeatured ?? false);
     setShowSidebar(loaded.showSidebar ?? false);
@@ -537,6 +585,11 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
     setOgImage(loaded.ogImage || '');
     setSelectedAuthorId(loaded.authorId || (loaded.author?.id ? String(loaded.author.id) : ''));
     setSelectedCoAuthorIds((loaded.coAuthors ?? []).map((ca) => String(ca.user.id)));
+    setArticleType(loaded.articleType ?? 'article');
+    setVideoUrl(loaded.videoUrl ?? '');
+    setReview(loaded.review ? { ...EMPTY_REVIEW, ...loaded.review } : EMPTY_REVIEW);
+    setQna(loaded.qna ? { ...EMPTY_QNA, ...loaded.qna, items: Array.isArray(loaded.qna.items) ? loaded.qna.items : [] } : EMPTY_QNA);
+    setFocusKeyword(loaded.seoMetadata?.focusKeyword ?? '');
   }
 
   function applyImageStyle(style: string) {
@@ -688,6 +741,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
       scheduledFor:
         targetStatus === 'scheduled' && scheduledFor ? new Date(scheduledFor).toISOString() : null,
       featuredImage: featuredImage || undefined,
+      featuredImageFocus: featuredImage ? featuredImageFocus : null,
       template: isPage ? (template || null) : undefined,
       isFeatured: isPage ? undefined : isFeatured,
       showSidebar,
@@ -704,8 +758,61 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
       ogTitle: ogTitle || undefined,
       ogDescription: ogDescription || undefined,
       ogImage: ogImage || undefined,
+      articleType: isPage ? undefined : articleType,
+      // An unfinished link is shown as an error under the field rather than failing every autosave.
+      videoUrl: isPage ? undefined : (youtubeId(videoUrl) ? videoUrl.trim() : null),
+      // Kept even when switching type, so flipping back to Review restores it.
+      review: !isPage && articleType === 'review' ? review : undefined,
+      qna: !isPage && articleType === 'qna' ? qna : undefined,
+      seo: { focusKeyword: focusKeyword.trim() || null, seoScore: seoResult.score, readabilityScore: seoResult.readability },
     };
   }
+
+  const seoFields: SeoFields = { focusKeyword, metaTitle, metaDescription, metaKeywords, canonicalUrl, ogTitle, ogDescription, ogImage };
+  const SEO_SETTERS: { [K in keyof SeoFields]: (v: string) => void } = {
+    focusKeyword: setFocusKeyword, metaTitle: setMetaTitle, metaDescription: setMetaDescription, metaKeywords: setMetaKeywords,
+    canonicalUrl: setCanonicalUrl, ogTitle: setOgTitle, ogDescription: setOgDescription, ogImage: setOgImage,
+  };
+
+  /** Fill every empty SEO field (and the excerpt) from the content. Returns what changed. */
+  function autoFillSeo(): { filled: string[]; values: { focusKeyword: string; metaTitle: string; metaDescription: string; excerpt: string } } {
+    const sg = seoSuggestions;
+    const filled: string[] = [];
+    const values = { focusKeyword, metaTitle, metaDescription, excerpt };
+    if (!focusKeyword.trim() && sg.focusKeyword) { values.focusKeyword = sg.focusKeyword; filled.push('focus keyword'); }
+    if (!metaTitle.trim() && sg.metaTitle) { values.metaTitle = sg.metaTitle; filled.push('SEO title'); }
+    if (!metaDescription.trim() && sg.metaDescription) { values.metaDescription = sg.metaDescription; filled.push('meta description'); }
+    if (!excerpt.trim() && sg.excerpt) { values.excerpt = sg.excerpt; filled.push('excerpt'); }
+    setFocusKeyword(values.focusKeyword);
+    setMetaTitle(values.metaTitle);
+    setMetaDescription(values.metaDescription);
+    setExcerpt(values.excerpt);
+    return { filled, values };
+  }
+
+  function addTags(tags: string[]) {
+    const current = tagsInput.split(',').map((t) => t.trim()).filter(Boolean);
+    const next = [...current, ...tags.filter((t) => !current.some((c) => c.toLowerCase() === t.toLowerCase()))];
+    setTagsInput(next.join(', '));
+  }
+
+  /** "Fix" buttons in the SEO panel scroll to and focus the field that resolves the check. */
+  function jumpTo(target: CheckTarget) {
+    const el: HTMLElement | null =
+      target === 'content' ? (document.querySelector<HTMLElement>('.ql-editor') ?? markdownTextareaRef.current)
+      : target === 'slug' ? document.getElementById('post-slug-input')
+      : target === 'featuredImage' ? document.getElementById('featured-image-panel')
+      : target === 'review' ? document.getElementById('review-panel')
+      : target === 'qna' ? document.getElementById('qna-panel')
+      : target === 'categories' ? document.getElementById('categories-panel')
+      : null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (target === 'content' || target === 'slug') el.focus({ preventScroll: true });
+  }
+
+  // Public path without the slug, for the search preview breadcrumb.
+  const pathPrefix = post?.publicUrl ? post.publicUrl.replace(/[^/]*\/?$/, '') : isPage ? '/pages/' : '/';
 
   async function submitPost(targetStatus: string, successText: string): Promise<Post | null> {
     if (!title.trim()) {
@@ -726,17 +833,30 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
     setSaving(true);
 
     const input = buildInput(targetStatus);
+    let autoFilled: string[] = [];
+    if (targetStatus === 'published' || targetStatus === 'scheduled') {
+      const { filled, values } = autoFillSeo();
+      if (filled.length) {
+        autoFilled = filled;
+        input.metaTitle = values.metaTitle || undefined;
+        input.metaDescription = values.metaDescription || undefined;
+        input.excerpt = values.excerpt || undefined;
+        const filledScore = analyzeSeo(seoInputFor(values));
+        input.seo = { focusKeyword: values.focusKeyword.trim() || null, seoScore: filledScore.score, readabilityScore: filledScore.readability };
+      }
+    }
+    const savedText = autoFilled.length ? `${successText} — filled the ${autoFilled.join(', ')} from your content` : successText;
 
     try {
       if (isEditing && post) {
         const updated = await updatePost(post.id, input, { fromEditor: true });
         applyPost(updated);
-        toast.success(successText);
+        toast.success(savedText);
         loadRevisions(updated.id).catch(() => {});
         return updated;
       }
       const created = await createPost(input);
-      toast.success(successText);
+      toast.success(savedText);
       allowLeaveRef.current = true;
       navigate(`${listPath}/${created.id}/edit`, { replace: true });
       // Revisions will load once the navigated-to edit page mounts
@@ -869,8 +989,8 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
       <div className={styles.header}>
         <h2 className={styles.title}>{isEditing ? `Edit ${noun}` : `Add New ${noun}`}</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          {autosaveStatus === 'saving' && <span style={{ fontSize: '0.8rem', color: '#6e6e73' }}>Saving…</span>}
-          {autosaveStatus === 'saved' && <span style={{ fontSize: '0.8rem', color: '#34c759' }}>Autosaved</span>}
+          {autosaveStatus === 'saving' && <span style={{ fontSize: '0.8rem', color: 'var(--t2)' }}>Saving…</span>}
+          {autosaveStatus === 'saved' && <span style={{ fontSize: '0.8rem', color: 'var(--success-t)' }}>Autosaved</span>}
           <button className={styles.backButton} onClick={() => navigate(listPath)}>
             <FontAwesomeIcon icon={faArrowLeft} /> Back to {noun}s
           </button>
@@ -880,6 +1000,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
 
       <div className={styles.layout}>
         <div className={styles.contentColumn}>
+          {!isPage && <PostTypeSwitch value={articleType} onChange={setArticleType} disabled={saving} />}
           <input
             type="text"
             className={styles.titleInput}
@@ -893,6 +1014,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
             <span className={styles.permalinkLabel}>Permalink:</span>
             <span className={styles.permalinkBase}>/{isPage ? 'pages' : 'posts'}/</span>
             <input
+              id="post-slug-input"
               type="text"
               className={styles.permalinkInput}
               value={slug}
@@ -904,6 +1026,18 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
               disabled={saving}
             />
           </div>
+
+          {!isPage && articleType === 'review' && (
+            <div className={styles.panel} id="review-panel">
+              <ReviewPanel key={post?.id ?? 'new'} value={review} onChange={setReview} featuredImage={featuredImage} disabled={saving} />
+            </div>
+          )}
+
+          {!isPage && articleType === 'qna' && (
+            <div className={styles.panel} id="qna-panel">
+              <QnaPanel value={qna} onChange={setQna} contentHtml={content} disabled={saving} />
+            </div>
+          )}
 
           <div className={styles.editorTabs}>
             <button
@@ -955,65 +1089,34 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
             />
           </div>
 
-          <div className={styles.panel}>
-            <button type="button" className={styles.seoToggle} onClick={() => setSeoOpen((open) => !open)}>
-              <h3>SEO</h3>
-              <span><FontAwesomeIcon icon={seoOpen ? faMinus : faPlus} /></span>
-            </button>
-
-            {seoOpen && (
-              <div className={styles.seoFields}>
-                <div className={styles.formGroup}>
-                  <label>Meta Title</label>
-                  <input type="text" value={metaTitle} onChange={(e) => setMetaTitle(e.target.value)} disabled={saving} />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Meta Description</label>
-                  <textarea
-                    value={metaDescription}
-                    onChange={(e) => setMetaDescription(e.target.value)}
-                    rows={2}
-                    disabled={saving}
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Meta Keywords</label>
-                  <input
-                    type="text"
-                    value={metaKeywords}
-                    onChange={(e) => setMetaKeywords(e.target.value)}
-                    placeholder="Comma-separated"
-                    disabled={saving}
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Canonical URL</label>
-                  <input type="text" value={canonicalUrl} onChange={(e) => setCanonicalUrl(e.target.value)} disabled={saving} />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>OG Title</label>
-                  <input type="text" value={ogTitle} onChange={(e) => setOgTitle(e.target.value)} disabled={saving} />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>OG Description</label>
-                  <textarea
-                    value={ogDescription}
-                    onChange={(e) => setOgDescription(e.target.value)}
-                    rows={2}
-                    disabled={saving}
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>OG Image</label>
-                  <MediaPickerInput
-                    value={ogImage}
-                    onChange={setOgImage}
-                    disabled={saving}
-                    placeholder="Paste URL or choose from library…"
-                  />
-                </div>
-              </div>
-            )}
+          <div className={styles.panel} id="seo-panel">
+            <SeoPanel
+              result={seoResult}
+              fields={seoFields}
+              onField={(key, value) => SEO_SETTERS[key](value)}
+              onFix={jumpTo}
+              title={title}
+              slug={slug || slugify(title)}
+              pathPrefix={pathPrefix}
+              siteTitle={site.title}
+              siteOrigin={window.location.origin}
+              favicon={site.favicon}
+              featuredImage={featuredImage}
+              contentHtml={analysedHtml}
+              excerpt={excerpt}
+              articleType={isPage ? 'article' : articleType}
+              review={activeReview}
+              qna={activeQna}
+              videoUrl={isPage ? '' : videoUrl}
+              hasCategory={categoryIds.length > 0}
+              suggestions={seoSuggestions}
+              onAutoFill={() => {
+                const { filled } = autoFillSeo();
+                if (filled.length) toast.success(`Filled the ${filled.join(', ')} — review them below`);
+              }}
+              onAddTags={addTags}
+              disabled={saving}
+            />
           </div>
 
           {isEditing && canViewRevisions && (
@@ -1349,7 +1452,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
           )}
 
           {!isPage && (
-            <div className={styles.panel}>
+            <div className={styles.panel} id="categories-panel">
               <div className={styles.panelTitleRow}>
                 <h3>Categories</h3>
                 <button
@@ -1404,6 +1507,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
                       disabled={saving}
                     />
                     {depth > 0 && <span className={styles.nestingMark} aria-hidden="true" />}
+                    <CategoryIcon icon={category.icon} iconSvg={category.iconSvg} />
                     {category.name}
                   </label>
                 ))}
@@ -1425,22 +1529,16 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
             </div>
           )}
 
-          <div className={styles.panel}>
+          <div className={styles.panel} id="featured-image-panel">
             <h3>Featured Image</h3>
             {featuredImage ? (
               <>
-                <div className={styles.imagePreview}>
-                  <img
-                    src={resolveMediaUrl(featuredImage)}
-                    alt="Featured preview"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                    onLoad={(e) => {
-                      e.currentTarget.style.display = 'block';
-                    }}
-                  />
-                </div>
+                <FocusPicker
+                  src={resolveMediaUrl(featuredImage)}
+                  value={featuredImageFocus}
+                  onChange={setFeaturedImageFocus}
+                  disabled={saving}
+                />
                 <div className={styles.imageActions}>
                   <button type="button" onClick={() => setMediaModalOpen(true)} disabled={saving}>
                     Replace image
@@ -1448,7 +1546,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
                   <button
                     type="button"
                     className={styles.imageRemoveButton}
-                    onClick={() => setFeaturedImage('')}
+                    onClick={() => { setFeaturedImage(''); setFeaturedImageFocus(null); }}
                     disabled={saving}
                   >
                     Remove image
@@ -1463,6 +1561,13 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
               </div>
             )}
           </div>
+
+          {!isPage && (
+            <div className={styles.panel}>
+              <h3>Featured video</h3>
+              <VideoField value={videoUrl} onChange={setVideoUrl} disabled={saving} />
+            </div>
+          )}
 
           <div className={styles.panel}>
             <button type="button" className={styles.scToggle} onClick={() => {

@@ -4,19 +4,19 @@
 
 /* ── Table ── */
 
-table {
+.sharesTableWrap table {
   width: 100%;
   border-collapse: collapse;
 }
 
-th, td {
+.sharesTableWrap th, .sharesTableWrap td {
   text-align: left;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--sep);
   vertical-align: middle;
 }
 
-th {
+.sharesTableWrap th {
   background: transparent;
   color: var(--t3);
   font-size: 0.75rem;
@@ -26,8 +26,8 @@ th {
   white-space: nowrap;
 }
 
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: var(--ghost); }
+.sharesTableWrap tr:last-child td { border-bottom: none; }
+.sharesTableWrap tr:hover td { background: var(--ghost); }
 
 /* ── Cell content ── */
 
@@ -44,7 +44,7 @@ tr:hover td { background: var(--ghost); }
 .pagination button:hover:not(:disabled) {
   background: var(--ghost-h);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* ── Table density ─────────────────────────────────────────────────────────── */
@@ -105,7 +105,7 @@ tr:hover td { background: var(--ghost); }
   border: none;
   border-radius: 50%;
   background: var(--ghost);
-  color: var(--danger);
+  color: var(--danger-t);
   font-size: 0.875rem;
   cursor: pointer;
   display: flex;
@@ -230,7 +230,7 @@ tr:hover td { background: var(--ghost); }
 .clickCell {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-text);
   text-align: center;
 }
 

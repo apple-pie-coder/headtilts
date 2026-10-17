@@ -35,7 +35,7 @@
   align-items: center;
   justify-content: center;
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 1.25rem;
   font-weight: 700;
   border: 2px solid var(--modal-bg);
@@ -52,12 +52,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--warning);
+  background: var(--warning-fill);
   color: #fff;
   font-size: 0.65rem;
   border: 2px solid var(--modal-bg);
 }
-.badgeFree { background: var(--success); }
+.badgeFree { background: var(--success-fill); }
 
 .title { font-size: 1.15rem; font-weight: 700; color: var(--t1); letter-spacing: -0.2px; }
 .text { margin-top: 0.5rem; color: var(--t2); font-size: 0.9rem; line-height: 1.55; }

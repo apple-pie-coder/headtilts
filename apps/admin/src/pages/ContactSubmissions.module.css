@@ -64,7 +64,7 @@
 .pane { overflow-y: auto; padding: 1.25rem 1.75rem 2rem; min-width: 0; }
 
 .paneBar { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1.25rem; }
-.back { display: none; align-items: center; gap: 0.4rem; background: none; color: var(--accent); font-size: 0.875rem; }
+.back { display: none; align-items: center; gap: 0.4rem; background: none; color: var(--accent-text); font-size: 0.875rem; }
 .paneActions { display: flex; gap: 0.35rem; margin-left: auto; }
 
 .primaryAct {
@@ -89,7 +89,7 @@
   color: var(--t2);
 }
 .act:hover { background: var(--ghost-h); color: var(--t1); }
-.danger:hover { background: var(--danger-bg); color: var(--danger); }
+.danger:hover { background: var(--danger-bg); color: var(--danger-t); }
 .act:focus-visible, .primaryAct:focus-visible { outline: none; box-shadow: var(--input-ring); }
 
 .paneSubject { font-size: 1.25rem; font-weight: 700; color: var(--t1); letter-spacing: -0.2px; }
@@ -105,7 +105,7 @@
   color: var(--t1);
 }
 .paneFrom a { color: var(--t2); }
-.paneFrom a:hover { color: var(--accent); }
+.paneFrom a:hover { color: var(--accent-text); }
 .paneDate { margin-left: auto; color: var(--t3); font-size: 0.8rem; }
 .paneBody { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; color: var(--t1); font-size: 0.95rem; }
 
@@ -119,7 +119,7 @@
   color: var(--t3);
   font-size: 0.875rem;
 }
-.paneEmpty > svg { font-size: 2rem; opacity: 0.5; }
+.paneEmpty > svg { font-size: 2rem; color: var(--t3); }
 .paneEmpty span { display: inline-flex; gap: 0.25rem; align-items: center; font-size: 0.75rem; }
 
 /* Narrow screens: show either the list or the open message. */

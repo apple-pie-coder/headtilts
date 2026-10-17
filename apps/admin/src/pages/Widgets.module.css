@@ -230,7 +230,7 @@
 
 .badge {
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--accent-text);
   border-radius: 999px;
   padding: 0.0625rem 0.5rem;
   font-size: 0.75rem;
@@ -266,7 +266,7 @@
 .inlineLink {
   border: none;
   background: none;
-  color: var(--accent);
+  color: var(--accent-text);
   cursor: pointer;
   font-size: inherit;
   padding: 0;
@@ -315,7 +315,7 @@
 .typeBadge {
   display: inline-block;
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--accent-text);
   border-radius: 999px;
   padding: 0.0625rem 0.5625rem;
   font-size: 0.75rem;
@@ -349,7 +349,7 @@
   transition: background var(--ease), color var(--ease);
 }
 
-.editBtn { color: var(--accent); }
+.editBtn { color: var(--accent-text); }
 .editBtn:hover { background: var(--accent-bg); }
 .deleteBtn { color: var(--danger-t); }
 .deleteBtn:hover { background: var(--danger-bg); }
@@ -472,7 +472,7 @@
   transition: color var(--ease), background var(--ease);
 }
 
-.reorderBtn:hover:not(:disabled) { color: var(--accent); background: var(--accent-bg); }
+.reorderBtn:hover:not(:disabled) { color: var(--accent-text); background: var(--accent-bg); }
 .reorderBtn:disabled { opacity: 0.3; cursor: default; }
 
 .zoneWidgetInfo {
@@ -498,7 +498,7 @@
 .removeBtn {
   border: none;
   background: none;
-  color: var(--danger);
+  color: var(--danger-t);
   cursor: pointer;
   padding: 0.25rem 0.375rem;
   font-size: 0.75rem;

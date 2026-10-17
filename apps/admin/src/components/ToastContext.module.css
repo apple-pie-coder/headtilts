@@ -54,7 +54,7 @@
   flex-shrink: 0;
   background: none;
   border: none;
-  color: var(--danger);
+  color: var(--danger-t);
   font-size: 1.1rem;
   line-height: 1;
   cursor: pointer;
@@ -66,10 +66,10 @@
 .close:hover { color: var(--danger-h); }
 
 /* Variant accents */
-.success .icon { background: #1d9d50; }
-.success { border-left: 3px solid #1d9d50; }
+.success .icon { background: var(--success-fill); }
+.success { border-left: 3px solid var(--success-fill); }
 
-.error .icon { background: var(--danger); }
+.error .icon { background: var(--danger-fill); }
 .error { border-left: 3px solid var(--danger); }
 
 .info .icon { background: var(--accent); }
@@ -91,7 +91,7 @@
   padding: 0.25rem 0.625rem;
   border-radius: var(--r-xs);
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 0.8125rem;
   font-weight: 600;
   transition: background var(--ease);

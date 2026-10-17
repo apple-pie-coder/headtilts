@@ -27,6 +27,8 @@ export function CelebrationForm({ celebration, onSaved, onCancel }: CelebrationF
   const [day, setDay] = useState(celebration?.day || now.getDate());
   const [year, setYear] = useState(celebration?.year ? String(celebration.year) : '');
   const [photo, setPhoto] = useState(celebration?.photo || '');
+  const [photoCredit, setPhotoCredit] = useState(celebration?.photoCredit || '');
+  const [photoCreditUrl, setPhotoCreditUrl] = useState(celebration?.photoCreditUrl || '');
   const [message, setMessage] = useState(celebration?.message || '');
   const [isActive, setIsActive] = useState(celebration?.isActive ?? true);
   const [saving, setSaving] = useState(false);
@@ -46,6 +48,8 @@ export function CelebrationForm({ celebration, onSaved, onCancel }: CelebrationF
       day: Math.min(day, daysInMonth),
       year: year ? Number(year) : null,
       photo: photo || null,
+      photoCredit: photoCredit.trim() || null,
+      photoCreditUrl: photoCreditUrl.trim() || null,
       message: message || null,
       isActive,
     };
@@ -143,6 +147,30 @@ export function CelebrationForm({ celebration, onSaved, onCancel }: CelebrationF
         <div className={styles.formGroup}>
           <label>Photo</label>
           <MediaPickerInput value={photo} onChange={setPhoto} disabled={saving} />
+        </div>
+
+        <div className={styles.formGroup}>
+          <label>Photo credit <span className={styles.optional}>(optional)</span></label>
+          <input
+            type="text"
+            value={photoCredit}
+            onChange={(e) => setPhotoCredit(e.target.value)}
+            maxLength={300}
+            placeholder="e.g. Photo: Jane Doe, CC BY-SA 4.0, via Wikimedia Commons"
+            disabled={saving}
+            aria-label="Photo credit"
+          />
+          <input
+            value={photoCreditUrl}
+            onChange={(e) => setPhotoCreditUrl(e.target.value)}
+            type="url"
+            maxLength={500}
+            placeholder="Link to the photo's source and licence (https://…)"
+            disabled={saving}
+            className={styles.stacked}
+            aria-label="Photo credit link"
+          />
+          <p className={styles.hint}>Shown in small type under the photo. Most free photos require crediting the photographer and licence.</p>
         </div>
 
         <div className={styles.formGroup}>

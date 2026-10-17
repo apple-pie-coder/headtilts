@@ -34,6 +34,7 @@
 .optional { font-weight: 400; color: var(--t3); }
 
 .formGroup input[type='text'],
+.formGroup input[type='url'],
 .formGroup input[type='number'],
 .formGroup textarea,
 .formGroup select {
@@ -79,7 +80,7 @@
 
 .typeButtonActive {
   background: var(--accent-bg, rgba(0, 113, 227, 0.12));
-  color: var(--accent);
+  color: var(--accent-text);
   border-color: var(--accent);
 }
 
@@ -117,3 +118,6 @@
 
 .saveButton:disabled,
 .cancelButton:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Second field in the same group (photo credit link) */
+.stacked { margin-top: 0.5rem; }

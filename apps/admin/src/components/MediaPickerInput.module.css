@@ -68,7 +68,7 @@
 .chooseBtn:hover:not(:disabled) {
   background: var(--ghost-h);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .chooseBtn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -88,5 +88,5 @@
   transition: background var(--ease);
 }
 
-.removeBtn:hover:not(:disabled) { background: var(--danger); color: #fff; }
+.removeBtn:hover:not(:disabled) { background: var(--danger-fill); color: #fff; }
 .removeBtn:disabled { opacity: 0.5; cursor: not-allowed; }

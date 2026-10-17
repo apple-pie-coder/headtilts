@@ -45,6 +45,9 @@ import BackupsPage from './pages/Backups';
 import WidgetsPage from './pages/Widgets';
 import LogsPage from './pages/Logs';
 import HealthPage from './pages/Health';
+import FeedbackPage from './pages/Feedback';
+import IssuesPage from './pages/Issues';
+import FrontPageEditorPage from './pages/FrontPageEditor';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'http://localhost:3000';
@@ -369,8 +372,32 @@ const router = createBrowserRouter(createRoutesFromElements(
     <Route
       path="/admin/health"
       element={
-        <ProtectedRoute>
+        <ProtectedRoute requiredPermission={PERMISSIONS.SETTING_READ}>
           <HealthPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/admin/feedback"
+      element={
+        <ProtectedRoute requiredPermission={PERMISSIONS.SETTING_READ}>
+          <FeedbackPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/admin/front-page"
+      element={
+        <ProtectedRoute requiredPermission={PERMISSIONS.WIDGET_READ}>
+          <FrontPageEditorPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/admin/issues"
+      element={
+        <ProtectedRoute requiredPermission={PERMISSIONS.SETTING_READ}>
+          <IssuesPage />
         </ProtectedRoute>
       }
     />
