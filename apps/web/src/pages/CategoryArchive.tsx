@@ -8,7 +8,7 @@ import { fetchPosts } from '../services/posts';
 import { fetchCategories } from '../services/taxonomy';
 import { useLayout } from '../context/LayoutContext';
 import { useSiteSettings } from '../context/SiteSettingsContext';
-import { applySeo, resetSeo } from '../utils/seo';
+import { applySeo, resetSeo, setSectionFeed } from '../utils/seo';
 import { Category, Pagination, PostSummary } from '../types';
 import { CategoryIcon } from '../components/CategoryIcon';
 
@@ -39,6 +39,12 @@ export function CategoryArchivePage() {
 
   useEffect(() => {
     if (!slug) return;
+    const name = category?.name || slug;
+    return setSectionFeed(`/categories/${encodeURIComponent(slug)}/feed`, `${name} — ${site_title}`);
+  }, [category, slug, site_title]);
+
+  useEffect(() => {
+    if (!slug) return;
     setLoading(true);
     Promise.all([
       fetchPosts({ page, limit: PAGE_SIZE, category: slug }),
@@ -65,7 +71,10 @@ export function CategoryArchivePage() {
         <h1 className="page-title">{category && <CategoryIcon icon={category.icon} iconSvg={category.iconSvg} />}{category?.name || slug}</h1>
         {category?.description && <p className="archive-description">{category.description}</p>}
         {!loading && pagination && (
-          <p className="archive-count">{pagination.total} post{pagination.total !== 1 ? 's' : ''}</p>
+          <p className="archive-count">
+            {pagination.total} post{pagination.total !== 1 ? 's' : ''}
+            {slug && <> · <a className="archive-feed" href={`/categories/${encodeURIComponent(slug)}/feed`}>RSS feed</a></>}
+          </p>
         )}
       </div>
 

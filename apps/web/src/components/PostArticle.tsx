@@ -7,6 +7,7 @@ import { useSiteSettings } from '../context/SiteSettingsContext';
 import { useLayout } from '../context/LayoutContext';
 import { formatDate, formatTime } from '../utils/date';
 import { applySeo, resetSeo } from '../utils/seo';
+import { postPath } from '../utils/permalink';
 import { resolveShortcodes } from '../utils/shortcodes';
 import { RichContent } from './RichContent';
 import { Comments } from './Comments';
@@ -73,8 +74,8 @@ export function PostArticle({ post }: { post: PostFull }) {
       title: post.metaTitle || `${post.title} — ${site_title}`,
       description: post.metaDescription || post.excerpt,
       keywords: post.metaKeywords,
-      canonicalUrl: post.canonicalUrl,
-      ogTitle: post.ogTitle,
+      canonicalUrl: post.canonicalUrl || `${window.location.origin}${postPath(post)}`,
+      ogTitle: post.ogTitle || post.title,
       ogDescription: post.ogDescription,
       ogImage: post.ogImage || post.featuredImage || `${API_BASE}/public/posts/${post.slug}/og-image`,
       ogType: 'article',

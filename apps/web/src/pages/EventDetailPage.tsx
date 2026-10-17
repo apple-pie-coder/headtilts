@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { useLayout } from '../context/LayoutContext';
+import { useSiteSettings } from '../context/SiteSettingsContext';
+import { applySeo, resetSeo } from '../utils/seo';
 import { resolveMediaUrl } from '../services/api';
 import { sanitizeHtml, sanitizeMapEmbed } from '../utils/sanitize';
 import { fetchEvent, registerForEvent, verifyEventPayment, eventIcalUrl, googleCalendarUrl } from '../services/events';
@@ -74,6 +76,17 @@ export default function EventDetailPage() {
     setShowSidebar(false);
     if (slug) load(slug);
   }, [slug]);
+
+  const { site_title } = useSiteSettings();
+  useEffect(() => {
+    if (!event) return;
+    applySeo({
+      title: event.metaTitle || `${event.title} — ${site_title}`,
+      description: event.metaDescription || event.excerpt,
+      ogImage: event.ogImage || event.bannerImage || event.featuredImage,
+    });
+    return () => resetSeo(site_title);
+  }, [event, site_title]);
 
   async function load(s: string) {
     try {

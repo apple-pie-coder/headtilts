@@ -5,6 +5,8 @@ import { SharePollModal } from '../components/SharePollModal';
 import { ShareRecipientBanner } from '../components/ShareRecipientBanner';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { useLayout } from '../context/LayoutContext';
+import { useSiteSettings } from '../context/SiteSettingsContext';
+import { applySeo, resetSeo } from '../utils/seo';
 import { fetchPublicPolls, PublicPoll, PublicPollSummary } from '../services/polls';
 import { pollTiming, votesLabel } from '../utils/pollTime';
 import './PollPage.css';
@@ -15,7 +17,9 @@ export default function PollPage() {
   const { setShowSidebar } = useLayout();
 
   const [polls,       setPolls]       = useState<PublicPollSummary[]>([]);
+  const [poll,        setPoll]        = useState<PublicPoll | null>(null);
   const [pollTitle,   setPollTitle]   = useState('');
+  const { site_title } = useSiteSettings();
   const [showShare,   setShowShare]   = useState(false);
   const [showBanner,  setShowBanner]  = useState(false);
 
@@ -40,7 +44,18 @@ export default function PollPage() {
   const handleLoaded = useCallback((poll: PublicPoll) => {
     setShowSidebar(Boolean(poll.showSidebar));
     setPollTitle(poll.title);
+    setPoll(poll);
   }, [setShowSidebar]);
+
+  useEffect(() => {
+    if (!poll) return;
+    applySeo({
+      title: `${poll.question} — ${site_title}`,
+      description: poll.description || `${poll.status === 'closed' ? 'See the results' : 'Cast your vote'}: ${poll.options.map((o) => o.text).join(' · ')}`,
+      ogImage: poll.featuredImage,
+    });
+    return () => resetSeo(site_title);
+  }, [poll, site_title]);
 
   function handleBannerDone() {
     if (shareToken) sessionStorage.setItem(`srb_seen_${shareToken}`, '1');

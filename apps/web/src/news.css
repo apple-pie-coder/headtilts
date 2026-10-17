@@ -313,6 +313,8 @@ a:hover > .story-media img { transform: scale(1.03); }
 }
 .archive-count,
 [data-theme='dark'] .archive-count { margin: 0.6rem 0 0; font-size: 0.875rem; color: var(--n-muted); }
+.archive-feed, .footer-rss { color: inherit; text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+.archive-feed:hover, .footer-rss:hover { color: var(--n-tape, #c3301f); }
 
 /* ── Article header ── */
 

@@ -164,7 +164,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
             <WidgetZone zone="footer-3" />
           </div>
           <div className="container footer-bottom">
-            <p>© {new Date().getFullYear()} {site_title}</p>
+            <p>© {new Date().getFullYear()} {site_title} · <a className="footer-rss" href="/feed">RSS</a></p>
             {footerItems.length > 0 && (
               <nav className="footer-legal-links">
                 {footerItems.map((item) => (

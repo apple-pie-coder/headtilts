@@ -61,7 +61,7 @@ export function PageDetail({ slug }: { slug: string }) {
         title: page.metaTitle || `${page.title} — ${site_title}`,
         description: page.metaDescription || page.excerpt,
         keywords: page.metaKeywords,
-        canonicalUrl: page.canonicalUrl,
+        canonicalUrl: page.canonicalUrl || `${window.location.origin}/pages/${page.slug}`,
         ogTitle: page.ogTitle,
         ogDescription: page.ogDescription,
         ogImage: page.ogImage || page.featuredImage,

@@ -70,7 +70,9 @@ export function applySeo(seo: SeoInput) {
 
   upsertMeta('name', 'description', description);
   upsertMeta('name', 'keywords', seo.keywords);
-  upsertCanonical(seo.canonicalUrl);
+  // The server fills these tags in on first load (pageMeta.service in the API);
+  // keep a canonical URL so rendering crawlers see the same one.
+  upsertCanonical(seo.canonicalUrl || `${window.location.origin}${window.location.pathname}`);
 
   upsertMeta('property', 'og:title', seo.ogTitle || seo.title);
   upsertMeta('property', 'og:description', seo.ogDescription || description);
@@ -113,4 +115,23 @@ export function resetSeo(siteTitle: string) {
   upsertMeta('property', 'og:type', null);
   upsertMeta('property', 'og:url', null);
   upsertMeta('name', 'twitter:card', null);
+  document.head.querySelectorAll('meta[property^="article:"]').forEach((el) => el.remove());
+}
+
+/**
+ * Offer a category or tag RSS feed next to the site feed. Returns a cleanup
+ * that removes it, including the one the server put in on first load.
+ */
+export function setSectionFeed(href: string, title: string) {
+  let el = document.head.querySelector<HTMLLinkElement>('link[data-feed="section"]');
+  if (!el) {
+    el = document.createElement('link');
+    el.rel = 'alternate';
+    el.type = 'application/rss+xml';
+    el.setAttribute('data-feed', 'section');
+    document.head.appendChild(el);
+  }
+  el.href = href;
+  el.title = title;
+  return () => document.head.querySelector('link[data-feed="section"]')?.remove();
 }
