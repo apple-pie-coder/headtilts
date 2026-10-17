@@ -1,4 +1,5 @@
 import { resolveMediaUrl } from '../services/api';
+import { trackPageReady } from './analytics';
 
 export interface SeoInput {
   title: string;
@@ -81,6 +82,7 @@ export function applySeo(seo: SeoInput) {
   upsertMeta('property', 'og:url', window.location.href);
 
   upsertMeta('name', 'twitter:card', ogImage ? 'summary_large_image' : 'summary');
+  trackPageReady();
 }
 
 /** Apply the site-wide search engine visibility setting as a robots meta tag. */
@@ -93,7 +95,8 @@ export function applyRobotsPolicy(visible: boolean) {
  * the SEO, so a late-resolving settings fetch can't overwrite a page's tags.
  */
 export function applySiteDefaults({ title, description }: { title: string; description?: string | null }) {
-  if (pageSeoActive) return;
+  // The server already filled in this page's tags on first load (pageMeta.service).
+  if (pageSeoActive || document.head.querySelector('meta[property="og:site_name"]')) return;
   document.title = title;
   upsertMeta('name', 'description', description || null);
   upsertMeta('property', 'og:title', title);

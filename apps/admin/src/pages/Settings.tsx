@@ -206,7 +206,7 @@ function CheckField({
 // Main component
 // ---------------------------------------------------------------------------
 
-const TABS = ['General', 'Reading', 'Discussion', 'Media', 'Permalinks', 'Email', 'Notifications'] as const;
+const TABS = ['General', 'Reading', 'Discussion', 'Media', 'Permalinks', 'Analytics', 'Email', 'Notifications'] as const;
 type Tab = (typeof TABS)[number];
 
 export default function SettingsPage() {
@@ -299,6 +299,12 @@ export default function SettingsPage() {
   const [savedEmail, setSavedEmail] = useState<Record<string, string>>({});
   const [testingEmail, setTestingEmail] = useState(false);
 
+  // ── Analytics ──
+  const [gaId,           setGaId]           = useState('');
+  const [gaConsent,      setGaConsent]      = useState('banner');
+  const [gaExcludeStaff, setGaExcludeStaff] = useState('yes');
+  const [savedAnalytics, setSavedAnalytics] = useState<Record<string, string>>({});
+
   // ── Notification preferences ──
   const [notifPrefs, setNotifPrefs] = useState<NotificationPreference[]>([]);
   const [notifLoadError, setNotifLoadError] = useState<string | null>(null);
@@ -369,6 +375,13 @@ export default function SettingsPage() {
         contact_page_id: cpid, about_page_id: apid,
         privacy_policy_page_id: ppid2, terms_page_id: tpid,
         posts_per_page: ppp, posts_per_rss: prss, rss_content: rc, search_engine_visibility: sv, toc_enabled: toc });
+
+      // Analytics
+      const gid = g(all, 'ga_measurement_id', '');
+      const gcs = g(all, 'ga_consent', 'banner');
+      const gex = g(all, 'ga_exclude_staff', 'yes');
+      setGaId(gid); setGaConsent(gcs); setGaExcludeStaff(gex);
+      setSavedAnalytics({ ga_measurement_id: gid, ga_consent: gcs, ga_exclude_staff: gex });
 
       // Discussion
       const cs  = g(all, 'default_comment_status', 'open');
@@ -523,6 +536,10 @@ export default function SettingsPage() {
     smtp_user: smtpUser, smtp_pass: smtpPass, smtp_from: smtpFrom,
   };
 
+  const curAnalytics: Record<string, string> = { ga_measurement_id: gaId.trim().toUpperCase(),
+    ga_consent: gaConsent, ga_exclude_staff: gaExcludeStaff };
+  const gaIdValid = curAnalytics.ga_measurement_id === '' || /^G-[A-Z0-9]{4,20}$/.test(curAnalytics.ga_measurement_id);
+
   const isDirty = (cur: Record<string, string>, saved: Record<string, string>) =>
     Object.entries(cur).some(([k, v]) => saved[k] !== v);
 
@@ -533,6 +550,7 @@ export default function SettingsPage() {
     Discussion: isDirty(curDiscussion, savedDiscussion),
     Media: isDirty(curMedia, savedMedia),
     Email: isDirty(curEmail, savedEmail),
+    Analytics: isDirty(curAnalytics, savedAnalytics),
     Permalinks: structure !== savedStructure,
   };
   useUnsavedChanges(() => Object.values(tabDirty).some(Boolean),
@@ -1315,6 +1333,102 @@ export default function SettingsPage() {
             </div>
           </form>
         </div>
+      ) : tab === 'Analytics' ? (
+        /* ═══════════════ ANALYTICS ═══════════════ */
+        <form onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          if (!gaIdValid) return;
+          save(curAnalytics, () => { setSavedAnalytics({ ...curAnalytics }); setGaId(curAnalytics.ga_measurement_id); });
+        }}>
+
+          <div className={styles.panel}>
+            <h3 className={styles.sectionTitle}>Google Analytics</h3>
+            <p className={savedAnalytics.ga_measurement_id ? `${styles.notice} ${styles.noticeSuccess}` : styles.notice}>
+              {savedAnalytics.ga_measurement_id
+                ? <>Tracking is on for the public site with <strong>{savedAnalytics.ga_measurement_id}</strong>. The admin panel is never tracked.</>
+                : <>Tracking is off. Paste a Measurement ID below to turn it on.</>}
+            </p>
+            <div className={styles.formTable}>
+              <label className={styles.formLabel} htmlFor="ga_measurement_id">Measurement ID</label>
+              <div className={styles.formField}>
+                <input id="ga_measurement_id" type="text" className={styles.regularText} value={gaId}
+                  placeholder="G-XXXXXXXXXX" autoComplete="off" spellCheck={false}
+                  aria-invalid={!gaIdValid} aria-describedby="ga_measurement_id_hint"
+                  onChange={(e) => setGaId(e.target.value)} disabled={saving} />
+                <p id="ga_measurement_id_hint" className={styles.fieldHint}>
+                  {gaIdValid
+                    ? <>In <a href="https://analytics.google.com/" target="_blank" rel="noreferrer">Google Analytics</a>: Admin → Data streams → your web stream. Leave empty to turn tracking off.</>
+                    : <strong>That doesn’t look like a GA4 Measurement ID. It starts with “G-”, e.g. G-AB12CD34EF.</strong>}
+                </p>
+              </div>
+
+              <span className={styles.formLabel}>Visitor consent</span>
+              <div className={styles.formField}>
+                <div className={styles.radioStack}>
+                  <label className={styles.radioRow}>
+                    <input type="radio" name="ga_consent" value="banner" checked={gaConsent === 'banner'}
+                      onChange={() => setGaConsent('banner')} disabled={saving} />
+                    <span>Ask first with a cookie banner (recommended)</span>
+                  </label>
+                  <label className={styles.radioRow}>
+                    <input type="radio" name="ga_consent" value="none" checked={gaConsent === 'none'}
+                      onChange={() => setGaConsent('none')} disabled={saving} />
+                    <span>Don’t ask, start tracking straight away</span>
+                  </label>
+                </div>
+                <p className={styles.fieldHint}>
+                  With the banner, nothing is sent to Google and no cookies are set until a visitor accepts.
+                  Visitors from the EU or UK must be asked; India’s DPDP Act points the same way.
+                  Browsers that send the Global Privacy Control signal are never tracked.
+                </p>
+              </div>
+
+              <span className={styles.formLabel}>Your own visits</span>
+              <div className={styles.formField}>
+                <CheckField
+                  id="ga_exclude_staff"
+                  label="Don’t count visits from browsers signed in to this admin"
+                  hint="Keeps your team’s own reading and checking out of the numbers. Previews are never counted."
+                  checked={gaExcludeStaff !== 'no'}
+                  onChange={(v) => setGaExcludeStaff(v ? 'yes' : 'no')}
+                  disabled={saving}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.panel}>
+            <h3 className={styles.sectionTitle}>One setting to change in Google Analytics</h3>
+            <p className={styles.fieldHint}>
+              The site sends each page view itself, once the page’s real title has loaded. Turn off Google’s own
+              history-based page views so pages aren’t counted twice: Admin → Data streams → your stream →
+              Enhanced measurement (gear icon) → Page views → Show advanced settings → untick
+              “Page changes based on browser history events”.
+            </p>
+          </div>
+
+          <div className={styles.panel}>
+            <h3 className={styles.sectionTitle}>What gets tracked</h3>
+            <ul className={styles.fieldHint}>
+              <li><strong>page_view</strong>: every page, with its real title</li>
+              <li><strong>poll_vote</strong>: a reader votes in a poll</li>
+              <li><strong>comment</strong>: a comment or reply is posted</li>
+              <li><strong>post_reaction</strong>: an emoji reaction on a post</li>
+              <li><strong>share</strong>: a poll is shared (copy link, WhatsApp, X…)</li>
+              <li><strong>event_registration</strong>: someone signs up for an event (paid or free)</li>
+              <li>Google’s enhanced measurement adds scrolls, outbound clicks and site searches (the <code>q</code> parameter) on its own.</li>
+            </ul>
+            <p className={styles.fieldHint}>To check it works, open Reports → Realtime in Google Analytics and visit the site in another browser.</p>
+          </div>
+
+          <div className={styles.submitRow}>
+            <button type="submit" className={styles.saveButton}
+              disabled={saving || !gaIdValid || !isDirty(curAnalytics, savedAnalytics)}>
+              {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+
       ) : tab === 'Email' ? (
         /* ═══════════════ EMAIL (SMTP) ═══════════════ */
         <form onSubmit={(e: FormEvent) => {

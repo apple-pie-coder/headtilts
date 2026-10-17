@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { fetchPostReactions, togglePostReaction, PostReactionSummary } from '../services/posts';
 import { useVisitorId } from '../hooks/useVisitorId';
+import { trackEvent } from '../utils/analytics';
 
 const EMOJIS = ['❤️', '👏', '🔥', '😮', '😢', '🙌'];
 
@@ -24,6 +25,7 @@ export function PostReactions({ slug }: { slug: string }) {
     try {
       const result = await togglePostReaction(slug, emoji, visitorId);
       setReactions((prev) => prev.map((r) => r.emoji === emoji ? result : r));
+      trackEvent('post_reaction', { post: slug, reaction: emoji });
     } catch {
       // ignore
     } finally {

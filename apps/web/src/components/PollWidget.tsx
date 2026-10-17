@@ -6,6 +6,7 @@ import { fetchPublicPoll, submitVote, PublicPoll, PollOptionResult } from '../se
 import { pollTiming, votesLabel } from '../utils/pollTime';
 import { postPath } from '../utils/permalink';
 import './PollWidget.css';
+import { trackEvent } from '../utils/analytics';
 
 function getVoterId(): string {
   const key = 'headtilts_voter_id';
@@ -67,6 +68,7 @@ export function PollWidget({ slug, onLoaded, variant = 'card', onShare }: Props)
       setPoll(updated);
       setChanging(false);
       setJustVoted(true);
+      trackEvent('poll_vote', { poll: slug, choices: selected.length });
     } catch (e: unknown) {
       setError((e as Error).message || 'Your vote didn’t go through. Please try again.');
     } finally {

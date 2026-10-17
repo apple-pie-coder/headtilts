@@ -148,6 +148,9 @@ export interface SiteSettings {
   event_carousel_show_dots?: string;
   event_carousel_count?: string;
   event_carousel_transition?: string;
+  ga_measurement_id?: string;
+  ga_consent?: string;
+  ga_exclude_staff?: string;
   front_page_id: string;
   posts_page_id: string;
   contact_page_id: string;

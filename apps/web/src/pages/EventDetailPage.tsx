@@ -9,6 +9,7 @@ import { sanitizeHtml, sanitizeMapEmbed } from '../utils/sanitize';
 import { fetchEvent, registerForEvent, verifyEventPayment, eventIcalUrl, googleCalendarUrl } from '../services/events';
 import { EventFull, EventCustomField, EventRegistrationResult } from '../types';
 import './EventDetailPage.css';
+import { trackEvent } from '../utils/analytics';
 
 declare global {
   interface Window {
@@ -116,6 +117,7 @@ export default function EventDetailPage() {
       });
 
       if (!result.requiresPayment) {
+        trackEvent('event_registration', { event: event.slug, tickets: qty, paid: false });
         setTicketCode(result.registration.ticketCode);
         setRegStep('done');
         return;
@@ -141,6 +143,7 @@ export default function EventDetailPage() {
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
             });
+            trackEvent('event_registration', { event: event.slug, tickets: qty, paid: true });
             setTicketCode(result.registration.ticketCode);
             setRegStep('done');
           } catch {

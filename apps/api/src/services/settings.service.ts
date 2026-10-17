@@ -26,7 +26,21 @@ const ALLOWED_SETTING_KEYS = new Set([
   'event_carousel_autoplay', 'event_carousel_interval', 'event_carousel_pause_on_hover',
   'event_carousel_loop', 'event_carousel_show_arrows', 'event_carousel_show_dots',
   'event_carousel_count', 'event_carousel_transition',
+  // Google Analytics (public site)
+  'ga_measurement_id', 'ga_consent', 'ga_exclude_staff',
 ]);
+
+// The measurement ID ends up in a script URL on every public page, so only a
+// well-formed GA4 ID gets through.
+const VALUE_RULES: Record<string, { test: (v: string) => boolean; message: string; normalize?: (v: string) => string }> = {
+  ga_measurement_id: {
+    normalize: (v) => v.trim().toUpperCase(),
+    test: (v) => v === '' || /^G-[A-Z0-9]{4,20}$/.test(v),
+    message: 'The Measurement ID looks like G-XXXXXXXXXX (Google Analytics → Admin → Data streams).',
+  },
+  ga_consent: { test: (v) => v === 'banner' || v === 'none', message: 'Consent must be "banner" or "none"' },
+  ga_exclude_staff: { test: (v) => v === 'yes' || v === 'no', message: 'Exclude staff must be "yes" or "no"' },
+};
 
 // Secrets are never sent back to the browser; the UI echoes this placeholder
 // back when the field is left untouched, and it is then ignored on save.
@@ -90,7 +104,10 @@ export async function updateSettings(input: Record<string, unknown>, requestingU
       throw new ValidationError(`Setting "${key}" must be a string`);
     }
     if (SECRET_KEYS.has(key) && value === SECRET_MASK) continue;
-    updates[key] = String(value);
+    const rule = VALUE_RULES[key];
+    const str = rule?.normalize ? rule.normalize(String(value)) : String(value);
+    if (rule && !rule.test(str)) throw new ValidationError(rule.message);
+    updates[key] = str;
   }
 
   // Only real changes to SMTP keys require super-admin, so admins can still

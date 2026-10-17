@@ -4,7 +4,7 @@
  * Keep in step with Settings.tsx when adding fields.
  */
 export interface SettingEntry {
-  tab: 'General' | 'Reading' | 'Discussion' | 'Media' | 'Permalinks' | 'Email' | 'Notifications';
+  tab: 'General' | 'Reading' | 'Discussion' | 'Media' | 'Permalinks' | 'Analytics' | 'Email' | 'Notifications';
   label: string;
   section: string;
   id?: string;
@@ -12,6 +12,10 @@ export interface SettingEntry {
 }
 
 export const SETTINGS_INDEX: SettingEntry[] = [
+  // Analytics
+  { tab: 'Analytics', section: 'Google Analytics', label: 'Google Analytics Measurement ID', id: 'ga_measurement_id', keywords: 'ga4 gtag tracking stats visitors traffic google' },
+  { tab: 'Analytics', section: 'Google Analytics', label: 'Cookie consent banner', keywords: 'gdpr privacy cookies analytics consent' },
+  { tab: 'Analytics', section: 'Google Analytics', label: 'Don’t count your own visits', id: 'ga_exclude_staff', keywords: 'staff admin exclude analytics' },
   // General
   { tab: 'General', section: 'Site Identity', label: 'Site title', id: 'site_title', keywords: 'name brand' },
   { tab: 'General', section: 'Site Identity', label: 'Tagline', id: 'site_tagline', keywords: 'slogan subtitle' },

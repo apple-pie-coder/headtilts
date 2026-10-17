@@ -4,6 +4,7 @@ import { createComment, fetchComments, toggleCommentReaction } from '../services
 import { useSiteSettings } from '../context/SiteSettingsContext';
 import { formatDate } from '../utils/date';
 import { CommentListResult, PublicComment } from '../types';
+import { trackEvent } from '../utils/analytics';
 
 const VISITOR_KEY = 'ht_visitor_id';
 const AUTHOR_KEY = 'ht_comment_author';
@@ -53,6 +54,7 @@ function CommentForm({ slug, parentId, requireNameEmail, onSubmitted, onCancel }
       });
       localStorage.setItem(AUTHOR_KEY, JSON.stringify({ name, email }));
       setContent('');
+      trackEvent('comment', { post: slug, reply: parentId != null });
       onSubmitted(comment);
     } catch (err) {
       setError((err as Error).message);

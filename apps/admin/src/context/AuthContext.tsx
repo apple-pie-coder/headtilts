@@ -15,6 +15,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUser();
   }, []);
 
+  // Lets the public site (same origin) leave staff visits out of Google
+  // Analytics when Settings → Analytics asks for that. Cleared on sign-out.
+  useEffect(() => {
+    if (user) try { localStorage.setItem('ht-staff', '1'); } catch { /* storage blocked */ }
+  }, [user]);
+
   // Listen for token refresh events from the API interceptor
   useEffect(() => {
     function handleUserRefreshed(e: Event) {
@@ -122,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAccessToken(null);
       setUser(null);
       setLoading(false);
+      try { localStorage.removeItem('ht-staff'); } catch { /* storage blocked */ }
     }
   }
 

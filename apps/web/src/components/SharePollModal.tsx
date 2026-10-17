@@ -1,6 +1,7 @@
 import { FormEvent, useRef, useState } from 'react';
 import { createShare } from '../services/polls';
 import './SharePollModal.css';
+import { trackEvent } from '../utils/analytics';
 
 interface Props {
   slug: string;
@@ -62,6 +63,7 @@ export function SharePollModal({ slug, title, onClose }: Props) {
       copyRef.current = url;
       await navigator.clipboard.writeText(url);
       setCopied(true);
+      trackEvent('share', { method: 'link', content_type: 'poll', item_id: slug });
       setTimeout(() => setCopied(false), 2500);
     } catch {}
   }
@@ -80,6 +82,7 @@ export function SharePollModal({ slug, title, onClose }: Props) {
       if (channel === 'facebook') shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`;
       if (channel === 'email')    shareUrl = `mailto:${recipientEmail}?subject=${encodedTitle}&body=${encodeURIComponent(`${note ? note + '\n\n' : ''}Vote here: ${url}`)}`;
 
+      if (shareUrl) trackEvent('share', { method: channel, content_type: 'poll', item_id: slug });
       if (shareUrl) window.open(shareUrl, '_blank', 'noopener,noreferrer,width=600,height=500');
     } catch {}
   }

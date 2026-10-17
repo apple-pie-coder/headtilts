@@ -101,6 +101,7 @@ router.get('/site-settings', publicReadLimiter, asyncHandler(async (_req: Reques
     'event_carousel_autoplay', 'event_carousel_interval', 'event_carousel_pause_on_hover',
     'event_carousel_loop', 'event_carousel_show_arrows', 'event_carousel_show_dots',
     'event_carousel_count', 'event_carousel_transition',
+    'ga_measurement_id', 'ga_consent', 'ga_exclude_staff',
   ];
   const PAGE_ID_KEYS = ['front_page_id', 'posts_page_id', 'contact_page_id', 'about_page_id', 'privacy_policy_page_id', 'terms_page_id'];
 

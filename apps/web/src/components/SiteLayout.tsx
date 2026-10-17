@@ -16,6 +16,8 @@ import { SearchBar } from './SearchBar';
 import { BackgroundEffect } from './BackgroundEffect';
 import { isFrontPagePreview } from './FrontPage';
 import { BackToTop } from './BackToTop';
+import { ConsentBanner } from './ConsentBanner';
+import { onAnalyticsChange, reopenConsent, trackRouteChange, usesConsentBanner } from '../utils/analytics';
 
 const THEME_OPTIONS: { value: ThemeMode; icon: typeof faSun; label: string }[] = [
   { value: 'system', icon: faDesktop, label: 'System' },
@@ -70,6 +72,13 @@ export function SiteLayout({ children }: { children: ReactNode }) {
   }, [location.pathname]);
 
   useEffect(() => {
+    trackRouteChange();
+  }, [location.pathname, location.search]);
+
+  const [cookieLink, setCookieLink] = useState(usesConsentBanner);
+  useEffect(() => onAnalyticsChange(() => setCookieLink(usesConsentBanner())), []);
+
+  useEffect(() => {
     fetchMenu('primary')
       .then((menu) => setNavItems(buildTree(menu.items)))
       .catch(() => {});
@@ -101,6 +110,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
     <div className="site-wrap" style={{ position: 'relative', zIndex: 2 }}>
       {!isBlank && !isFrontPagePreview() && <CelebrationSpotlight />}
       {!isFrontPagePreview() && <BackToTop />}
+      {!isFrontPagePreview() && <ConsentBanner />}
       {!isBlank && (
         <header className={`site-header${isFullBleed ? ' site-header--transparent' : ''}`}>
           <div className="container header-inner">
@@ -164,7 +174,10 @@ export function SiteLayout({ children }: { children: ReactNode }) {
             <WidgetZone zone="footer-3" />
           </div>
           <div className="container footer-bottom">
-            <p>© {new Date().getFullYear()} {site_title} · <a className="footer-rss" href="/feed">RSS</a></p>
+            <p>
+              © {new Date().getFullYear()} {site_title} · <a className="footer-rss" href="/feed">RSS</a>
+              {cookieLink && <> · <button type="button" className="footer-rss footer-cookies" onClick={reopenConsent}>Cookie settings</button></>}
+            </p>
             {footerItems.length > 0 && (
               <nav className="footer-legal-links">
                 {footerItems.map((item) => (

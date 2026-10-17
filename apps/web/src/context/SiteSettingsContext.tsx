@@ -2,6 +2,7 @@ import { createContext, ReactNode, useContext, useEffect, useState } from 'react
 import { fetchSiteSettings } from '../services/taxonomy';
 import { setPermalinkStructure } from '../utils/permalink';
 import { applySiteDefaults, applyFavicon } from '../utils/seo';
+import { configureAnalytics } from '../utils/analytics';
 import { SiteSettings } from '../types';
 
 const DEFAULTS: SiteSettings = {
@@ -42,6 +43,7 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
         // already applied its own SEO (prevents the title resetting on refresh).
         applySiteDefaults({ title: merged.site_title, description: merged.site_description });
         applyFavicon(merged.site_favicon);
+        configureAnalytics(merged);
       })
       .catch(() => {});
   }, []);
