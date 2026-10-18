@@ -86,6 +86,8 @@ export function PostArticle({ post }: { post: PostFull }) {
   const primaryCategory = post.categories[0]?.category ?? null;
   const review = post.articleType === 'review' ? post.review ?? null : null;
   const videoId = post.videoUrl ? youtubeId(post.videoUrl) : null;
+  // Skip the type badge when a category tape already says it ("News", "Reviews").
+  const tapeSays = (word: string) => post.categories.some(({ category }) => category.name.toLowerCase().startsWith(word));
   // The review card already shows the cover; don't repeat it as a banner.
   const showBanner = post.featuredImage && !(review && (!review.coverImage || review.coverImage === post.featuredImage));
 
@@ -113,8 +115,8 @@ export function PostArticle({ post }: { post: PostFull }) {
 
       <header className="post-header">
         <div className="post-meta">
-          {post.articleType === 'news' && <span className="type-badge type-badge--news">News</span>}
-          {review && <span className="type-badge type-badge--review">Review</span>}
+          {post.articleType === 'news' && !tapeSays('news') && <span className="type-badge type-badge--news">News</span>}
+          {review && !tapeSays('review') && <span className="type-badge type-badge--review">Review</span>}
           {post.articleType === 'qna' && <span className="type-badge type-badge--qna">Q&amp;A</span>}
           {post.categories.map(({ category }) => <Tape key={category.id} category={category} />)}
         </div>

@@ -34,20 +34,25 @@ export function ReviewCard({ review, fallbackCover }: { review: ReviewFull; fall
 
   return (
     <section className="review-card" aria-label={`${SUBJECT_LABEL[review.subjectType] ?? 'Review'}: ${review.artist} — ${review.subjectTitle}`}>
-      <div className="review-card-main">
+      {/* Head and body are separate grid areas so phones can put the score between them. */}
+      <div className={`review-card-main${cover ? '' : ' review-card-main--bare'}`}>
         {cover && <img src={resolveMediaUrl(cover)} alt={`${review.subjectTitle} cover art`} className="review-cover" />}
-        <div className="review-info">
+        <div className="review-head">
           <span className="review-kicker">{SUBJECT_LABEL[review.subjectType] ?? 'Review'}</span>
           <p className="review-subject">
             <span className="review-artist">{review.artist}</span>
             <span className="review-title">{review.subjectTitle}</span>
           </p>
           {meta.length > 0 && <p className="review-meta">{meta.join(' · ')}</p>}
-          {review.verdict && <p className="review-verdict">{review.verdict}</p>}
-          {review.highlights && review.highlights.length > 0 && (
-            <p className="review-highlights"><strong>Standout tracks:</strong> {review.highlights.join(', ')}</p>
-          )}
         </div>
+        {(review.verdict || (review.highlights && review.highlights.length > 0)) && (
+          <div className="review-body">
+            {review.verdict && <p className="review-verdict">{review.verdict}</p>}
+            {review.highlights && review.highlights.length > 0 && (
+              <p className="review-highlights"><strong>Standout tracks:</strong> {review.highlights.join(', ')}</p>
+            )}
+          </div>
+        )}
         {review.rating != null && <ScoreDial rating={review.rating} />}
       </div>
 

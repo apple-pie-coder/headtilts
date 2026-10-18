@@ -61,6 +61,12 @@
   width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
   display: grid; place-items: center; background: #1d1d1f; color: #fff; font-size: 0.875rem;
 }
+@media (max-width: 480px) {
+  .stream-lite { gap: 0.625rem; padding: 0.625rem 0.75rem 0.625rem 0.625rem; }
+  .stream-lite-cover { width: 48px; height: 48px; }
+  /* The label already names the service; the cover is the better use of the width. */
+  .stream-lite-cover + .stream-lite-icon { display: none; }
+}
 
 /* Embeds that came from post content sit in the text flow */
 .post-content .stream-lite,
@@ -77,20 +83,32 @@
   display: flex; flex-direction: column; gap: 1rem;
 }
 
-.review-card-main { display: grid; grid-template-columns: 148px minmax(0, 1fr) auto; gap: 1.25rem; align-items: center; }
-@media (max-width: 640px) {
-  .review-card-main { grid-template-columns: 96px minmax(0, 1fr); }
-  .review-score { grid-column: 1 / -1; justify-self: start; }
+/* The empty 1fr rows centre head + body as one block beside the cover. */
+.review-card-main {
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr) auto;
+  grid-template-rows: 1fr auto auto 1fr;
+  grid-template-areas: "cover . score" "cover head score" "cover body score" "cover . score";
+  column-gap: 1.25rem;
+  align-items: center;
 }
+.review-card-main--bare {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: ". score" "head score" "body score" ". score";
+}
+.review-cover { grid-area: cover; }
+.review-head { grid-area: head; }
+.review-body { grid-area: body; min-width: 0; }
+.review-score { grid-area: score; }
 
 .review-cover {
   width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
 }
 
-.review-info { min-width: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.review-head { min-width: 0; display: flex; flex-direction: column; gap: 0.25rem; }
 .review-kicker { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #55555a; }
-.review-subject { margin: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.review-subject { margin: 0; display: flex; flex-direction: column; line-height: 1.2; overflow-wrap: anywhere; }
 .review-artist { font-size: 1.5rem; font-weight: 800; color: #1d1d1f; }
 .review-title { font-size: 1.125rem; font-weight: 500; color: #3a3a3c; font-style: italic; }
 .review-meta { margin: 0.125rem 0 0; font-size: 0.875rem; color: #55555a; }
@@ -110,6 +128,30 @@
   font-size: 1.625rem; font-weight: 800; color: #1d1d1f; font-variant-numeric: tabular-nums;
 }
 .review-score-word { font-size: 0.8125rem; font-weight: 700; color: #1d1d1f; }
+
+/* Phones: cover beside the name, then a score strip, then the verdict at full width. */
+@media (max-width: 640px) {
+  .review-card { padding: 1rem; border-radius: 14px; gap: 0.875rem; }
+  .review-card-main {
+    grid-template-columns: 88px minmax(0, 1fr);
+    grid-template-rows: auto;
+    grid-template-areas: "cover head" "score score" "body body";
+    gap: 0.875rem;
+  }
+  .review-card-main--bare { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "score" "body"; }
+  .review-cover { border-radius: 8px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16); }
+  .review-artist { font-size: 1.25rem; }
+  .review-title { font-size: 1rem; }
+  .review-meta { font-size: 0.8125rem; }
+  .review-verdict { margin-top: 0; }
+  .review-score {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding-top: 0.875rem; border-top: 1px solid rgba(0, 0, 0, 0.08);
+  }
+  .review-score svg { width: 60px; height: 60px; }
+  .review-score-value { top: 0.875rem; left: 0; width: 60px; height: 60px; font-size: 1.25rem; }
+  .review-score-word { font-size: 1rem; }
+}
 
 /* Listen on */
 .review-listen { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
@@ -184,6 +226,7 @@
 [data-theme='dark'] .review-verdict { border-left-color: #2997ff; }
 [data-theme='dark'] .review-score-track { stroke: rgba(255, 255, 255, 0.1); }
 [data-theme='dark'] .review-score-fill { stroke: #2997ff; }
+[data-theme='dark'] .review-score { border-top-color: rgba(255, 255, 255, 0.1); }
 [data-theme='dark'] .listen-btn { background: #1c1c1e; border-color: rgba(255, 255, 255, 0.14); color: #f5f5f7; }
 [data-theme='dark'] .listen-btn:hover { border-color: rgba(255, 255, 255, 0.35); }
 [data-theme='dark'] .listen-btn-ext,
@@ -228,6 +271,14 @@
 .qna-credit--answer { margin: 0.5rem 0 0.25rem; font-weight: 700; color: #5856d6; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.75rem; }
 .qna-answer p { margin: 0 0 0.75rem; line-height: 1.7; color: #1d1d1f; }
 .qna-answer p:last-child { margin-bottom: 0; }
+
+@media (max-width: 600px) {
+  .qna-title { font-size: 1.375rem; }
+  .qna-list { gap: 1.5rem; }
+  .qna-q, .qna-a { grid-template-columns: 1.875rem minmax(0, 1fr); gap: 0.625rem; }
+  .qna-label { width: 1.875rem; height: 1.875rem; font-size: 0.8125rem; }
+  .qna-question { margin-top: 0.25rem; font-size: 1.0625rem; }
+}
 
 [data-theme='dark'] .qna-kicker,
 [data-theme='dark'] .qna-credit--answer { color: #b4b2ff; }
