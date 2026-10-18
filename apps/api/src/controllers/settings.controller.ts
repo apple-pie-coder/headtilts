@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import * as settingsService from '../services/settings.service';
-import { sendMail } from '../services/mail.service';
+import { sendBuilt } from '../services/mail.service';
+import { testEmail as testEmailContent } from '../services/emailContent';
+import { formatNow } from '../services/security.service';
 import { sendSuccess, sendError } from '../utils/response';
 import { ApiError, ValidationError } from '../utils/errors';
 
@@ -40,12 +42,7 @@ export async function testEmail(req: Request, res: Response): Promise<void> {
     const to = (req as Request & { user?: { email: string } }).user?.email;
     if (!to) throw new ValidationError('Could not determine recipient email from session');
 
-    const sent = await sendMail({
-      to,
-      subject: 'Headtilts CMS — Test Email',
-      text: 'This is a test email sent from the Headtilts CMS settings page to verify your SMTP configuration.',
-      html: '<p>This is a test email sent from the <strong>Headtilts CMS</strong> settings page to verify your SMTP configuration.</p>',
-    });
+    const sent = await sendBuilt(to, testEmailContent({ to, when: await formatNow() }));
 
     if (sent) {
       sendSuccess(res, { sent: true, to }, 200, `Test email sent to ${to}`);

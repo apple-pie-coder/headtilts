@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
+import { BookingPanel } from '../components/BookingPanel';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { useLayout } from '../context/LayoutContext';
 import { useSiteSettings } from '../context/SiteSettingsContext';
@@ -58,6 +59,7 @@ export default function EventDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const { setShowSidebar } = useLayout();
   const [event, setEvent]   = useState<EventFull | null>(null);
+  const ticketParam = useSearchParams()[0].get('ticket');
   const [error, setError]   = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -239,6 +241,8 @@ export default function EventDetailPage() {
       <div className="event-detail-page">
         <div className="event-detail-body">
           <div className="event-detail-main">
+
+            {ticketParam && <BookingPanel ticketCode={ticketParam} eventSlug={event.slug} />}
 
             <div className="event-detail-quickinfo">
               <span className={`event-detail-type event-detail-type--${event.type}`}>

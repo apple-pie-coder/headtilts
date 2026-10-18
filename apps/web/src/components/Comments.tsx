@@ -196,6 +196,10 @@ function CommentItem(props: CommentItemProps) {
 
 export function Comments({ slug }: { slug: string }) {
   const [data, setData] = useState<CommentListResult | null>(null);
+  // Links from emails end in #comments; the list loads after the page, so scroll once it's here.
+  useEffect(() => {
+    if (data && window.location.hash === '#comments') document.getElementById('comments')?.scrollIntoView();
+  }, [data]);
   const [error, setError] = useState('');
   const [replyTo, setReplyTo] = useState<number | null>(null);
   const [notice, setNotice] = useState('');
@@ -246,12 +250,12 @@ export function Comments({ slug }: { slug: string }) {
   }
 
   if (error) return null;
-  if (!data) return <section className="comments-section"><p className="loading-msg">Loading comments…</p></section>;
+  if (!data) return <section className="comments-section" id="comments"><p className="loading-msg">Loading comments…</p></section>;
 
   const roots = childrenOf.get(null) || [];
 
   return (
-    <section className="comments-section">
+    <section className="comments-section" id="comments">
       <h2 className="comments-title">
         Comments{data.total > 0 && <span className="comments-count">{data.total}</span>}
       </h2>

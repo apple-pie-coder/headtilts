@@ -1,6 +1,7 @@
 import { prisma } from '../config/database';
 import { NotFoundError } from '../utils/errors';
-import { sendMail } from './mail.service';
+import { sendBuilt } from './mail.service';
+import { contactMessage } from './emailContent';
 import * as notifications from './notifications.service';
 
 export async function listSubmissions(page: number, limit: number, unreadOnly = false) {
@@ -48,11 +49,8 @@ export async function createSubmission(input: {
   // Notify the site admin; never fail the submission if email delivery fails.
   const adminEmail = await prisma.setting.findUnique({ where: { key: 'admin_email' } });
   if (adminEmail?.value) {
-    sendMail({
-      to: adminEmail.value,
-      subject: `New contact submission: ${input.subject || '(no subject)'}`,
-      text: `From: ${input.name} <${input.email}>\n\n${input.message}`,
-    }).catch((error) => console.error('Contact notification email failed:', error));
+    sendBuilt(adminEmail.value, contactMessage(input))
+      .catch((error) => console.error('Contact notification email failed:', error));
   }
 
   // Real-time in-app notification to settings admins (fire-and-forget).

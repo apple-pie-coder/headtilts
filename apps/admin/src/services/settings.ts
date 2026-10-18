@@ -22,3 +22,25 @@ export async function sendTestEmail(): Promise<{ sent: boolean; to: string }> {
   const response = await apiClient.post('/settings/test-email');
   return response.data.data;
 }
+
+export interface EmailPreview {
+  id: string;
+  group: 'Readers' | 'Your team' | 'Notifications';
+  name: string;
+  when: string;
+  to: string;
+  subject: string;
+  html: string;
+}
+
+/** Every email the site sends, rendered with sample data (Settings → Email). */
+export async function fetchEmailPreviews(): Promise<EmailPreview[]> {
+  const response = await apiClient.get('/settings/email-previews');
+  return response.data.data;
+}
+
+/** Send one preview to the signed-in user. */
+export async function sendEmailPreview(id: string): Promise<{ sent: boolean; to: string }> {
+  const response = await apiClient.post(`/settings/email-previews/${encodeURIComponent(id)}/send`);
+  return response.data.data;
+}

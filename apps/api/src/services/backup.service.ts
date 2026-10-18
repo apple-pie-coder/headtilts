@@ -9,7 +9,8 @@ import { prisma } from '../config/database';
 import { resolveStorageProvider } from '../storage';
 import { uploadDir } from '../middleware/upload';
 import { getBackupSettings } from './backup.settings';
-import { sendMail } from './mail.service';
+import { sendBuilt } from './mail.service';
+import { backupResult } from './emailContent';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const archiver = require('archiver') as (format: string, options?: object) => import('archiver').Archiver;
@@ -224,11 +225,7 @@ async function notifyResult(label: string, success: boolean, errorMsg?: string) 
   try {
     const { notifyEmail } = await getBackupSettings();
     if (!notifyEmail) return;
-    const subject = success ? `✓ Backup completed: ${label}` : `✗ Backup failed: ${label}`;
-    const text = success
-      ? `Your backup "${label}" completed successfully.`
-      : `Your backup "${label}" failed.\n\nError: ${errorMsg}`;
-    await sendMail({ to: notifyEmail, subject, text });
+    await sendBuilt(notifyEmail, backupResult({ label, success, error: errorMsg }));
   } catch { /* non-fatal */ }
 }
 

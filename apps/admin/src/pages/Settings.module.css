@@ -334,6 +334,9 @@
     border-right: none;
   }
   .saveKbd { display: none; }
+  /* Nothing to save: just the buttons, so they don't squeeze the text into a column. */
+  .saveBar:not(.saveBarDirty) .saveStatus { display: none; }
+  .saveActions { margin-left: auto; }
 }
 
 /* ── Input variants ── */

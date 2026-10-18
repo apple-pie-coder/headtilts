@@ -76,8 +76,21 @@ export async function verifyEventPayment(
   return post<unknown>(`/public/events/${slug}/register/verify`, input);
 }
 
-export async function cancelRegistration(ticketCode: string): Promise<unknown> {
-  return post<unknown>(`/public/events/cancel/${ticketCode}`, {});
+export interface Booking {
+  ticketCode: string;
+  name: string;
+  quantity: number;
+  status: 'confirmed' | 'pending' | 'waitlisted' | 'cancelled';
+  event: { slug: string; title: string; startAt: string };
+  canCancel: boolean;
+}
+
+export async function fetchBooking(ticketCode: string): Promise<Booking> {
+  return get<Booking>(`/public/events/ticket/${encodeURIComponent(ticketCode)}`);
+}
+
+export async function cancelRegistration(ticketCode: string): Promise<Booking> {
+  return post<Booking>(`/public/events/cancel/${encodeURIComponent(ticketCode)}`, {});
 }
 
 export function eventIcalUrl(slug?: string): string {

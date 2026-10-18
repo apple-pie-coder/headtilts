@@ -1,11 +1,18 @@
 import nodemailer from 'nodemailer';
+import type Mail from 'nodemailer/lib/mailer';
 import { prisma } from '../config/database';
+import { EmailContent, renderEmail } from './emailLayout';
+import type { BuiltEmail } from './emailContent';
 
 export interface MailInput {
   to: string;
   subject: string;
   text: string;
   html?: string;
+  /** Where replies go, e.g. the visitor who wrote in, instead of our own address. */
+  replyTo?: string;
+  /** Inline images (referenced as cid:…) and files. */
+  attachments?: Mail.Attachment[];
 }
 
 interface SmtpConfig {
@@ -17,10 +24,16 @@ interface SmtpConfig {
   from: string;
 }
 
+/** A bare address gets the site's name, so inboxes show "Headtilts" rather than the address. */
+function withName(from: string, name?: string): string {
+  if (!from || from.includes('<') || !name) return from;
+  return `"${name.replace(/["\\]/g, '')}" <${from}>`;
+}
+
 async function getSmtpConfig(): Promise<SmtpConfig | null> {
   // DB settings take priority; fall back to environment variables
   try {
-    const keys = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'smtp_from', 'smtp_enabled'];
+    const keys = ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'smtp_from', 'smtp_enabled', 'site_title'];
     const rows = await prisma.setting.findMany({ where: { key: { in: keys } } });
     const db: Record<string, string> = Object.fromEntries(rows.map((r) => [r.key, r.value]));
 
@@ -36,7 +49,7 @@ async function getSmtpConfig(): Promise<SmtpConfig | null> {
       secure: (db.smtp_secure ?? process.env.SMTP_SECURE) === 'true',
       user: db.smtp_user || process.env.SMTP_USER || '',
       pass: db.smtp_pass || process.env.SMTP_PASS || '',
-      from: db.smtp_from || process.env.SMTP_FROM || db.smtp_user || process.env.SMTP_USER || '',
+      from: withName(db.smtp_from || process.env.SMTP_FROM || db.smtp_user || process.env.SMTP_USER || '', db.site_title),
     };
   } catch {
     // DB not ready — fall back to env
@@ -106,9 +119,25 @@ export async function sendMail(input: MailInput): Promise<boolean> {
   await transport.sendMail({
     from: config.from,
     to: input.to,
+    replyTo: input.replyTo,
     subject: input.subject,
     text: input.text,
     html: input.html,
+    attachments: input.attachments,
+    // Marks these as automatic, so out-of-office replies don't bounce back.
+    headers: { 'Auto-Submitted': 'auto-generated' },
   });
   return true;
+}
+
+/** Send an email built with the shared layout (emailLayout.ts). */
+export async function sendTemplate(input: Omit<MailInput, 'text' | 'html'> & { content: EmailContent }): Promise<boolean> {
+  const { html, text } = await renderEmail(input.content);
+  const { content: _content, ...rest } = input;
+  return sendMail({ ...rest, html, text });
+}
+
+/** Send one of the emails defined in emailContent.ts. */
+export function sendBuilt(to: string, email: BuiltEmail): Promise<boolean> {
+  return sendTemplate({ to, subject: email.subject, replyTo: email.replyTo, attachments: email.attachments, content: email.content });
 }

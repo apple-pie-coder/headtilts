@@ -541,3 +541,37 @@
 [data-theme='dark'] .event-reg__tier-price { color: #2997ff; }
 [data-theme='dark'] .event-reg__success-title { color: #f5f5f7; }
 [data-theme='dark'] .event-reg__ticket-code code { background: rgba(255,255,255,0.08); color: #f5f5f7; }
+
+/* ── Your booking (from the link in a registration email) ── */
+.booking-panel {
+  margin: 0 0 1.75rem;
+  padding: 1.25rem 1.25rem 1.375rem;
+  border: 1px solid var(--n-rule, #e5e5ea);
+  border-top: 3px solid var(--n-tape, #c3301f);
+  border-radius: 12px;
+  background: var(--n-page, #fff);
+}
+.booking-panel__title { margin: 0 0 0.875rem; font-size: 1.125rem; font-weight: 800; color: var(--n-ink, #1d1d1f); }
+.booking-panel__facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem 1.25rem; margin: 0 0 1rem; }
+.booking-panel__facts dt { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--n-muted, #6e6e73); }
+.booking-panel__facts dd { margin: 0.2rem 0 0; font-size: 0.9375rem; font-weight: 600; color: var(--n-ink, #1d1d1f); overflow-wrap: anywhere; }
+.booking-panel__facts code { font-size: 0.8125rem; }
+.booking-panel__status { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.8125rem; background: var(--n-tile, #f2f2f4); }
+.booking-panel__status--confirmed { background: #e8f6ec; color: #1d5c33; }
+.booking-panel__status--pending, .booking-panel__status--waitlisted { background: #fff6e0; color: #6b4c00; }
+.booking-panel__status--cancelled { background: #fdecea; color: #8a1f13; }
+.booking-panel__cancel, .booking-panel__keep {
+  min-height: 2.5rem; padding: 0.5rem 1.1rem; border-radius: 8px; font: inherit; font-size: 0.875rem; font-weight: 700; cursor: pointer;
+  border: 1px solid var(--n-rule, #e5e5ea); background: var(--n-page, #fff); color: var(--n-ink, #1d1d1f);
+}
+.booking-panel__cancel:hover, .booking-panel__keep:hover { border-color: var(--n-ink, #1d1d1f); }
+.booking-panel__cancel--danger { border-color: var(--n-tape, #c3301f); background: var(--n-tape, #c3301f); color: #fff; }
+.booking-panel__cancel--danger:hover { opacity: 0.9; border-color: var(--n-tape, #c3301f); }
+.booking-panel__cancel:focus-visible, .booking-panel__keep:focus-visible { outline: 3px solid var(--n-accent, #0071e3); outline-offset: 2px; }
+.booking-panel__confirm p { margin: 0 0 0.75rem; font-size: 0.9375rem; color: var(--n-ink, #1d1d1f); }
+.booking-panel__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.booking-panel__note { margin: 0.75rem 0 0; font-size: 0.875rem; color: var(--n-muted, #6e6e73); }
+.booking-panel__error { margin: 0.75rem 0 0; font-size: 0.875rem; color: #a3261a; }
+[data-theme='dark'] .booking-panel__status--confirmed { background: #12301d; color: #8fdca8; }
+[data-theme='dark'] .booking-panel__status--pending, [data-theme='dark'] .booking-panel__status--waitlisted { background: #3a2e0a; color: #f2cf73; }
+[data-theme='dark'] .booking-panel__status--cancelled { background: #3a1410; color: #f3a198; }

@@ -934,11 +934,30 @@ router.post('/events/:slug/register/verify', publicWriteLimiter(), asyncHandler(
   }
 }));
 
+// What a ticket holder sees about their own booking (from the link in their email).
+function bookingView(reg: { ticketCode: string; name: string; quantity: number; status: string; event: { slug: string; title: string; startAt: Date } }) {
+  return {
+    ticketCode: reg.ticketCode, name: reg.name, quantity: reg.quantity, status: reg.status,
+    event: { slug: reg.event.slug, title: reg.event.title, startAt: reg.event.startAt },
+    canCancel: reg.status !== 'cancelled' && reg.event.startAt > new Date(),
+  };
+}
+
+// GET /public/events/ticket/:code — look up your booking by ticket code
+router.get('/events/ticket/:code', publicReadLimiter, asyncHandler(async (req: Request, res: Response) => {
+  const reg = await prisma.eventRegistration.findUnique({
+    where: { ticketCode: req.params.code },
+    select: { ticketCode: true, name: true, quantity: true, status: true, event: { select: { slug: true, title: true, startAt: true } } },
+  });
+  if (!reg) { sendError(res, 'NOT_FOUND', 'We couldn’t find that booking', 404); return; }
+  sendSuccess(res, bookingView(reg));
+}));
+
 // POST /public/events/cancel/:code — self-cancel by ticket code
 router.post('/events/cancel/:code', publicWriteLimiter(), asyncHandler(async (req: Request, res: Response) => {
   try {
     const reg = await cancelRegistration(req.params.code);
-    sendSuccess(res, reg);
+    sendSuccess(res, bookingView({ ...reg, status: 'cancelled' }));
   } catch (e) {
     if (e instanceof ApiError) sendError(res, e.code, e.message, e.statusCode);
     else sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);

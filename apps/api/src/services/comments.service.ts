@@ -1,7 +1,10 @@
 import crypto from 'crypto';
 import { prisma } from '../config/database';
 import { ApiError, NotFoundError, ValidationError } from '../utils/errors';
-import { sendMail } from './mail.service';
+import { sendBuilt } from './mail.service';
+import { siteUrl } from './emailLayout';
+import { commentAwaitingApproval, commentOnYourPost } from './emailContent';
+import { buildPostPath, getPermalinkStructure } from '../utils/permalinks';
 import * as notifications from './notifications.service';
 
 export const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮'] as const;
@@ -225,19 +228,15 @@ export async function createPublicComment(input: CreateCommentInput) {
   });
 
   // Notifications are fire-and-forget; comment creation never fails on email.
+  const postUrl = `${siteUrl()}${buildPostPath(await getPermalinkStructure(), post)}`;
+  const facts = { postTitle: post.title, postUrl, authorName: comment.authorName, authorEmail: email, content };
   if (status === 'pending' && settings.notifyModeration && settings.adminEmail) {
-    sendMail({
-      to: settings.adminEmail,
-      subject: `Comment awaiting moderation on "${post.title}"`,
-      text: `${comment.authorName} <${email}> wrote:\n\n${content}`,
-    }).catch((error) => console.error('Moderation notification failed:', error));
+    sendBuilt(settings.adminEmail, commentAwaitingApproval(facts))
+      .catch((error) => console.error('Moderation notification failed:', error));
   }
   if (status === 'approved' && settings.notifyAuthor && post.author?.email) {
-    sendMail({
-      to: post.author.email,
-      subject: `New comment on "${post.title}"`,
-      text: `${comment.authorName} wrote:\n\n${content}`,
-    }).catch((error) => console.error('Author notification failed:', error));
+    sendBuilt(post.author.email, commentOnYourPost(facts))
+      .catch((error) => console.error('Author notification failed:', error));
   }
 
   // Real-time in-app notification to moderators (fire-and-forget).

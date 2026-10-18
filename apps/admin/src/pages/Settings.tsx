@@ -18,6 +18,7 @@ import {
 } from '../services/notifications';
 import { Post, Setting } from '../types';
 import { PageHeader } from '../components/ui';
+import { EmailPreviews } from '../components/EmailPreviews';
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 import { SettingsSearch, revealSetting } from './SettingsSearch';
 import styles from './Settings.module.css';
@@ -1500,6 +1501,7 @@ export default function SettingsPage() {
 
       ) : tab === 'Email' ? (
         /* ═══════════════ EMAIL (SMTP) ═══════════════ */
+        <>
         <form onSubmit={(e: FormEvent) => {
           e.preventDefault();
           save(curEmail, () => setSavedEmail({ ...curEmail }));
@@ -1623,6 +1625,14 @@ export default function SettingsPage() {
           </SaveBar>
 
         </form>
+        <div className={styles.panel}>
+          <h3 className={styles.sectionTitle}>Emails the site sends</h3>
+          <p className={styles.sectionDesc}>
+            Every email, shown with sample data exactly as people receive it. “Send me this” delivers the sample to your own inbox.
+          </p>
+          <EmailPreviews />
+        </div>
+        </>
       ) : tab === 'Notifications' ? (
         /* ═══════════════ NOTIFICATIONS ═══════════════ */
         <div>

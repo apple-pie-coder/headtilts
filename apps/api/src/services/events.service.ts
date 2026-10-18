@@ -4,8 +4,8 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { ValidationError, NotFoundError } from '../utils/errors';
 import { slugify } from '@headtilts/shared';
-import { sendMail } from './mail.service';
-import qrcode from 'qrcode';
+import { sendBuilt } from './mail.service';
+import { EmailEvent, EmailRegistration, RegistrationEmailKind, registrationEmail } from './emailContent';
 
 // ─── Select shapes ────────────────────────────────────────────────────────────
 
@@ -511,9 +511,7 @@ export async function registerForEvent(
   });
 
   if (isFree) {
-    if (status === 'confirmed') {
-      await sendTicketEmail(reg, event);
-    }
+    void sendRegistrationEmail(status as RegistrationEmailKind, reg, event);
     return { registration: reg, requiresPayment: false };
   }
 
@@ -607,8 +605,8 @@ export async function verifyPayment(input: {
     });
   }
 
-  if (updated.status === 'confirmed') {
-    await sendTicketEmail(updated, reg.event);
+  if (updated.status === 'confirmed' || updated.status === 'pending') {
+    void sendRegistrationEmail(updated.status, updated, reg.event);
   }
 
   return updated;
@@ -643,6 +641,7 @@ export async function cancelRegistration(ticketCode: string) {
   if (reg.event.startAt <= new Date()) throw new ValidationError('Event has already started');
 
   await cancelAndReleaseStock(reg);
+  void sendRegistrationEmail('cancelled', reg, reg.event, 'you');
   return reg;
 }
 
@@ -699,9 +698,12 @@ export async function updateRegistration(
     await prisma.eventRegistration.update({
       where: { id }, data: { status: 'confirmed' },
     });
-    await sendTicketEmail({ ...reg, status: 'confirmed' }, reg.event);
+    void sendRegistrationEmail('confirmed', reg, reg.event);
   } else if (action === 'cancel') {
-    await cancelAndReleaseStock(reg);
+    if (reg.status !== 'cancelled') {
+      await cancelAndReleaseStock(reg);
+      void sendRegistrationEmail('cancelled', reg, reg.event, 'organisers');
+    }
   } else if (action === 'check-in') {
     await prisma.eventRegistration.update({
       where: { id }, data: { checkInAt: new Date() },
@@ -798,40 +800,21 @@ export async function generateIcal(slugs?: string[]): Promise<string> {
 
 // ─── Email ────────────────────────────────────────────────────────────────────
 
-async function sendTicketEmail(
-  reg: { id: number; name: string; email: string; ticketCode: string; quantity: number; status: string },
-  event: { title: string; startAt: Date; endAt: Date; venueName?: string | null; venueCity?: string | null; type: string },
+/**
+ * Registration emails (emailContent.ts). Callers don't wait for them: sending
+ * through Gmail takes seconds, and the email never fails the registration.
+ */
+async function sendRegistrationEmail(
+  kind: RegistrationEmailKind,
+  reg: EmailRegistration & { id: number; email: string },
+  event: EmailEvent,
+  cancelledBy: 'you' | 'organisers' = 'organisers',
 ) {
   try {
-    const qrDataUrl = await qrcode.toDataURL(reg.ticketCode, { width: 200 });
-    const location = event.type === 'online'
-      ? 'Online Event — join link sent separately'
-      : [event.venueName, event.venueCity].filter(Boolean).join(', ') || 'TBD';
-
-    const html = `
-<h2>Your registration is confirmed!</h2>
-<p>Hi ${reg.name},</p>
-<p>You're registered for <strong>${event.title}</strong>.</p>
-<table style="font-family:sans-serif;font-size:14px;border-collapse:collapse">
-  <tr><td style="padding:4px 12px 4px 0;color:#888">Date</td><td>${event.startAt.toUTCString()}</td></tr>
-  <tr><td style="padding:4px 12px 4px 0;color:#888">Location</td><td>${location}</td></tr>
-  <tr><td style="padding:4px 12px 4px 0;color:#888">Ticket code</td><td><code>${reg.ticketCode}</code></td></tr>
-  <tr><td style="padding:4px 12px 4px 0;color:#888">Quantity</td><td>${reg.quantity}</td></tr>
-</table>
-<p>Show this QR code at the event entrance:</p>
-<img src="${qrDataUrl}" alt="QR Code" width="200" />
-<p>To cancel your registration, use ticket code: <code>${reg.ticketCode}</code></p>
-    `.trim();
-
-    await sendMail({
-      to: reg.email,
-      subject: `Ticket confirmed: ${event.title}`,
-      html,
-      text: `Confirmed for ${event.title}. Ticket code: ${reg.ticketCode}`,
-    });
-  } catch {
-    // Non-blocking — log silently
-    console.error('[events] Failed to send ticket email for registration', reg.id);
+    const replyTo = (await prisma.setting.findUnique({ where: { key: 'admin_email' } }))?.value || undefined;
+    await sendBuilt(reg.email, await registrationEmail(kind, reg, event, { cancelledBy, replyTo }));
+  } catch (error) {
+    console.error('[events] Failed to send', kind, 'email for registration', reg.id, error);
   }
 }
 
