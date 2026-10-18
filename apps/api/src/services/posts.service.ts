@@ -352,10 +352,17 @@ export async function createPost(input: PostInput, authorId: string) {
   });
 
   const post = await prisma.post.findUniqueOrThrow({ where: { id: createdId }, include: postInclude });
+  if (post.status === 'scheduled' && post.scheduledFor) announceScheduled(post, authorId);
   return withPublicUrl(post);
 }
 
-export async function updatePost(id: number, input: PostInput) {
+function announceScheduled(post: { id: number; title: string; authorId: string | null; scheduledFor: Date | null }, actorId?: string) {
+  notifications
+    .notifyPostScheduled({ id: post.id, title: post.title, authorId: post.authorId, scheduledFor: post.scheduledFor!, actorId })
+    .catch((error) => console.error('Scheduled-post notification failed:', error));
+}
+
+export async function updatePost(id: number, input: PostInput, actorId?: string) {
   const existing = await prisma.post.findUnique({ where: { id } });
   if (!existing) {
     throw new NotFoundError('Post not found');
@@ -459,6 +466,11 @@ export async function updatePost(id: number, input: PostInput) {
   });
 
   const post = await prisma.post.findUniqueOrThrow({ where: { id }, include: postInclude });
+  // Newly scheduled, or moved to a different time.
+  if (post.status === 'scheduled' && post.scheduledFor
+    && (existing.status !== 'scheduled' || existing.scheduledFor?.getTime() !== post.scheduledFor.getTime())) {
+    announceScheduled(post, actorId);
+  }
   return withPublicUrl(post);
 }
 

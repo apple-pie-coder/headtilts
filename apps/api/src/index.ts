@@ -9,6 +9,7 @@ import { heartbeat, startHealthSampler } from './services/healthMonitor';
 import { seedSmtpFromEnv } from './services/settings.service';
 import { reconcileBackupRecords } from './services/backup.service';
 import { startLogPrivacySweep } from './services/logger.service';
+import { startStorageWatch } from './services/storageWatch';
 
 const REQUIRED_ENV_VARS = ['DATABASE_URL', 'JWT_SECRET', 'JWT_REFRESH_SECRET'] as const;
 
@@ -82,6 +83,8 @@ async function start(): Promise<void> {
     const stopHealthSampler = startHealthSampler();
     // Erase IPs and browser details from activity logs after 90 days
     const logSweepTimer = startLogPrivacySweep();
+    // Alert admins when the disk holding uploads and backups fills up
+    const storageTimer = startStorageWatch();
 
     // Graceful shutdown
     process.on('SIGTERM', async () => {
@@ -89,6 +92,7 @@ async function start(): Promise<void> {
       clearInterval(publisherTimer);
       clearInterval(backupTimer);
       clearInterval(logSweepTimer);
+      clearInterval(storageTimer);
       stopHealthSampler();
       await disconnectDatabase();
       process.exit(0);
@@ -99,6 +103,7 @@ async function start(): Promise<void> {
       clearInterval(publisherTimer);
       clearInterval(backupTimer);
       clearInterval(logSweepTimer);
+      clearInterval(storageTimer);
       stopHealthSampler();
       await disconnectDatabase();
       process.exit(0);

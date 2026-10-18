@@ -5,8 +5,10 @@ import { prisma } from '../config/database';
 import { signAccessToken, signRefreshToken, signMfaToken, JWTPayload } from '../utils/jwt';
 import { ValidationError, UnauthorizedError, ConflictError, ForbiddenError, ApiError } from '../utils/errors';
 import { validateEmail, validatePassword, validateUsername } from '@headtilts/shared';
-import { sendMail } from './mail.service';
+import { sendBuilt } from './mail.service';
+import { passwordReset } from './emailContent';
 import * as mfaService from './mfa.service';
+import { accountChanged } from './security.service';
 
 // Compared against when the account doesn't exist, so a login attempt takes
 // the same time either way and can't be used to discover valid usernames.
@@ -252,6 +254,7 @@ export async function enableMfa(userId: string, totpCode: string) {
     data: { mfaEnabled: true, mfaBackupCodes: JSON.stringify(hashed) },
   });
 
+  await accountChanged(userId, 'mfa_on');
   return { backupCodes: plain };
 }
 
@@ -295,6 +298,7 @@ export async function disableMfa(userId: string, password: string, code: string)
     where: { id: userId },
     data: { mfaEnabled: false, mfaSecret: null, mfaBackupCodes: null },
   });
+  await accountChanged(userId, 'mfa_off');
 }
 
 export async function getCurrentUser(userId: string) {
@@ -409,11 +413,10 @@ export async function requestPasswordReset(email: string): Promise<void> {
   });
 
   const resetUrl = buildResetUrl(token);
-  await sendMail({
-    to: user.email,
-    subject: 'Reset your password',
-    text: `Hello ${user.firstName || user.username},\n\nA password reset was requested for your account. Open the link below to choose a new password. The link expires in 1 hour.\n\n${resetUrl}\n\nIf you did not request this, you can safely ignore this email.`,
-  });
+  // Not awaited: a reply that took longer for real accounts would reveal which
+  // addresses have one, and Gmail takes a few seconds to accept a message.
+  sendBuilt(user.email, passwordReset({ name: user.firstName || user.username, resetUrl }))
+    .catch((error) => console.error('Password reset email failed:', error));
 }
 
 export async function resetPassword(token: string, newPassword: string): Promise<void> {
@@ -442,4 +445,5 @@ export async function resetPassword(token: string, newPassword: string): Promise
     // Revoke existing sessions so a compromised account is fully locked out
     prisma.session.deleteMany({ where: { userId: record.userId } }),
   ]);
+  await accountChanged(record.userId, 'password_reset');
 }

@@ -43,6 +43,7 @@ function deliverSession<T extends object>(req: Request, res: Response, result: T
   return rest;
 }
 import { clientIp } from '../utils/clientIp';
+import { clearFailedLogins, recordFailedLogin, recordSignIn } from '../services/security.service';
 
 export async function register(req: Request, res: Response): Promise<void> {
   try {
@@ -99,6 +100,8 @@ export async function login(req: Request, res: Response): Promise<void> {
     }
 
     const result = await authService.login(loginId, password);
+    clearFailedLogins(loginId);
+    if ('user' in result && result.user) await recordSignIn(result.user.id, clientIp(req), req.get('user-agent'));
     log({
       site: 'admin', level: 'info', category: 'auth', action: 'auth.login',
       actorEmail: loginId,
@@ -117,6 +120,7 @@ export async function login(req: Request, res: Response): Promise<void> {
         path: req.path, method: req.method, statusCode: error.statusCode,
         meta: { reason: error.message },
       });
+      if (error.statusCode === 401) recordFailedLogin(req.body.identifier ?? req.body.email, clientIp(req));
       sendError(res, error.code, error.message, error.statusCode, error.details);
     } else {
       sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
@@ -241,6 +245,7 @@ export async function mfaVerify(req: Request, res: Response): Promise<void> {
       return;
     }
     const result = await authService.completeMfaLogin(payload.sub);
+    await recordSignIn(payload.sub, clientIp(req), req.get('user-agent'));
     sendSuccess(res, deliverSession(req, res, result));
   } catch (error) {
     if (error instanceof ApiError) {
@@ -269,6 +274,7 @@ export async function mfaVerifyBackup(req: Request, res: Response): Promise<void
       return;
     }
     const result = await authService.completeMfaLogin(payload.sub);
+    await recordSignIn(payload.sub, clientIp(req), req.get('user-agent'));
     sendSuccess(res, deliverSession(req, res, result));
   } catch (error) {
     if (error instanceof ApiError) {
@@ -372,6 +378,7 @@ export async function mfaEnrollComplete(req: Request, res: Response): Promise<vo
       return;
     }
     const result = await authService.completeMfaEnrollment(payload.sub, String(req.body.code));
+    await recordSignIn(payload.sub, clientIp(req), req.get('user-agent'));
     sendSuccess(res, deliverSession(req, res, result));
   } catch (error) {
     if (error instanceof ApiError) {

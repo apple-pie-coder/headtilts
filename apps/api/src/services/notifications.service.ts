@@ -2,7 +2,8 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { PERMISSIONS } from '@headtilts/shared';
 import { pushNotification } from '../realtime/notifications.gateway';
-import { sendMail } from './mail.service';
+import { sendBuilt } from './mail.service';
+import { notificationEmail } from './emailContent';
 
 export type NotificationType =
   | 'comment'
@@ -112,7 +113,12 @@ interface NotifyInput {
   link?: string | null;
   data?: Record<string, unknown> | null;
   recipientIds: string[];
+  /** For types with a threshold: whether this recipient's own threshold is met. */
+  passes?: (threshold: number) => boolean;
+  /** Extra detail rows for the email version, e.g. IP address or time. */
+  details?: { label: string; value: string }[];
 }
+
 
 /**
  * Resolve active users holding a given permission string ("module_action").
@@ -137,15 +143,15 @@ export async function getUserIdsWithPermission(permission: string): Promise<stri
  * Get a user's notification preference for a given type.
  * Falls back to the type's default channel if no preference is set.
  */
-async function getPreference(userId: string, type: NotificationType): Promise<{ channel: NotificationChannel; enabled: boolean }> {
+async function getPreference(userId: string, type: NotificationType): Promise<{ channel: NotificationChannel; enabled: boolean; threshold: number | null }> {
   const pref = await prisma.userNotificationPreference.findUnique({
     where: { userId_type: { userId, type } },
   });
-  if (pref) {
-    return { channel: pref.channel as NotificationChannel, enabled: pref.enabled };
-  }
   const def = NOTIFICATION_TYPES.find((t) => t.type === type);
-  return { channel: def?.defaultChannel ?? 'inapp', enabled: true };
+  if (pref) {
+    return { channel: pref.channel as NotificationChannel, enabled: pref.enabled, threshold: pref.threshold ?? def?.thresholdDefault ?? null };
+  }
+  return { channel: def?.defaultChannel ?? 'inapp', enabled: true, threshold: def?.thresholdDefault ?? null };
 }
 
 /**
@@ -158,8 +164,9 @@ export async function notify(input: NotifyInput): Promise<void> {
 
   await Promise.all(
     recipients.map(async (userId) => {
-      const { channel, enabled } = await getPreference(userId, input.type);
+      const { channel, enabled, threshold } = await getPreference(userId, input.type);
       if (!enabled || channel === 'none') return;
+      if (input.passes && threshold != null && !input.passes(threshold)) return;
 
       const sendInApp = channel === 'inapp' || channel === 'both';
       const sendEmail = channel === 'email' || channel === 'both';
@@ -183,12 +190,7 @@ export async function notify(input: NotifyInput): Promise<void> {
       if (sendEmail) {
         const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
         if (user?.email) {
-          sendMail({
-            to: user.email,
-            subject: input.title,
-            text: [input.title, input.body].filter(Boolean).join('\n\n'),
-            html: `<p><strong>${input.title}</strong></p>${input.body ? `<p>${input.body}</p>` : ''}${input.link ? `<p><a href="${input.link}">View in admin</a></p>` : ''}`,
-          }).catch(() => {
+          sendBuilt(user.email, notificationEmail(input)).catch(() => {
             /* non-fatal — email failure should not break the in-app flow */
           });
         }
@@ -272,13 +274,122 @@ export async function notifyApiKeyCreated(input: {
   userId: string;
   name: string;
 }): Promise<void> {
-  const recipientIds = await getUserIdsWithPermission(PERMISSIONS.USER_MANAGE_ROLES);
+  const [recipientIds, creator] = await Promise.all([
+    getUserIdsWithPermission(PERMISSIONS.USER_MANAGE_ROLES),
+    prisma.user.findUnique({ where: { id: input.userId }, select: { username: true, firstName: true, lastName: true } }),
+  ]);
+  const who = creator ? ([creator.firstName, creator.lastName].filter(Boolean).join(' ') || creator.username) : 'Someone';
   await notify({
     type: 'api_key_created',
-    title: `New API key created: "${input.name}"`,
-    body: `A new API key was created by user ${input.userId}.`,
+    title: `New API key: "${input.name}"`,
+    body: `${who} created an API key. Anyone holding it can use the API with their permissions, so check it was expected.`,
     link: '/admin/api-keys',
-    recipientIds,
+    recipientIds: recipientIds.filter((id) => id !== input.userId),
+  });
+}
+
+/** Repeated wrong passwords for one sign-in name, within 15 minutes. */
+export async function notifyFailedLogins(input: {
+  identifier: string;
+  attempts: number;
+  ip: string | null;
+}): Promise<void> {
+  const target = await prisma.user.findFirst({
+    where: { OR: [{ email: input.identifier }, { username: input.identifier }] },
+    select: { id: true },
+  });
+  const admins = await getUserIdsWithPermission(PERMISSIONS.USER_MANAGE_ROLES);
+  await notify({
+    type: 'failed_login',
+    title: target ? `${input.attempts} failed sign-ins on ${input.identifier}` : `${input.attempts} failed sign-ins for unknown account "${input.identifier}"`,
+    body: target
+      ? 'Someone has entered the wrong password for this account several times in the last 15 minutes. If it wasn\'t you, change the password and turn on two-step sign-in.'
+      : 'Someone is trying to sign in with a name that has no account here, which often means password guessing.',
+    link: '/admin/logs',
+    details: [
+      { label: 'Attempts', value: `${input.attempts} in 15 minutes` },
+      ...(input.ip ? [{ label: 'From IP address', value: input.ip }] : []),
+    ],
+    // Alert once, as the count reaches each person's own threshold.
+    passes: (threshold) => input.attempts === threshold,
+    recipientIds: [...admins, ...(target ? [target.id] : [])],
+  });
+}
+
+/** Something changed on a user's own account (password, two-step sign-in, a new device). */
+export async function notifySecurityAlert(input: {
+  userId: string;
+  title: string;
+  body: string;
+  details?: { label: string; value: string }[];
+}): Promise<void> {
+  await notify({
+    type: 'security_alert',
+    title: input.title,
+    body: input.body,
+    link: '/admin/profile',
+    details: input.details,
+    recipientIds: [input.userId],
+  });
+}
+
+export async function notifyPostScheduled(input: {
+  id: number;
+  title: string;
+  authorId: string | null;
+  scheduledFor: Date;
+  actorId?: string;
+}): Promise<void> {
+  const byPermission = await getUserIdsWithPermission(PERMISSIONS.POST_PUBLISH);
+  const tz = (await prisma.setting.findUnique({ where: { key: 'timezone' } }))?.value || 'UTC';
+  let when: string;
+  try {
+    when = new Intl.DateTimeFormat('en-GB', { dateStyle: 'full', timeStyle: 'short', timeZone: tz }).format(input.scheduledFor);
+  } catch {
+    when = input.scheduledFor.toUTCString();
+  }
+  await notify({
+    type: 'post_scheduled',
+    title: `Scheduled: "${input.title}"`,
+    body: `It will be published automatically on ${when}.`,
+    link: `/admin/posts/${input.id}/edit`,
+    data: { id: input.id },
+    recipientIds: [...byPermission, ...(input.authorId ? [input.authorId] : [])].filter((id) => id !== input.actorId),
+  });
+}
+
+export async function notifyUserDeactivated(input: {
+  id: string;
+  username: string;
+  actorId?: string;
+}): Promise<void> {
+  const [recipientIds, actor] = await Promise.all([
+    getUserIdsWithPermission(PERMISSIONS.USER_READ),
+    input.actorId ? prisma.user.findUnique({ where: { id: input.actorId }, select: { username: true } }) : null,
+  ]);
+  await notify({
+    type: 'user_deactivated',
+    title: `Account deactivated: ${input.username}`,
+    body: `${actor ? actor.username : 'An administrator'} deactivated this account. They can no longer sign in.`,
+    link: '/admin/users',
+    recipientIds: recipientIds.filter((id) => id !== input.actorId && id !== input.id),
+  });
+}
+
+export async function notifyStorageHigh(input: {
+  percent: number;
+  usedGb: number;
+  totalGb: number;
+  recipientIds: string[];
+}): Promise<void> {
+  await notify({
+    type: 'media_storage_high',
+    title: `Storage is ${input.percent}% full`,
+    body: 'The disk that holds uploads and backups is filling up. When it\'s full, uploads and backups fail.',
+    link: '/admin/media',
+    details: [{ label: 'Used', value: `${input.usedGb} GB of ${input.totalGb} GB` }],
+    passes: (threshold) => input.percent >= threshold,
+    recipientIds: input.recipientIds,
   });
 }
 

@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { prisma } from '../config/database';
+import { notifyApiKeyCreated } from './notifications.service';
 
 export const AVAILABLE_SCOPES = [
   'posts:read', 'posts:write', 'posts:delete',
@@ -39,6 +40,7 @@ export async function createApiKey(
       expiresAt: expiresAt ?? null,
     },
   });
+  notifyApiKeyCreated({ userId, name }).catch((error) => console.error('API key notification failed:', error));
   return { ...record, rawKey: raw };
 }
 

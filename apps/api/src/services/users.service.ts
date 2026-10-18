@@ -4,6 +4,7 @@ import { ValidationError, NotFoundError, ConflictError } from '../utils/errors';
 import { validateEmail, validateUsername, validatePassword } from '@headtilts/shared';
 import * as notifications from './notifications.service';
 import { assertCanAssignRoles, assertCanManageUser } from './authz.service';
+import { accountChanged } from './security.service';
 
 const userInclude = {
   userRoles: {
@@ -226,6 +227,11 @@ export async function updateUser(id: string, input: UpdateUserInput, requestingU
     return tx.user.findUniqueOrThrow({ where: { id: updated.id }, include: userInclude });
   });
 
+  if (existing.isActive && input.isActive === false) {
+    notifications
+      .notifyUserDeactivated({ id, username: existing.username, actorId: requestingUserId })
+      .catch((error) => console.error('Deactivation notification failed:', error));
+  }
   return toUserDTO(user);
 }
 
@@ -276,6 +282,7 @@ export async function updateMe(id: string, input: UpdateMeInput) {
     include: userInclude,
   });
 
+  if (hashedPassword) await accountChanged(id, 'password_changed');
   return toUserDTO(user);
 }
 

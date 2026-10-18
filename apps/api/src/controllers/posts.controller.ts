@@ -234,7 +234,7 @@ export async function update(req: Request, res: Response): Promise<void> {
     if (!(await loadPermissions(req)).includes(PERMISSIONS.POST_EDIT_OTHERS)) {
       input.authorId = undefined;
     }
-    const post = await postsService.updatePost(id, input);
+    const post = await postsService.updatePost(id, input, req.user!.sub);
     const changes = revisionsService.computeDiff(old, post, input);
     const action = revisionsService.deriveAction(old.status, post.status);
     revisionsService.recordRevision({ postId: id, userId: req.user!.sub, action, changes, snapshot: revisionsService.buildSnapshot(post) }).catch(() => {});
