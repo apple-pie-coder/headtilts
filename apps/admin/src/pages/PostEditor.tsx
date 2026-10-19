@@ -271,6 +271,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   const confirm = useConfirm();
   const isEditing = !!id;
   const canPublish         = hasPermission(PERMISSIONS.POST_PUBLISH);
+  const canAddCategory     = hasPermission(PERMISSIONS.CATEGORY_CREATE);
   const canViewRevisions   = hasPermission(PERMISSIONS.REVISION_READ);
   const canArchiveRevisions = hasPermission(PERMISSIONS.REVISION_ARCHIVE);
   const isPage = contentType === 'page';
@@ -1494,17 +1495,17 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
             <div className={styles.panel} id="categories-panel">
               <div className={styles.panelTitleRow}>
                 <h3>Categories</h3>
-                <button
+                {canAddCategory && <button
                   type="button"
                   className={styles.addCatToggle}
                   onClick={() => { setShowAddCategory((s) => !s); setNewCatName(''); setNewCatParentId(''); }}
                   title={showAddCategory ? 'Cancel' : 'Add new category'}
                 >
                   <FontAwesomeIcon icon={showAddCategory ? faMinus : faPlus} />
-                </button>
+                </button>}
               </div>
 
-              {showAddCategory && (
+              {canAddCategory && showAddCategory && (
                 <form onSubmit={handleAddCategory} className={styles.addCatForm}>
                   <input
                     className={styles.addCatInput}

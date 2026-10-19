@@ -252,3 +252,6 @@
 
 .selectButton:hover:not(:disabled) { background: var(--accent-h); }
 .selectButton:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.deniedCard { max-width: 440px; height: auto; }
+.denied { margin: 0; padding: 1.25rem 1.5rem 1.5rem; color: var(--t2); font-size: 0.9375rem; line-height: 1.5; }

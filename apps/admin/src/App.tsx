@@ -326,7 +326,7 @@ const router = createBrowserRouter(createRoutesFromElements(
         </ProtectedRoute>
       }
     />
-    <Route path="/admin/api-keys" element={<ApiKeysPage />} />
+    <Route path="/admin/api-keys" element={<ProtectedRoute><ApiKeysPage /></ProtectedRoute>} />
     <Route
       path="/admin/analytics"
       element={

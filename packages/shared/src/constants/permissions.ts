@@ -53,7 +53,6 @@ export const PERMISSIONS = {
 
   // Permissions
   PERMISSION_READ: 'permissions_read',
-  PERMISSION_MANAGE: 'permissions_manage',
 
   // Comments
   COMMENT_READ: 'comments_read',
@@ -65,7 +64,6 @@ export const PERMISSIONS = {
 
   // SEO
   SEO_READ: 'seo_read',
-  SEO_EDIT: 'seo_update',
   SEO_MANAGE: 'seo_manage',
 
   // Celebrations
@@ -79,7 +77,6 @@ export const PERMISSIONS = {
   POLL_READ: 'polls_read',
   POLL_EDIT: 'polls_update',
   POLL_DELETE: 'polls_delete',
-  POLL_VOTE: 'polls_vote',
   POLL_RESET: 'polls_reset',
 
   // Revisions
@@ -115,7 +112,16 @@ export const PERMISSIONS = {
   EVENT_MANAGE_REGISTRATIONS: 'events_manage_registrations',
 } as const;
 
-// Default roles with their permissions
+// Default roles with their permissions, modelled on WordPress's roles:
+//   super-admin  everything, including backups (a restore overwrites the whole database)
+//   admin        runs the site: users, roles, settings, appearance, all content
+//   editor       all content, anyone's: publish, delete, categories and tags, comments
+//   author       their own posts: write, publish, delete, upload media
+//   contributor  their own drafts only: an editor reviews and publishes; no uploads
+//   subscriber   their own profile and notification preferences
+// "Own" vs "anyone's" is POST_EDIT_OTHERS; publishing and live posts need POST_PUBLISH.
+const ADMIN_EXCLUDED: string[] = [PERMISSIONS.SYSTEM_BACKUP];
+
 export const DEFAULT_ROLES = {
   SUPER_ADMIN: {
     name: 'super-admin',
@@ -124,7 +130,12 @@ export const DEFAULT_ROLES = {
   },
   ADMIN: {
     name: 'admin',
-    description: 'Administrative access',
+    description: 'Runs the site: users, roles, settings, appearance and all content',
+    permissions: Object.values(PERMISSIONS).filter((p) => !ADMIN_EXCLUDED.includes(p)),
+  },
+  EDITOR: {
+    name: 'editor',
+    description: 'Publishes and manages all content, including other people\u2019s',
     permissions: [
       PERMISSIONS.POST_CREATE,
       PERMISSIONS.POST_READ,
@@ -135,11 +146,6 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.MEDIA_UPLOAD,
       PERMISSIONS.MEDIA_READ,
       PERMISSIONS.MEDIA_DELETE,
-      PERMISSIONS.USER_CREATE,
-      PERMISSIONS.USER_READ,
-      PERMISSIONS.USER_EDIT,
-      PERMISSIONS.USER_DELETE,
-      PERMISSIONS.USER_MANAGE_ROLES,
       PERMISSIONS.CATEGORY_CREATE,
       PERMISSIONS.CATEGORY_READ,
       PERMISSIONS.CATEGORY_EDIT,
@@ -148,26 +154,11 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.TAG_READ,
       PERMISSIONS.TAG_EDIT,
       PERMISSIONS.TAG_DELETE,
-      PERMISSIONS.MENU_CREATE,
       PERMISSIONS.MENU_READ,
-      PERMISSIONS.MENU_EDIT,
-      PERMISSIONS.MENU_DELETE,
-      PERMISSIONS.WIDGET_CREATE,
       PERMISSIONS.WIDGET_READ,
-      PERMISSIONS.WIDGET_EDIT,
-      PERMISSIONS.WIDGET_DELETE,
-      PERMISSIONS.ROLE_CREATE,
-      PERMISSIONS.ROLE_READ,
-      PERMISSIONS.ROLE_EDIT,
-      PERMISSIONS.ROLE_DELETE,
-      PERMISSIONS.PERMISSION_READ,
-      PERMISSIONS.PERMISSION_MANAGE,
       PERMISSIONS.COMMENT_READ,
       PERMISSIONS.COMMENT_MODERATE,
-      PERMISSIONS.SETTING_READ,
-      PERMISSIONS.SETTING_EDIT,
       PERMISSIONS.SEO_READ,
-      PERMISSIONS.SEO_EDIT,
       PERMISSIONS.SEO_MANAGE,
       PERMISSIONS.CELEBRATION_CREATE,
       PERMISSIONS.CELEBRATION_READ,
@@ -177,18 +168,12 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.POLL_READ,
       PERMISSIONS.POLL_EDIT,
       PERMISSIONS.POLL_DELETE,
-      PERMISSIONS.POLL_VOTE,
       PERMISSIONS.POLL_RESET,
       PERMISSIONS.REVISION_READ,
       PERMISSIONS.REVISION_ARCHIVE,
       PERMISSIONS.NOTIFICATION_MANAGE,
-      PERMISSIONS.API_ANALYTICS_VIEW,
-      PERMISSIONS.REDIRECT_READ,
-      PERMISSIONS.REDIRECT_MANAGE,
       PERMISSIONS.CONTACT_READ,
-      PERMISSIONS.CONTACT_MANAGE,
-      PERMISSIONS.LOG_READ,
-      PERMISSIONS.LOG_DELETE,
+      PERMISSIONS.REDIRECT_READ,
       PERMISSIONS.EVENT_CREATE,
       PERMISSIONS.EVENT_READ,
       PERMISSIONS.EVENT_EDIT,
@@ -196,52 +181,15 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.EVENT_MANAGE_REGISTRATIONS,
     ],
   },
-  EDITOR: {
-    name: 'editor',
-    description: 'Can edit and publish posts',
-    permissions: [
-      PERMISSIONS.POST_CREATE,
-      PERMISSIONS.POST_READ,
-      PERMISSIONS.POST_EDIT,
-      PERMISSIONS.POST_PUBLISH,
-      PERMISSIONS.POST_EDIT_OTHERS,
-      PERMISSIONS.MEDIA_UPLOAD,
-      PERMISSIONS.MEDIA_READ,
-      PERMISSIONS.MEDIA_DELETE,
-      PERMISSIONS.CATEGORY_READ,
-      PERMISSIONS.TAG_READ,
-      PERMISSIONS.TAG_CREATE,
-      PERMISSIONS.TAG_EDIT,
-      PERMISSIONS.MENU_READ,
-      PERMISSIONS.WIDGET_READ,
-      PERMISSIONS.COMMENT_READ,
-      PERMISSIONS.COMMENT_MODERATE,
-      PERMISSIONS.SEO_READ,
-      PERMISSIONS.SEO_EDIT,
-      PERMISSIONS.SEO_MANAGE,
-      PERMISSIONS.CELEBRATION_READ,
-      PERMISSIONS.POLL_CREATE,
-      PERMISSIONS.POLL_READ,
-      PERMISSIONS.POLL_EDIT,
-      PERMISSIONS.POLL_RESET,
-      PERMISSIONS.REVISION_READ,
-      PERMISSIONS.REVISION_ARCHIVE,
-      PERMISSIONS.NOTIFICATION_MANAGE,
-      PERMISSIONS.CONTACT_READ,
-      PERMISSIONS.REDIRECT_READ,
-      PERMISSIONS.EVENT_CREATE,
-      PERMISSIONS.EVENT_READ,
-      PERMISSIONS.EVENT_EDIT,
-      PERMISSIONS.EVENT_MANAGE_REGISTRATIONS,
-    ],
-  },
   AUTHOR: {
     name: 'author',
-    description: 'Can write and manage their own posts',
+    description: 'Writes, publishes and deletes their own posts',
     permissions: [
       PERMISSIONS.POST_CREATE,
       PERMISSIONS.POST_READ,
       PERMISSIONS.POST_EDIT,
+      PERMISSIONS.POST_DELETE,
+      PERMISSIONS.POST_PUBLISH,
       PERMISSIONS.MEDIA_UPLOAD,
       PERMISSIONS.MEDIA_READ,
       PERMISSIONS.CATEGORY_READ,
@@ -254,12 +202,28 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.REVISION_READ,
       PERMISSIONS.NOTIFICATION_MANAGE,
       PERMISSIONS.EVENT_READ,
+    ],
+  },
+  CONTRIBUTOR: {
+    name: 'contributor',
+    description: 'Writes their own drafts for an editor to review and publish',
+    permissions: [
+      PERMISSIONS.POST_CREATE,
+      PERMISSIONS.POST_READ,
+      PERMISSIONS.POST_EDIT,
+      PERMISSIONS.POST_DELETE,
+      PERMISSIONS.CATEGORY_READ,
+      PERMISSIONS.TAG_READ,
+      PERMISSIONS.TAG_CREATE,
+      PERMISSIONS.SEO_READ,
+      PERMISSIONS.REVISION_READ,
+      PERMISSIONS.NOTIFICATION_MANAGE,
     ],
   },
   SUBSCRIBER: {
     name: 'subscriber',
-    description: 'Subscriber access',
-    // No POST_READ: on the admin API that exposes every draft and scheduled post.
-    permissions: [PERMISSIONS.CATEGORY_READ, PERMISSIONS.TAG_READ, PERMISSIONS.POLL_READ, PERMISSIONS.NOTIFICATION_MANAGE],
+    description: 'Manages their own profile and notifications',
+    // Nothing on the admin API: even "read" there includes drafts and unpublished items.
+    permissions: [PERMISSIONS.NOTIFICATION_MANAGE],
   },
 } as const;

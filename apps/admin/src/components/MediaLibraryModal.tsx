@@ -7,6 +7,8 @@ import { Media } from '../types';
 import { fetchMedia, uploadMedia } from '../services/media';
 import { MediaGrid } from './MediaGrid';
 import { useToast } from './ToastContext';
+import { PERMISSIONS } from '@headtilts/shared';
+import { useAuth } from '../hooks/useAuth';
 import styles from './MediaLibraryModal.module.css';
 
 const PAGE_SIZE = 20;
@@ -16,7 +18,25 @@ interface MediaLibraryModalProps {
   onClose: () => void;
 }
 
-export function MediaLibraryModal({ onSelect, onClose }: MediaLibraryModalProps) {
+/** Every image picker opens this; roles without media access (contributors) get a note instead of an error. */
+export function MediaLibraryModal(props: MediaLibraryModalProps) {
+  const { hasPermission } = useAuth();
+  if (hasPermission(PERMISSIONS.MEDIA_READ)) return <MediaLibraryBrowser {...props} />;
+  return createPortal(
+    <div className={styles.overlay} onMouseDown={(e) => { if (e.target === e.currentTarget) props.onClose(); }}>
+      <div className={`${styles.card} ${styles.deniedCard}`} role="dialog" aria-modal="true" aria-labelledby="media-denied-title">
+        <div className={styles.header}>
+          <span className={styles.title} id="media-denied-title">Media Library</span>
+          <button type="button" className={styles.closeBtn} onClick={props.onClose} title="Close"><FontAwesomeIcon icon={faXmark} /></button>
+        </div>
+        <p className={styles.denied}>Your role can’t add images or files. Write your post and an editor will add them when they review it.</p>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function MediaLibraryBrowser({ onSelect, onClose }: MediaLibraryModalProps) {
   const [items, setItems] = useState<Media[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);

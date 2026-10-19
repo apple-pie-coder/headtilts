@@ -1,7 +1,20 @@
+import { PERMISSIONS } from '@headtilts/shared';
 import { prisma } from '../config/database';
 import { getUpcomingCelebrations } from './celebrations.service';
 
-export async function getDashboardStats() {
+/**
+ * Admin dashboard numbers. Each section is filled only when the caller holds the
+ * permission that guards the same data elsewhere; otherwise it is empty/zero and
+ * its query is skipped. (Any signed-in user can call this, subscribers included.)
+ */
+export async function getDashboardStats(permissions: string[]) {
+  const can = (p: string) => permissions.includes(p);
+  const when = <T>(allowed: boolean, query: () => Promise<T>, empty: T): Promise<T> => (allowed ? query() : Promise.resolve(empty));
+  const posts = can(PERMISSIONS.POST_READ);
+  const media = can(PERMISSIONS.MEDIA_READ);
+  const users = can(PERMISSIONS.USER_READ);
+  const comments = can(PERMISSIONS.COMMENT_READ);
+
   const [
     postStatusCounts,
     pageCount,
@@ -17,14 +30,14 @@ export async function getDashboardStats() {
     recentUsers,
     upcomingCelebrations,
   ] = await Promise.all([
-    prisma.post.groupBy({ by: ['status'], where: { type: 'post' }, _count: { id: true } }),
-    prisma.post.count({ where: { type: 'page', status: { not: 'trash' } } }),
-    prisma.media.aggregate({ _count: { id: true }, _sum: { size: true } }),
-    prisma.category.count(),
-    prisma.tag.count(),
-    prisma.user.count(),
-    prisma.user.count({ where: { isActive: true } }),
-    prisma.post.findMany({
+    when(posts, () => prisma.post.groupBy({ by: ['status'], where: { type: 'post' }, _count: { id: true } }), []),
+    when(posts, () => prisma.post.count({ where: { type: 'page', status: { not: 'trash' } } }), 0),
+    when(media, () => prisma.media.aggregate({ _count: { id: true }, _sum: { size: true } }), { _count: { id: 0 }, _sum: { size: 0 } }),
+    when(can(PERMISSIONS.CATEGORY_READ), () => prisma.category.count(), 0),
+    when(can(PERMISSIONS.TAG_READ), () => prisma.tag.count(), 0),
+    when(users, () => prisma.user.count(), 0),
+    when(users, () => prisma.user.count({ where: { isActive: true } }), 0),
+    when(posts, () => prisma.post.findMany({
       where: { type: 'post', status: { not: 'trash' } },
       orderBy: { updatedAt: 'desc' },
       take: 5,
@@ -37,14 +50,14 @@ export async function getDashboardStats() {
         updatedAt: true,
         author: { select: { id: true, username: true, firstName: true, lastName: true } },
       },
-    }),
-    prisma.media.findMany({
+    }), []),
+    when(media, () => prisma.media.findMany({
       orderBy: { createdAt: 'desc' },
       take: 8,
       select: { id: true, filename: true, originalName: true, url: true, mimeType: true, size: true, createdAt: true },
-    }),
-    prisma.comment.count({ where: { status: 'pending' } }),
-    prisma.comment.findMany({
+    }), []),
+    when(comments, () => prisma.comment.count({ where: { status: 'pending' } }), 0),
+    when(comments, () => prisma.comment.findMany({
       orderBy: { createdAt: 'desc' },
       take: 5,
       select: {
@@ -55,13 +68,13 @@ export async function getDashboardStats() {
         createdAt: true,
         post: { select: { id: true, title: true, slug: true } },
       },
-    }),
-    prisma.user.findMany({
+    }), []),
+    when(users, () => prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
       take: 5,
       select: { id: true, username: true, firstName: true, lastName: true, email: true, avatar: true, createdAt: true },
-    }),
-    getUpcomingCelebrations(5),
+    }), []),
+    when(can(PERMISSIONS.CELEBRATION_READ), () => getUpcomingCelebrations(5), [] as Awaited<ReturnType<typeof getUpcomingCelebrations>>),
   ]);
 
   const postCounts: Record<string, number> = { published: 0, draft: 0, scheduled: 0, trash: 0 };
