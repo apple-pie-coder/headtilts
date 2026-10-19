@@ -6,6 +6,7 @@ import { sendSuccess, sendError, sendPaginatedSuccess } from '../utils/response'
 import { ApiError } from '../utils/errors';
 import { prisma } from '../config/database';
 import * as pollsService from '../services/polls.service';
+import { POLL_IMAGE_FORMATS, PollImageFormat, renderPollResultsImage } from '../services/pollImage.service';
 
 const router: IRouter = Router();
 router.use(authenticate);
@@ -31,6 +32,27 @@ router.get('/:id', requirePermission(PERMISSIONS.POLL_READ), asyncHandler(async 
   try {
     const poll = await pollsService.getPoll(req.params.id);
     sendSuccess(res, poll);
+  } catch (e) {
+    if (e instanceof ApiError) sendError(res, e.code, e.message, e.statusCode);
+    else sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+  }
+}));
+
+// Results as a shareable PNG (?format=square|story|wide), once the poll has ended
+router.get('/:id/results-image', requirePermission(PERMISSIONS.POLL_READ), asyncHandler(async (req: Request, res: Response) => {
+  const requested = String(req.query.format ?? 'square');
+  const format: PollImageFormat = Object.prototype.hasOwnProperty.call(POLL_IMAGE_FORMATS, requested) ? (requested as PollImageFormat) : 'square';
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) { sendError(res, 'VALIDATION_ERROR', 'Invalid poll id', 400); return; }
+  try {
+    const { png, filename } = await renderPollResultsImage(id, format);
+    res.set({
+      'Content-Type': 'image/png',
+      'Content-Length': String(png.byteLength),
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Cache-Control': 'private, no-store',
+    });
+    res.end(png);
   } catch (e) {
     if (e instanceof ApiError) sendError(res, e.code, e.message, e.statusCode);
     else sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);

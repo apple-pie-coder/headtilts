@@ -1,6 +1,7 @@
 import { imageFromContent, withCardImages } from '../utils/cardImage';
 import crypto from 'crypto';
 import sharp from 'sharp';
+import { esc, SVG_FONT, textWidth, truncate, wrap } from '../utils/svgText';
 import { Router, IRouter, Request, Response } from 'express';
 import { asyncHandler } from '../middleware/errorHandler';
 import { prisma } from '../config/database';
@@ -785,32 +786,37 @@ router.get('/posts/:slug/og-image', asyncHandler(async (req: Request, res: Respo
     ? [post.author.firstName, post.author.lastName].filter(Boolean).join(' ') || post.author.username
     : '';
   const category = post.categories[0]?.category.name || '';
+  const host = (process.env.SITE_URL || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
 
-  // Wrap title at ~40 chars per line
-  const wrapText = (text: string, maxLen: number): string[] => {
-    const words = text.split(' ');
-    const lines: string[] = [];
-    let line = '';
-    for (const word of words) {
-      if ((line + ' ' + word).trim().length > maxLen) { lines.push(line.trim()); line = word; }
-      else { line = (line + ' ' + word).trim(); }
-    }
-    if (line) lines.push(line.trim());
-    return lines;
-  };
-  const titleLines = wrapText(post.title, 38);
-  const titleSvgLines = titleLines.slice(0, 3)
-    .map((l, i) => `<text x="80" y="${200 + i * 72}" font-size="56" font-weight="700" fill="#1d1d1f">${l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</text>`)
-    .join('\n');
-
-  const svg = `<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
-    <rect width="1200" height="630" fill="#f5f5f7"/>
-    <rect x="0" y="0" width="8" height="630" fill="#0071e3"/>
-    <text x="80" y="130" font-size="28" font-weight="700" fill="#0071e3" font-family="sans-serif">${site.replace(/&/g, '&amp;')}</text>
-    ${category ? `<text x="80" y="168" font-size="22" fill="#6e6e73" font-family="sans-serif">${category.replace(/&/g, '&amp;')}</text>` : ''}
-    <g font-family="sans-serif">${titleSvgLines}</g>
-    ${authorName ? `<text x="80" y="${200 + titleLines.slice(0, 3).length * 72 + 40}" font-size="26" fill="#6e6e73" font-family="sans-serif">By ${authorName.replace(/&/g, '&amp;')}</text>` : ''}
-  </svg>`;
+  // Same look as the poll results images: site name, red category tape, title, byline.
+  const W = 1200, H = 630, PAD = 72, INNER = W - PAD * 2;
+  const titleSize = 60;
+  const titleLines = wrap(post.title, titleSize, INNER, 3);
+  const tape = category.toUpperCase();
+  const tapeSize = 17;
+  const tapeW = Math.round(textWidth(tape, tapeSize, true) + tapeSize * 0.12 * tape.length + 30);
+  const lineH = Math.round(titleSize * 1.14);
+  // Centre the tape + title block between the site name and the byline.
+  const blockH = (tape ? 46 + 28 : 0) + titleLines.length * lineH;
+  let y = 150 + Math.max(0, (H - 150 - 130 - blockH) / 2);
+  const parts: string[] = [
+    `<rect width="${W}" height="${H}" fill="#ffffff"/>`,
+    `<rect width="${W}" height="8" fill="#0071e3"/>`,
+    `<text x="${PAD}" y="${PAD + 26}" font-size="28" font-weight="800" fill="#1d1d1f" letter-spacing="-0.5">${esc(site)}</text>`,
+  ];
+  if (tape) {
+    parts.push(`<g transform="rotate(-3 ${PAD} ${y + 23})"><rect x="${PAD}" y="${y}" width="${tapeW}" height="46" rx="3" fill="#c3301f"/>`
+      + `<text x="${PAD + 15}" y="${y + 30}" font-size="${tapeSize}" font-weight="800" fill="#ffffff" letter-spacing="${(tapeSize * 0.12).toFixed(1)}">${esc(tape)}</text></g>`);
+    y += 46 + 28;
+  }
+  for (const line of titleLines) {
+    y += lineH;
+    parts.push(`<text x="${PAD}" y="${y - lineH * 0.22}" font-size="${titleSize}" font-weight="800" fill="#1d1d1f" letter-spacing="-1.2">${esc(line)}</text>`);
+  }
+  parts.push(`<rect x="${PAD}" y="${H - PAD - 46}" width="${INNER}" height="1.5" fill="#e8e8ed"/>`);
+  if (authorName) parts.push(`<text x="${PAD}" y="${H - PAD}" font-size="24" fill="#6e6e73">By ${esc(truncate(authorName, 24, INNER * 0.5))}</text>`);
+  if (host) parts.push(`<text x="${W - PAD}" y="${H - PAD}" font-size="24" font-weight="700" fill="#0071e3" text-anchor="end">${esc(host)}</text>`);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${SVG_FONT}">${parts.join('')}</svg>`;
 
   const png = await sharp(Buffer.from(svg)).png().toBuffer();
 

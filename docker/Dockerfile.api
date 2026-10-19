@@ -41,7 +41,9 @@ FROM node:22-slim AS production
 WORKDIR /app
 
 # Prisma needs OpenSSL; backup/restore needs mysqldump and mysql clients.
-RUN apt-get update -y && apt-get install -y --no-install-recommends openssl default-mysql-client && rm -rf /var/lib/apt/lists/*
+# Fonts: sharp draws text in generated images (link previews, poll results) with
+# the system's fonts; without any, every glyph renders as a box.
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl default-mysql-client fontconfig fonts-inter fonts-dejavu-core && rm -rf /var/lib/apt/lists/*
 
 # Reuse the installed dependencies instead of installing them a second time.
 # Copied from `deps` (not `builder`) so this layer only changes with dependencies.

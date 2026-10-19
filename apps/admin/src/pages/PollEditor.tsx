@@ -2,12 +2,13 @@ import { KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faArrowLeft, faPlus, faTrash, faGripVertical, faArrowUpRightFromSquare, faFileCsv, faRotateLeft, faListUl,
+  faArrowLeft, faPlus, faTrash, faGripVertical, faArrowUpRightFromSquare, faFileCsv, faRotateLeft, faListUl, faImage,
 } from '@fortawesome/free-solid-svg-icons';
 import { AdminLayout } from '../components/AdminLayout';
 import { MediaPickerInput } from '../components/MediaPickerInput';
 import { useToast } from '../components/ToastContext';
-import { fetchPoll, createPoll, updatePoll, resetPollVotes, exportPollUrl, PollInput, PollOption } from '../services/polls';
+import { fetchPoll, createPoll, updatePoll, resetPollVotes, downloadPollCsv, pollHasEnded, PollInput, PollOption } from '../services/polls';
+import { PollResultsImage } from '../components/polls/PollResultsImage';
 import { useConfirm } from '../components/ConfirmDialog';
 import { slugify } from '@headtilts/shared';
 import styles from './PollEditor.module.css';
@@ -45,6 +46,7 @@ export default function PollEditorPage() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
+  const [showImage, setShowImage] = useState(false);
   const [featuredImage, setFeaturedImage] = useState('');
   const [options, setOptions] = useState<PollOption[]>([
     { text: '', order: 0 },
@@ -343,7 +345,10 @@ export default function PollEditorPage() {
                 </ol>
               )}
               <div className={styles.resultActions}>
-                <a className={styles.draftButton} href={exportPollUrl(Number(id))} target="_blank" rel="noopener noreferrer"><FontAwesomeIcon icon={faFileCsv} /> Export CSV</a>
+                <button type="button" className={styles.draftButton} onClick={() => downloadPollCsv(Number(id), slug).catch(() => toast.error('Export failed'))}><FontAwesomeIcon icon={faFileCsv} /> Export CSV</button>
+                {pollHasEnded({ status, endsAt: endsAt ? new Date(endsAt).toISOString() : null }) && (
+                  <button type="button" className={styles.draftButton} onClick={() => setShowImage(true)}><FontAwesomeIcon icon={faImage} /> Results image</button>
+                )}
                 {totalVotes > 0 && <button className={styles.dangerLink} onClick={handleReset}><FontAwesomeIcon icon={faRotateLeft} /> Reset votes</button>}
               </div>
             </div>
@@ -457,6 +462,7 @@ export default function PollEditorPage() {
           </div>
         </div>
       </div>
+      {showImage && isEdit && <PollResultsImage poll={{ id: Number(id), slug, title }} onClose={() => setShowImage(false)} />}
     </AdminLayout>
   );
 }

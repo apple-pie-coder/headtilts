@@ -114,9 +114,18 @@ export async function resetPollVotes(id: number) {
   return res.data.data as Poll;
 }
 
-export function exportPollUrl(id: number) {
-  const base = (import.meta.env.VITE_API_URL as string) || '/api';
-  return `${base}/polls/${id}/export`;
+/**
+ * Download a poll's votes as CSV. Fetched with the login attached (a plain link
+ * can't send the Authorization header, so it always got 401), then saved.
+ */
+export async function downloadPollCsv(id: number, slug?: string) {
+  const res = await apiClient.get(`/polls/${id}/export`, { responseType: 'blob' });
+  const url = URL.createObjectURL(res.data as Blob);
+  const a = Object.assign(document.createElement('a'), { href: url, download: `${slug || `poll-${id}`}-votes.csv` });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export interface PollShareClick {
@@ -147,4 +156,17 @@ export interface PollShare {
 export async function fetchPollShares(pollId: number): Promise<PollShare[]> {
   const res = await apiClient.get(`/polls/${pollId}/shares`);
   return res.data.data as PollShare[];
+}
+
+export type PollImageFormat = 'square' | 'story' | 'wide';
+
+/** PNG of a finished poll's results, sized for sharing (see the API's pollImage.service). */
+export async function fetchPollResultsImage(id: number, format: PollImageFormat): Promise<Blob> {
+  const res = await apiClient.get(`/polls/${id}/results-image`, { params: { format }, responseType: 'blob' });
+  return res.data as Blob;
+}
+
+/** Results are final once a poll is closed, or open past its end time. */
+export function pollHasEnded(poll: Pick<Poll, 'status' | 'endsAt'>): boolean {
+  return poll.status === 'closed' || (poll.status === 'open' && !!poll.endsAt && new Date(poll.endsAt) <= new Date());
 }

@@ -4,7 +4,7 @@ import { AxiosError } from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faPlus, faPen, faTrashCan, faRotateLeft, faDownload, faShareNodes, faArrowUpRightFromSquare, faLock,
-  faLockOpen, faSquarePollVertical, faMagnifyingGlass,
+  faLockOpen, faSquarePollVertical, faMagnifyingGlass, faImage,
 } from '@fortawesome/free-solid-svg-icons';
 import { AdminLayout } from '../components/AdminLayout';
 import { useToast } from '../components/ToastContext';
@@ -15,14 +15,15 @@ import {
 } from '../components/ui';
 import t from '../components/ui/table.module.css';
 import {
-  fetchPolls, deletePoll, resetPollVotes, exportPollUrl, fetchPollShares, updatePoll, Poll, PollShare, PollShareClick,
-  fetchPollAnalytics, PollAnalyticsData,
+  fetchPolls, deletePoll, resetPollVotes, downloadPollCsv, fetchPollShares, updatePoll, Poll, PollShare, PollShareClick,
+  fetchPollAnalytics, PollAnalyticsData, pollHasEnded,
 } from '../services/polls';
 import { PERMISSIONS } from '@headtilts/shared';
 import { useAuth } from '../hooks/useAuth';
 import { useDensity } from '../hooks/useDensity';
 import { useHotkeys } from '../hooks/useHotkeys';
 import { useUrlState } from '../hooks/useUrlState';
+import { PollResultsImage } from '../components/polls/PollResultsImage';
 import styles from './Polls.module.css';
 
 const STATUS_META: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' | 'info' }> = {
@@ -56,6 +57,7 @@ export default function PollsPage() {
   const [loaded, setLoaded] = useState(false);
   const [density, setDensity] = useDensity('pollsDensity');
   const [sharesPoll, setSharesPoll] = useState<Poll | null>(null);
+  const [imagePoll, setImagePoll] = useState<Poll | null>(null);
   const [shares, setShares] = useState<PollShare[]>([]);
   const [sharesLoading, setSharesLoading] = useState(false);
   const [expandedShare, setExpandedShare] = useState<number | null>(null);
@@ -153,7 +155,8 @@ export default function PollsPage() {
       { label: 'Edit', icon: faPen, onClick: () => navigate(`/admin/polls/${poll.id}/edit`), hidden: !canEdit },
       { label: 'View on site', icon: faArrowUpRightFromSquare, onClick: () => window.open(`/polls/${poll.slug}`, '_blank', 'noopener'), hidden: poll.status === 'draft' },
       { label: 'Share analytics', icon: faShareNodes, onClick: () => handleViewShares(poll) },
-      { label: 'Export votes (CSV)', icon: faDownload, onClick: () => { window.location.href = exportPollUrl(poll.id); }, hidden: poll._count.votes === 0 },
+      { label: 'Results image', icon: faImage, onClick: () => setImagePoll(poll), hidden: !pollHasEnded(poll) },
+      { label: 'Export votes (CSV)', icon: faDownload, onClick: () => { downloadPollCsv(poll.id, poll.slug).catch((e) => toast.error(errorMessage(e, 'Export failed'))); }, hidden: poll._count.votes === 0 },
       { label: 'Close voting', icon: faLock, onClick: () => setStatus(poll, 'closed'), hidden: !canEdit || poll.status !== 'open', divider: true },
       { label: 'Reopen voting', icon: faLockOpen, onClick: () => setStatus(poll, 'open'), hidden: !canEdit || poll.status !== 'closed', divider: true },
       { label: 'Reset votes', icon: faRotateLeft, onClick: () => handleReset(poll), danger: true, hidden: !canReset || poll._count.votes === 0, divider: true },
@@ -283,6 +286,8 @@ export default function PollsPage() {
           onPageSize={(n) => setQ({ per: String(n) })}
         />
       )}
+
+      {imagePoll && <PollResultsImage poll={imagePoll} onClose={() => setImagePoll(null)} />}
 
       {sharesPoll && (
         <div className={styles.sharesOverlay} onMouseDown={(e) => { if (e.target === e.currentTarget) setSharesPoll(null); }}>
