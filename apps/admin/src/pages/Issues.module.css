@@ -175,12 +175,13 @@
 .commentHead a { color: var(--t3); }
 
 .composer { margin-top: 1.25rem; display: flex; flex-direction: column; gap: 0.5rem; }
-.composer textarea, .field input, .field textarea {
+/* Text boxes only; checkboxes keep their own size. */
+.composer textarea, .field input:not([type="checkbox"]), .field textarea {
   width: 100%; box-sizing: border-box; padding: 0.6rem 0.75rem;
   border: 1px solid var(--input-border); border-radius: var(--r-sm); background: var(--input-bg); color: var(--t1);
   font: inherit; font-size: 0.9375rem; resize: vertical;
 }
-.composer textarea:focus, .field input:focus, .field textarea:focus { outline: none; border-color: var(--accent); box-shadow: var(--input-ring); }
+.composer textarea:focus, .field input:not([type="checkbox"]):focus, .field textarea:focus { outline: none; border-color: var(--accent); box-shadow: var(--input-ring); }
 .composerActions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
@@ -196,7 +197,16 @@
 .modalFoot { display: flex; justify-content: flex-end; gap: 0.5rem; padding: 0.9rem 1.25rem; border-top: 1px solid var(--border); }
 .field { display: flex; flex-direction: column; gap: 0.35rem; margin: 0; padding: 0; border: none; }
 .field > span, .field > legend { color: var(--t2); font-size: 0.8125rem; font-weight: 600; padding: 0; margin-bottom: 0.35rem; }
-.labelGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.2rem; }
+.labelGrid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.labelToggle {
+  display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.55rem 0.25rem 0.45rem;
+  border: 1px solid var(--border); border-radius: 999px; cursor: pointer; font-size: 0.8125rem;
+  transition: border-color 0.15s, background 0.15s;
+}
+.labelToggle:hover { background: var(--ghost); }
+.labelToggle:has(input:checked) { border-color: var(--accent); background: var(--ghost); }
+.labelToggle:has(input:focus-visible) { box-shadow: var(--input-ring); }
+.labelToggle input { margin: 0; accent-color: var(--accent); cursor: pointer; }
 
 @media (max-width: 720px) {
   .controls { grid-template-columns: 1fr; }

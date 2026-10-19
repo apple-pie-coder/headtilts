@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import * as mediaService from '../services/media.service';
-import { prisma } from '../config/database';
 import { MAX_FILES } from '../middleware/upload';
 import { sendSuccess, sendPaginatedSuccess, sendError } from '../utils/response';
 import { ApiError, ValidationError, parseIntParam } from '../utils/errors';
@@ -181,23 +180,17 @@ export async function deleteFolder(req: Request, res: Response): Promise<void> {
 
 export async function usage(req: Request, res: Response): Promise<void> {
   try {
-    const id = parseIntParam(req.params.id);
-    const media = await prisma.media.findUnique({ where: { id }, select: { url: true, originalName: true } });
-    if (!media) { sendError(res, 'NOT_FOUND', 'Media not found', 404); return; }
+    const uses = await mediaService.findMediaUsage(parseIntParam(req.params.id));
+    sendSuccess(res, { count: uses.length, uses });
+  } catch (error) {
+    handleError(res, error);
+  }
+}
 
-    const posts = await prisma.post.findMany({
-      where: {
-        status: { not: 'trash' },
-        OR: [
-          { content: { contains: media.url } },
-          { featuredImage: { contains: media.url } },
-          { ogImage: { contains: media.url } },
-        ],
-      },
-      select: { id: true, title: true, slug: true, status: true, type: true },
-    });
-
-    sendSuccess(res, { count: posts.length, posts });
+export async function usageCount(req: Request, res: Response): Promise<void> {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Number.isInteger).slice(0, 500) : [];
+    sendSuccess(res, { inUse: await mediaService.countMediaInUse(ids) });
   } catch (error) {
     handleError(res, error);
   }

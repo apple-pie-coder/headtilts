@@ -146,7 +146,37 @@ export async function fetchMediaCounts(): Promise<{ all: number; unfiled: number
   return (await apiClient.get('/media/counts')).data.data;
 }
 
-export async function fetchMediaUsage(id: number): Promise<{ count: number; posts: { id: number; title: string; slug: string; status: string; type: string }[] }> {
+export interface MediaUse {
+  kind: 'post' | 'page' | 'celebration' | 'poll' | 'event' | 'series' | 'user' | 'setting' | 'widget';
+  title: string;
+  href: string | null;
+}
+
+/** Everywhere a file is referenced: posts, pages, celebrations, polls, events, series, avatars, settings, widgets. */
+export async function fetchMediaUsage(id: number): Promise<{ count: number; uses: MediaUse[] }> {
   const response = await apiClient.get(`/media/${id}/usage`);
   return response.data.data;
+}
+
+/** How many of these files are used anywhere. */
+export async function fetchMediaInUseCount(ids: number[]): Promise<number> {
+  return (await apiClient.post('/media/usage-count', { ids })).data.data.inUse;
+}
+
+const USE_NOUNS: Record<MediaUse['kind'], [string, string]> = {
+  post: ['post', 'posts'], page: ['page', 'pages'], celebration: ['celebration', 'celebrations'], poll: ['poll', 'polls'],
+  event: ['event', 'events'], series: ['series', 'series'], user: ['avatar', 'avatars'], setting: ['site setting', 'site settings'], widget: ['widget', 'widgets'],
+};
+
+/** "2 posts and 1 celebration" */
+export function describeMediaUses(uses: MediaUse[]): string {
+  const counts = new Map<MediaUse['kind'], number>();
+  uses.forEach((u) => counts.set(u.kind, (counts.get(u.kind) ?? 0) + 1));
+  const parts = [...counts].map(([kind, n]) => `${n} ${USE_NOUNS[kind][n === 1 ? 0 : 1]}`);
+  return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0] ?? '';
+}
+
+export function mediaUseKindLabel(kind: MediaUse['kind']): string {
+  const noun = USE_NOUNS[kind][0];
+  return noun[0].toUpperCase() + noun.slice(1);
 }

@@ -499,7 +499,7 @@ function NewIssueModal({ labels, onClose, onCreated }: { labels: IssueLabel[]; o
               <legend>Labels</legend>
               <div className={styles.labelGrid}>
                 {labels.map((l) => (
-                  <label key={l.name} className={styles.labelOption}>
+                  <label key={l.name} className={styles.labelToggle}>
                     <input type="checkbox" checked={picked.includes(l.name)} onChange={() => setPicked((p) => (p.includes(l.name) ? p.filter((x) => x !== l.name) : [...p, l.name]))} />
                     <LabelChip label={l} />
                   </label>

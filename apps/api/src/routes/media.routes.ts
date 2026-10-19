@@ -18,6 +18,7 @@ router.get('/counts', requirePermission(PERMISSIONS.MEDIA_READ), asyncHandler(me
 
 // Bulk delete
 router.post('/bulk-delete', requirePermission(PERMISSIONS.MEDIA_DELETE), asyncHandler(mediaController.bulkRemove));
+router.post('/usage-count', requirePermission(PERMISSIONS.MEDIA_READ), asyncHandler(mediaController.usageCount));
 
 // Upload constraints for client-side pre-checks
 router.get('/upload-config', requirePermission(PERMISSIONS.MEDIA_READ), asyncHandler(mediaController.uploadConfig));

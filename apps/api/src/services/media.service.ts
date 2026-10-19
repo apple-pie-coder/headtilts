@@ -463,6 +463,72 @@ export async function replaceMedia(id: number, file: Express.Multer.File) {
   });
 }
 
+// ── Usage ──
+
+export interface MediaUse {
+  kind: 'post' | 'page' | 'celebration' | 'poll' | 'event' | 'series' | 'user' | 'setting' | 'widget';
+  title: string;
+  /** Admin page where the reference can be changed. */
+  href: string | null;
+}
+
+const SETTING_LABELS: Record<string, string> = {
+  site_logo: 'Site logo', site_logo_dark: 'Site logo (dark)', site_favicon: 'Site favicon', admin_favicon: 'Admin favicon',
+};
+
+/** Every stored form of a file (delivery, original and resized copies) shares its path stem. */
+function referenceNeedles(media: { url: string; originalUrl: string | null }): string[] {
+  const stem = (media.originalUrl ?? media.url).replace(/(-(?:display|thumb|medium))?\.[a-z0-9]+$/i, '');
+  return ['.', '-display.', '-thumb.', '-medium.'].map((suffix) => stem + suffix);
+}
+
+function mentions<F extends string>(needles: string[], ...fields: F[]): Record<F, { contains: string }>[] {
+  return fields.flatMap((field) => needles.map((needle) => ({ [field]: { contains: needle } }) as Record<F, { contains: string }>));
+}
+
+/** Where a file is used: posts and pages (body, images, review cover), celebrations, polls, events, series, avatars, settings and widgets. */
+export async function findMediaUsage(id: number): Promise<MediaUse[]> {
+  const media = await prisma.media.findUnique({ where: { id }, select: { url: true, originalUrl: true } });
+  if (!media) throw new NotFoundError('Media not found');
+  const n = referenceNeedles(media);
+
+  const [posts, celebrations, polls, events, series, users, settings, widgetSettings] = await Promise.all([
+    prisma.post.findMany({
+      where: { status: { not: 'trash' }, OR: [...mentions(n, 'content', 'featuredImage', 'ogImage'), { review: { is: { OR: mentions(n, 'coverImage') } } }] },
+      select: { id: true, title: true, type: true },
+    }),
+    prisma.celebration.findMany({ where: { OR: mentions(n, 'photo') }, select: { id: true, name: true } }),
+    prisma.poll.findMany({ where: { OR: mentions(n, 'featuredImage') }, select: { id: true, title: true } }),
+    prisma.event.findMany({
+      where: { OR: [...mentions(n, 'featuredImage', 'bannerImage', 'ogImage'), { speakers: { some: { OR: mentions(n, 'photo') } } }] },
+      select: { id: true, title: true },
+    }),
+    prisma.series.findMany({ where: { OR: mentions(n, 'coverImage') }, select: { id: true, name: true } }),
+    prisma.user.findMany({ where: { OR: mentions(n, 'avatar') }, select: { id: true, username: true } }),
+    prisma.setting.findMany({ where: { OR: mentions(n, 'value') }, select: { key: true } }),
+    prisma.widgetSetting.findMany({ where: { OR: mentions(n, 'value') }, select: { widget: { select: { id: true, name: true } } } }),
+  ]);
+
+  const widgets = new Map(widgetSettings.map((w) => [w.widget.id, w.widget.name]));
+  return [
+    ...posts.map((p): MediaUse => ({ kind: p.type === 'page' ? 'page' : 'post', title: p.title, href: `/admin/${p.type === 'page' ? 'pages' : 'posts'}/${p.id}/edit` })),
+    ...celebrations.map((c): MediaUse => ({ kind: 'celebration', title: c.name, href: '/admin/celebrations' })),
+    ...polls.map((p): MediaUse => ({ kind: 'poll', title: p.title, href: `/admin/polls/${p.id}/edit` })),
+    ...events.map((e): MediaUse => ({ kind: 'event', title: e.title, href: `/admin/events/${e.id}/edit` })),
+    ...series.map((s): MediaUse => ({ kind: 'series', title: s.name, href: null })),
+    ...users.map((u): MediaUse => ({ kind: 'user', title: `${u.username}'s avatar`, href: '/admin/users' })),
+    ...settings.map((s): MediaUse => ({ kind: 'setting', title: SETTING_LABELS[s.key] ?? s.key.replace(/_/g, ' '), href: '/admin/settings' })),
+    ...[...widgets.values()].map((name): MediaUse => ({ kind: 'widget', title: name, href: '/admin/widgets' })),
+  ];
+}
+
+/** How many of these files are used anywhere, for the bulk-delete warning. */
+export async function countMediaInUse(ids: number[]): Promise<number> {
+  const existing = await prisma.media.findMany({ where: { id: { in: ids } }, select: { id: true } });
+  const uses = await Promise.all(existing.map((m) => findMediaUsage(m.id)));
+  return uses.filter((u) => u.length > 0).length;
+}
+
 export async function deleteMedia(id: number) {
   const existing = await prisma.media.findUnique({ where: { id } });
   if (!existing) throw new NotFoundError('Media not found');

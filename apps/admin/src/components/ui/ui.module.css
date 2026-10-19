@@ -458,6 +458,8 @@
 /* ── Badges ── */
 .badge {
   display: inline-flex;
+  /* Never stretch to the cell when stacked in a flex column (e.g. table status cells). */
+  width: fit-content;
   align-items: center;
   gap: 0.35rem;
   padding: 0.15rem 0.55rem;

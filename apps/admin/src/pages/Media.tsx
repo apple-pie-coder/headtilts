@@ -1,4 +1,5 @@
 import { ChangeEvent, DragEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AxiosError } from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -18,7 +19,7 @@ import { useUrlState } from '../hooks/useUrlState';
 import { Media, MediaFolder } from '../types';
 import {
   bulkDeleteMedia, createFolder, deleteFolder, deleteMedia, fetchFolders, fetchMedia, fetchMediaCounts, MediaSort,
-  fetchUploadConfig, fetchMediaUsage, renameFolder, replaceMedia, resolveMediaUrl, updateMedia, uploadMediaBatch, UploadConfig,
+  fetchUploadConfig, fetchMediaUsage, fetchMediaInUseCount, describeMediaUses, mediaUseKindLabel, MediaUse, renameFolder, replaceMedia, resolveMediaUrl, updateMedia, uploadMediaBatch, UploadConfig,
 } from '../services/media';
 import styles from './Media.module.css';
 
@@ -97,7 +98,7 @@ export default function MediaPage() {
   const [meta, setMeta] = useState(EMPTY_META);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [usageCount, setUsageCount] = useState<number | null>(null);
+  const [uses, setUses] = useState<MediaUse[] | null>(null);
 
   // Upload
   const [uploading, setUploading] = useState(false);
@@ -136,9 +137,9 @@ export default function MediaPage() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    setUsageCount(null);
+    setUses(null);
     if (selected) {
-      fetchMediaUsage(selected.id).then((d) => setUsageCount(d.count)).catch(() => {});
+      fetchMediaUsage(selected.id).then((d) => setUses(d.uses)).catch(() => {});
     }
   }, [selected?.id]);
 
@@ -280,9 +281,15 @@ export default function MediaPage() {
 
   async function handleBulkDelete() {
     if (selectedIds.size === 0) return;
+    const inUse = await fetchMediaInUseCount(Array.from(selectedIds)).catch(() => null);
+    const usageWarning = inUse === null
+      ? 'Anything using these files will show a broken image.'
+      : inUse > 0
+        ? `${inUse} of ${selectedIds.size} ${selectedIds.size === 1 ? 'is' : 'are'} in use (in posts, celebrations, events or settings) and will show as broken images.`
+        : 'None of them is in use.';
     if (!(await confirm({
       title: `Delete ${selectedIds.size} file${selectedIds.size === 1 ? '' : 's'}?`,
-      message: 'Any posts using these files will show broken images. This cannot be undone.',
+      message: `${usageWarning} This cannot be undone.`,
       confirmLabel: 'Delete permanently',
       danger: true,
     }))) return;
@@ -395,9 +402,9 @@ export default function MediaPage() {
 
   async function handleDelete() {
     if (!selected) return;
-    const usageWarning = usageCount && usageCount > 0
-      ? ` It is used in ${usageCount} post${usageCount === 1 ? '' : 's'} — those images will break.`
-      : '';
+    // Re-check now rather than trusting the panel, which may still be loading.
+    const current = await fetchMediaUsage(selected.id).then((d) => d.uses).catch(() => uses ?? []);
+    const usageWarning = current.length ? ` It is used in ${describeMediaUses(current)}, which will show a broken image.` : '';
     if (!(await confirm({
       title: 'Delete file?',
       message: `Permanently delete “${selected.originalName}”?${usageWarning} This cannot be undone.`,
@@ -707,13 +714,22 @@ export default function MediaPage() {
               <li><span>Uploaded</span><span>{formatDate(selected.createdAt)}</span></li>
             </ul>
 
-            {usageCount !== null && (
-              <div className={usageCount > 0 ? styles.usageWarn : styles.usageOk}>
-                {usageCount > 0
-                  ? `Used in ${usageCount} post${usageCount !== 1 ? 's' : ''} — deleting it will break those images`
-                  : 'Not used in any posts'}
+            {uses !== null && (uses.length > 0 ? (
+              <div className={styles.usageWarn}>
+                Used in {describeMediaUses(uses)}. Deleting it will break {uses.length === 1 ? 'that image' : 'those images'}.
+                <ul className={styles.usageList}>
+                  {uses.slice(0, 8).map((u, i) => (
+                    <li key={i}>
+                      <span className={styles.usageKind}>{mediaUseKindLabel(u.kind)}</span>
+                      {u.href ? <Link to={u.href}>{u.title}</Link> : <span>{u.title}</span>}
+                    </li>
+                  ))}
+                  {uses.length > 8 && <li>and {uses.length - 8} more</li>}
+                </ul>
               </div>
-            )}
+            ) : (
+              <div className={styles.usageOk}>Not used anywhere</div>
+            ))}
 
             <form onSubmit={(e) => { e.preventDefault(); handleSaveMeta(); }}>
               <div className={styles.formGroup}>
