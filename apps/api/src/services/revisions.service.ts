@@ -100,6 +100,7 @@ interface OldSnapshot {
   commentStatus: string | null;
   parentId: number | null;
   scheduledFor: Date | null;
+  publishedAt: Date | null;
   metaTitle: string | null;
   metaDescription: string | null;
   metaKeywords: string | null;
@@ -124,6 +125,7 @@ interface PostInput {
   commentStatus?: string | null;
   parentId?: number | null;
   scheduledFor?: string | null;
+  publishedAt?: string | null;
   metaTitle?: string;
   metaDescription?: string;
   metaKeywords?: string;
@@ -165,6 +167,9 @@ export function computeDiff(old: OldSnapshot, updated: OldSnapshot, input: PostI
     if (oldDate !== newDate)
       c.push({ field: 'scheduledFor', label: 'Scheduled for', from: fmtDate(old.scheduledFor), to: fmtDate(updated.scheduledFor) });
   }
+
+  if (input.publishedAt && old.publishedAt && updated.publishedAt && old.publishedAt.getTime() !== updated.publishedAt.getTime())
+    c.push({ field: 'publishedAt', label: 'Published on', from: fmtDate(old.publishedAt), to: fmtDate(updated.publishedAt) });
 
   if (input.content !== undefined && old.content !== updated.content) {
     const delta = updated.content.length - old.content.length;

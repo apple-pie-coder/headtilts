@@ -178,7 +178,7 @@ interface PostInput extends PostExtrasInput {
   parentId?: number | null;
   status?: string;
   scheduledFor?: string | null;
-  /** Original publish date for published posts (e.g. when importing). Create only. */
+  /** Publish date for published posts: backdates imports, or moves an existing post. */
   publishedAt?: string | null;
   featuredImage?: string;
   template?: string | null;
@@ -225,18 +225,20 @@ function resolveStatusForCreate(input: PostInput): ResolvedStatus {
   if (status === 'published') {
     // Keeping an original date lets imported content sit in the right place in
     // the archive; future dates belong to scheduling instead.
-    if (input.publishedAt) {
-      const original = new Date(input.publishedAt);
-      if (Number.isNaN(original.getTime())) throw new ValidationError('publishedAt must be a valid date');
-      if (original.getTime() > Date.now() + 60_000) {
-        throw new ValidationError('A publish date in the future needs the scheduled status');
-      }
-      return { status, publishedAt: original, scheduledFor: null };
-    }
-    return { status, publishedAt: new Date(), scheduledFor: null };
+    return { status, publishedAt: parsePublishedAt(input.publishedAt) ?? new Date(), scheduledFor: null };
   }
 
   return { status, publishedAt: null, scheduledFor: null };
+}
+
+function parsePublishedAt(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new ValidationError('publishedAt must be a valid date');
+  if (date.getTime() > Date.now() + 60_000) {
+    throw new ValidationError('A publish date in the future needs the scheduled status');
+  }
+  return date;
 }
 
 function resolveStatusForUpdate(
@@ -260,7 +262,7 @@ function resolveStatusForUpdate(
   }
 
   if (status === 'published') {
-    return { status, publishedAt: existing.publishedAt ?? new Date(), scheduledFor: null };
+    return { status, publishedAt: parsePublishedAt(input.publishedAt) ?? existing.publishedAt ?? new Date(), scheduledFor: null };
   }
 
   return { status, publishedAt: existing.publishedAt, scheduledFor: null };
@@ -383,7 +385,7 @@ export async function updatePost(id: number, input: PostInput, actorId?: string)
   }
 
   let resolvedStatus: ResolvedStatus | undefined;
-  if (input.status !== undefined || input.scheduledFor !== undefined) {
+  if (input.status !== undefined || input.scheduledFor !== undefined || (input.publishedAt && existing.status === 'published')) {
     resolvedStatus = resolveStatusForUpdate(input, existing);
   }
   const extras = prepareExtras(input);
@@ -471,7 +473,25 @@ export async function updatePost(id: number, input: PostInput, actorId?: string)
     && (existing.status !== 'scheduled' || existing.scheduledFor?.getTime() !== post.scheduledFor.getTime())) {
     announceScheduled(post, actorId);
   }
+  if (post.type === 'post' && existing.status === 'published' && post.status === 'published'
+    && existing.publishedAt && post.publishedAt && existing.publishedAt.getTime() !== post.publishedAt.getTime()) {
+    await redirectMovedPost(existing, post);
+  }
   return withPublicUrl(post);
+}
+
+/** With a date-based permalink structure, a new publish date moves the post; keep the old URL working. */
+async function redirectMovedPost(before: { id: number; slug: string; publishedAt: Date | null }, after: { id: number; slug: string; publishedAt: Date | null }) {
+  const structure = await getPermalinkStructure();
+  const from = buildPostPath(structure, before);
+  const to = buildPostPath(structure, after);
+  if (from === to || from.includes('?')) return;
+  await prisma.$transaction([
+    // Moving the date back must not leave a redirect looping off the live URL.
+    prisma.redirect.deleteMany({ where: { fromPath: to } }),
+    prisma.redirect.updateMany({ where: { toPath: from }, data: { toPath: to } }),
+    prisma.redirect.upsert({ where: { fromPath: from }, create: { fromPath: from, toPath: to, type: 301 }, update: { toPath: to, type: 301 } }),
+  ]);
 }
 
 export async function deletePost(id: number) {
@@ -561,9 +581,14 @@ export async function bulkUpdatePosts(ids: number[], action: string) {
   const statusMap: Record<string, string> = { publish: 'published', draft: 'draft', trash: 'trash' };
   const status = statusMap[action];
   if (!status) throw new ValidationError(`Unknown action: ${action}`);
-  const { count } = await prisma.post.updateMany({
-    where: { id: { in: ids } },
-    data: { status, ...(action === 'publish' ? { publishedAt: new Date() } : {}) },
-  });
+  if (action === 'publish') {
+    // Already-published posts keep their date; only posts without one get today's.
+    const [dated, undated] = await prisma.$transaction([
+      prisma.post.updateMany({ where: { id: { in: ids }, publishedAt: { not: null } }, data: { status, scheduledFor: null } }),
+      prisma.post.updateMany({ where: { id: { in: ids }, publishedAt: null }, data: { status, publishedAt: new Date(), scheduledFor: null } }),
+    ]);
+    return dated.count + undated.count;
+  }
+  const { count } = await prisma.post.updateMany({ where: { id: { in: ids } }, data: { status } });
   return count;
 }

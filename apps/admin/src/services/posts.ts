@@ -11,7 +11,7 @@ export interface PostInput {
   parentId?: number | null;
   status?: string;
   scheduledFor?: string | null;
-  /** Original publish date — only honoured when creating a published post. */
+  /** Publish date for a published post; future dates are rejected (use scheduledFor). */
   publishedAt?: string | null;
   featuredImage?: string;
   featuredImageFocus?: string | null;

@@ -218,6 +218,14 @@ function toDatetimeLocal(value?: string | null): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+const BROWSER_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+/** A datetime-local value that is set and not in the future (a minute's grace for clock skew). */
+function isPastLocalDate(value: string): boolean {
+  const time = new Date(value).getTime();
+  return !Number.isNaN(time) && time <= Date.now() + 60_000;
+}
+
 interface CategoryNode {
   category: Category;
   depth: number;
@@ -307,6 +315,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   const [excerpt, setExcerpt] = useState('');
   const [status, setStatus] = useState('draft');
   const [scheduledFor, setScheduledFor] = useState('');
+  const [publishedAt, setPublishedAt] = useState('');
   const [featuredImage, setFeaturedImage] = useState('');
   const [featuredImageFocus, setFeaturedImageFocus] = useState<string | null>(null);
   const [template, setTemplate] = useState<string>('');
@@ -566,6 +575,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
     setExcerpt(loaded.excerpt || '');
     setStatus(loaded.status === 'trash' ? 'draft' : loaded.status);
     setScheduledFor(toDatetimeLocal(loaded.scheduledFor));
+    setPublishedAt(toDatetimeLocal(loaded.publishedAt));
     setFeaturedImage(loaded.featuredImage || '');
     setFeaturedImageFocus(loaded.featuredImageFocus ?? null);
     setTemplate(loaded.template || '');
@@ -740,6 +750,12 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
       status: targetStatus,
       scheduledFor:
         targetStatus === 'scheduled' && scheduledFor ? new Date(scheduledFor).toISOString() : null,
+      // Only an actual change is sent, so a save never rounds the stored date to the minute.
+      // Future dates are left out here (autosave) and rejected with a message on submit.
+      publishedAt:
+        targetStatus === 'published' && publishedAt && publishedAt !== toDatetimeLocal(post?.publishedAt) && isPastLocalDate(publishedAt)
+          ? new Date(publishedAt).toISOString()
+          : undefined,
       featuredImage: featuredImage || undefined,
       featuredImageFocus: featuredImage ? featuredImageFocus : null,
       template: isPage ? (template || null) : undefined,
@@ -822,6 +838,11 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
 
     if (targetStatus === 'scheduled' && !scheduledFor) {
       toast.error(`Please choose a date and time to schedule this ${isPage ? 'page' : 'post'}`);
+      return null;
+    }
+
+    if (targetStatus === 'published' && publishedAt && !isPastLocalDate(publishedAt)) {
+      toast.error('The publish date is in the future. Choose Scheduled to publish later.');
       return null;
     }
 
@@ -1303,6 +1324,24 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
                   onChange={(e) => setScheduledFor(e.target.value)}
                   disabled={saving}
                 />
+              </div>
+            )}
+
+            {status === 'published' && (
+              <div className={styles.formGroup}>
+                <label htmlFor="post-published-at">Published on</label>
+                <input
+                  id="post-published-at"
+                  type="datetime-local"
+                  value={publishedAt}
+                  max={toDatetimeLocal(new Date().toISOString())}
+                  onChange={(e) => setPublishedAt(e.target.value)}
+                  disabled={saving}
+                />
+                <p className={styles.hint}>
+                  {publishedAt ? 'Change to backdate this post.' : 'Leave empty to use the time you publish.'}
+                  {' '}For a future date, use Scheduled. Times are in {BROWSER_TIME_ZONE}.
+                </p>
               </div>
             )}
 
