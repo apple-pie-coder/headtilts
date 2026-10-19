@@ -64,14 +64,12 @@ function useFaviconFromSettings() {
         const data = json?.data ?? {};
         const raw = data.admin_favicon || data.site_favicon;
         if (!raw) return;
-        const href = resolveUrl(raw);
-        let el = document.head.querySelector<HTMLLinkElement>('link[rel="icon"]');
-        if (!el) {
-          el = document.createElement('link');
-          el.setAttribute('rel', 'icon');
-          document.head.appendChild(el);
-        }
-        el.setAttribute('href', href);
+        // A fresh tag with no type: a stale type="image/svg+xml" makes browsers ignore a PNG.
+        document.head.querySelectorAll('link[rel~="icon"]').forEach((el) => el.remove());
+        const el = document.createElement('link');
+        el.rel = 'icon';
+        el.href = resolveUrl(raw);
+        document.head.appendChild(el);
       })
       .catch(() => {});
   }, []);

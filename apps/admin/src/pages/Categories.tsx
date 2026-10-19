@@ -82,7 +82,7 @@ export default function CategoriesPage() {
     const children = all.filter((x) => x.parentId === c.id).length;
     const posts = c._count?.posts ?? 0;
     const notes = [
-      posts ? `${posts} post${posts === 1 ? '' : 's'} will lose this category.` : '',
+      posts ? `${posts} post${posts === 1 ? '' : 's'} will lose this category; any left with none move to ${all.find((x) => x.isDefault)?.name ?? 'Uncategorized'}.` : '',
       children ? `${children} subcategor${children === 1 ? 'y' : 'ies'} will become top-level.` : '',
     ].filter(Boolean).join(' ');
     if (!(await confirm({
@@ -115,7 +115,7 @@ export default function CategoriesPage() {
       { label: 'Edit', icon: faPen, onClick: () => edit(c), hidden: !canEdit },
       { label: 'View posts', icon: faList, onClick: () => navigate(`/admin/posts?category=${c.id}`) },
       { label: 'View on site', icon: faArrowUpRightFromSquare, onClick: () => window.open(`/categories/${c.slug}`, '_blank', 'noopener') },
-      { label: 'Delete', icon: faTrashCan, onClick: () => handleDelete(c), danger: true, hidden: !canDelete, divider: true },
+      { label: 'Delete', icon: faTrashCan, onClick: () => handleDelete(c), danger: true, hidden: !canDelete || c.isDefault, divider: true },
     ];
   }
 
@@ -171,6 +171,7 @@ export default function CategoriesPage() {
                                 : <span className={t.primary}>{c.name}</span>}
                               <span className={t.secondary}>
                                 <span className={t.mono}>/{c.slug}</span>
+                                {c.isDefault && <span className={t.chip} title="Posts without a category are filed here. It can't be deleted.">Default</span>}
                                 {q.search && c.parent?.name && <span className={t.chip}>in {c.parent.name}</span>}
                               </span>
                             </div>

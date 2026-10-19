@@ -5,6 +5,7 @@ import { slugify } from '@headtilts/shared';
 import { buildPostPath, getPermalinkStructure } from '../utils/permalinks';
 import * as notifications from './notifications.service';
 import { PostExtrasInput, assertPublishable, prepareExtras, saveExtras } from './postExtras';
+import { getDefaultCategoryId, withDefaultCategory } from './defaultCategory';
 
 const VALID_STATUSES = ['draft', 'published', 'scheduled', 'trash'];
 
@@ -328,9 +329,13 @@ export async function createPost(input: PostInput, authorId: string) {
 
     await saveExtras(tx, created.id, extras);
 
-    if (input.categoryIds?.length) {
+    // Posts always have a category; pages never do.
+    const categoryIds = created.type === 'post'
+      ? withDefaultCategory(input.categoryIds ?? [], await getDefaultCategoryId(tx))
+      : input.categoryIds ?? [];
+    if (categoryIds.length) {
       await tx.postCategory.createMany({
-        data: input.categoryIds.map((categoryId) => ({ postId: created.id, categoryId })),
+        data: categoryIds.map((categoryId) => ({ postId: created.id, categoryId })),
       });
     }
 
@@ -437,10 +442,13 @@ export async function updatePost(id: number, input: PostInput, actorId?: string)
     await saveExtras(tx, id, extras);
 
     if (input.categoryIds !== undefined) {
+      const categoryIds = existing.type === 'post'
+        ? withDefaultCategory(input.categoryIds, await getDefaultCategoryId(tx))
+        : input.categoryIds;
       await tx.postCategory.deleteMany({ where: { postId: id } });
-      if (input.categoryIds.length) {
+      if (categoryIds.length) {
         await tx.postCategory.createMany({
-          data: input.categoryIds.map((categoryId) => ({ postId: id, categoryId })),
+          data: categoryIds.map((categoryId) => ({ postId: id, categoryId })),
         });
       }
     }

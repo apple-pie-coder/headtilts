@@ -1537,6 +1537,9 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
 
               <div className={styles.categoryList}>
                 {categoryTree.length === 0 && !showAddCategory && <p className={styles.hint}>No categories yet.</p>}
+                {categoryIds.length === 0 && allCategories.some((c) => c.isDefault) && (
+                  <p className={styles.hint}>None chosen: this post will be filed under {allCategories.find((c) => c.isDefault)!.name}.</p>
+                )}
                 {categoryTree.map(({ category, depth }) => (
                   <label key={category.id} className={styles.categoryOption} style={{ paddingLeft: `${depth * 1.25}rem` }}>
                     <input

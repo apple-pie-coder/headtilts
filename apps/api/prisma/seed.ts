@@ -116,6 +116,17 @@ async function seed() {
     }
     console.log(`✓ Ensured ${settings.length} default settings`);
 
+    // Posts without a category are filed under this one; it can't be deleted.
+    const uncategorized =
+      (await prisma.category.findFirst({ where: { OR: [{ slug: 'uncategorized' }, { name: 'Uncategorized' }] } }))
+      ?? (await prisma.category.create({ data: { name: 'Uncategorized', slug: 'uncategorized' } }));
+    await prisma.setting.upsert({
+      where: { key: 'default_category' },
+      update: {},
+      create: { key: 'default_category', value: String(uncategorized.id), type: 'string' },
+    });
+    console.log('✓ Ensured the default "Uncategorized" category');
+
     // Create default widget zones
     const widgetZones = [
       { name: 'sidebar', description: 'Main sidebar', maxWidgets: 10 },

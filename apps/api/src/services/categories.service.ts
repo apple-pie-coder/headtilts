@@ -2,6 +2,7 @@ import { prisma } from '../config/database';
 import { ValidationError, NotFoundError, ConflictError } from '../utils/errors';
 import { slugify } from '@headtilts/shared';
 import { normalizeIconSvg } from '../utils/iconSvg';
+import { getDefaultCategoryId } from './defaultCategory';
 
 async function assertSlugAvailable(slug: string, excludeId?: number) {
   const existing = await prisma.category.findFirst({
@@ -63,7 +64,8 @@ export async function listCategories(page: number, limit: number, search?: strin
     prisma.category.count({ where }),
   ]);
 
-  return { items: categories, total };
+  const defaultId = await getDefaultCategoryId();
+  return { items: categories.map((c) => ({ ...c, isDefault: c.id === defaultId })), total };
 }
 
 export async function getCategoryById(id: number) {
@@ -76,7 +78,7 @@ export async function getCategoryById(id: number) {
     throw new NotFoundError('Category not found');
   }
 
-  return category;
+  return { ...category, isDefault: category.id === (await getDefaultCategoryId()) };
 }
 
 interface CreateCategoryInput {
@@ -196,5 +198,20 @@ export async function deleteCategory(id: number) {
     throw new NotFoundError('Category not found');
   }
 
-  await prisma.category.delete({ where: { id } });
+  const defaultId = await getDefaultCategoryId();
+  if (id === defaultId) {
+    throw new ValidationError(`“${existing.name}” is the default category and can't be deleted. Posts without a category are filed here.`);
+  }
+
+  // Posts left with no category fall back to the default.
+  await prisma.$transaction(async (tx) => {
+    const orphaned = await tx.post.findMany({
+      where: { type: 'post', categories: { some: { categoryId: id }, every: { categoryId: id } } },
+      select: { id: true },
+    });
+    if (orphaned.length) {
+      await tx.postCategory.createMany({ data: orphaned.map((p) => ({ postId: p.id, categoryId: defaultId })), skipDuplicates: true });
+    }
+    await tx.category.delete({ where: { id } });
+  });
 }

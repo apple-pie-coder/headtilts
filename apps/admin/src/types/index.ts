@@ -43,6 +43,8 @@ export interface Category {
   /** JSON { w, h, d } of the picked Font Awesome icon (see CategoryIcon). */
   iconSvg?: string | null;
   showSidebar?: boolean;
+  /** The fallback for posts with no category ("Uncategorized"); can't be deleted. */
+  isDefault?: boolean;
   _count?: { posts: number };
 }
 
