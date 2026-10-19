@@ -9,6 +9,14 @@ export const PERMISSIONS = {
   // Edit/trash/delete posts authored by someone else (authors only manage their own)
   POST_EDIT_OTHERS: 'posts_edit_others',
 
+  // Pages: the same set as posts, as in WordPress (only editors and up get them)
+  PAGE_CREATE: 'pages_create',
+  PAGE_READ: 'pages_read',
+  PAGE_EDIT: 'pages_update',
+  PAGE_DELETE: 'pages_delete',
+  PAGE_PUBLISH: 'pages_publish',
+  PAGE_EDIT_OTHERS: 'pages_edit_others',
+
   // Media
   MEDIA_UPLOAD: 'media_create',
   MEDIA_READ: 'media_read',
@@ -112,11 +120,18 @@ export const PERMISSIONS = {
   EVENT_MANAGE_REGISTRATIONS: 'events_manage_registrations',
 } as const;
 
+export type ContentAction = 'create' | 'read' | 'update' | 'delete' | 'publish' | 'edit_others';
+
+/** The posts_* or pages_* permission for an action on a content item of this type. */
+export function contentPermission(type: string | null | undefined, action: ContentAction): string {
+  return `${type === 'page' ? 'pages' : 'posts'}_${action}`;
+}
+
 // Default roles with their permissions, modelled on WordPress's roles:
 //   super-admin  everything, including backups (a restore overwrites the whole database)
 //   admin        runs the site: users, roles, settings, appearance, all content
-//   editor       all content, anyone's: publish, delete, categories and tags, comments
-//   author       their own posts: write, publish, delete, upload media
+//   editor       all content, anyone's: posts and pages, categories and tags, comments
+//   author       their own posts (not pages): write, publish, delete, upload media
 //   contributor  their own drafts only: an editor reviews and publishes; no uploads
 //   subscriber   their own profile and notification preferences
 // "Own" vs "anyone's" is POST_EDIT_OTHERS; publishing and live posts need POST_PUBLISH.
@@ -143,6 +158,12 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.POST_DELETE,
       PERMISSIONS.POST_PUBLISH,
       PERMISSIONS.POST_EDIT_OTHERS,
+      PERMISSIONS.PAGE_CREATE,
+      PERMISSIONS.PAGE_READ,
+      PERMISSIONS.PAGE_EDIT,
+      PERMISSIONS.PAGE_DELETE,
+      PERMISSIONS.PAGE_PUBLISH,
+      PERMISSIONS.PAGE_EDIT_OTHERS,
       PERMISSIONS.MEDIA_UPLOAD,
       PERMISSIONS.MEDIA_READ,
       PERMISSIONS.MEDIA_DELETE,

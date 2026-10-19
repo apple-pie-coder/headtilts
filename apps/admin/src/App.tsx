@@ -161,7 +161,7 @@ const router = createBrowserRouter(createRoutesFromElements(
     <Route
       path="/admin/pages"
       element={
-        <ProtectedRoute requiredPermission={PERMISSIONS.POST_READ}>
+        <ProtectedRoute requiredPermission={PERMISSIONS.PAGE_READ}>
           <PagesPage />
         </ProtectedRoute>
       }
@@ -169,7 +169,7 @@ const router = createBrowserRouter(createRoutesFromElements(
     <Route
       path="/admin/pages/new"
       element={
-        <ProtectedRoute requiredPermission={PERMISSIONS.POST_CREATE}>
+        <ProtectedRoute requiredPermission={PERMISSIONS.PAGE_CREATE}>
           <PostEditorPage contentType="page" />
         </ProtectedRoute>
       }
@@ -177,7 +177,7 @@ const router = createBrowserRouter(createRoutesFromElements(
     <Route
       path="/admin/pages/:id/edit"
       element={
-        <ProtectedRoute requiredPermission={PERMISSIONS.POST_EDIT}>
+        <ProtectedRoute requiredPermission={PERMISSIONS.PAGE_EDIT}>
           <PostEditorPage contentType="page" />
         </ProtectedRoute>
       }

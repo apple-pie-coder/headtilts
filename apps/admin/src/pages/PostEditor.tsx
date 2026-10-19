@@ -5,7 +5,7 @@ import ReactQuill, { Quill } from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import { marked } from 'marked';
 import TurndownService from 'turndown';
-import { slugify, PERMISSIONS, youtubeId } from '@headtilts/shared';
+import { slugify, PERMISSIONS, youtubeId, contentPermission } from '@headtilts/shared';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faArrowUpRightFromSquare, faPlus, faMinus, faBold, faCode, faTag, faHistory, faArchive } from '@fortawesome/free-solid-svg-icons';
 import { fetchRevisions, archiveRevision, restoreRevision } from '../services/revisions';
@@ -270,7 +270,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   const toast = useToast();
   const confirm = useConfirm();
   const isEditing = !!id;
-  const canPublish         = hasPermission(PERMISSIONS.POST_PUBLISH);
+  const canPublish         = hasPermission(contentPermission(contentType, 'publish'));
   const canAddCategory     = hasPermission(PERMISSIONS.CATEGORY_CREATE);
   const canViewRevisions   = hasPermission(PERMISSIONS.REVISION_READ);
   const canArchiveRevisions = hasPermission(PERMISSIONS.REVISION_ARCHIVE);

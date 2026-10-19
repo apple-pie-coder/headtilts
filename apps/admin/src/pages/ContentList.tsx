@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AxiosError } from 'axios';
-import { PERMISSIONS } from '@headtilts/shared';
+import { contentPermission } from '@headtilts/shared';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faPlus, faPen, faEye, faCopy, faTrash, faRotateLeft, faStar as faStarSolid, faLink,
@@ -92,10 +92,10 @@ export default function ContentList({ type }: { type: ContentType }) {
   const toast = useToast();
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
-  const canCreate = hasPermission(PERMISSIONS.POST_CREATE);
-  const canEdit = hasPermission(PERMISSIONS.POST_EDIT);
-  const canPublish = hasPermission(PERMISSIONS.POST_PUBLISH);
-  const canDelete = hasPermission(PERMISSIONS.POST_DELETE);
+  const canCreate = hasPermission(contentPermission(type, 'create'));
+  const canEdit = hasPermission(contentPermission(type, 'update'));
+  const canPublish = hasPermission(contentPermission(type, 'publish'));
+  const canDelete = hasPermission(contentPermission(type, 'delete'));
 
   const [q, setQ, resetQ] = useUrlState({
     status: '',

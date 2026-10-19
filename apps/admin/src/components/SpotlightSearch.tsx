@@ -10,7 +10,9 @@ import {
   faCakeCandles, faChartBar, faCalendarAlt, faMagnifyingGlass, faPlus, faUser,
   faXmark, faHeartPulse, faUpload, faFileImport,
 } from '@fortawesome/free-solid-svg-icons';
+import { PERMISSIONS } from '@headtilts/shared';
 import { useSpotlight } from '../context/SpotlightContext';
+import { useAuth } from '../hooks/useAuth';
 import { fetchPosts } from '../services/posts';
 import { Post } from '../types';
 import styles from './SpotlightSearch.module.css';
@@ -122,6 +124,9 @@ function defaultGroups(navigate: (to: string) => void, close: () => void): Resul
 export function SpotlightSearch() {
   const { isOpen, open, close } = useSpotlight();
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
+  const canReadPosts = hasPermission(PERMISSIONS.POST_READ);
+  const canReadPages = hasPermission(PERMISSIONS.PAGE_READ);
 
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
@@ -169,16 +174,14 @@ export function SpotlightSearch() {
     setSearching(true);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
+      // Only search what the role may read, and let one failing search not blank the other.
+      const search = (allowed: boolean, type: 'post' | 'page') => (allowed
+        ? fetchPosts(1, 5, { search: query, type }).then((r) => r.items).catch(() => [] as Post[])
+        : Promise.resolve([] as Post[]));
       try {
-        const [postsRes, pagesRes] = await Promise.all([
-          fetchPosts(1, 5, { search: query, type: 'post' }),
-          fetchPosts(1, 5, { search: query, type: 'page' }),
-        ]);
-        setPostResults(postsRes.items);
-        setPageResults(pagesRes.items);
-      } catch {
-        setPostResults([]);
-        setPageResults([]);
+        const [posts, pages] = await Promise.all([search(canReadPosts, 'post'), search(canReadPages, 'page')]);
+        setPostResults(posts);
+        setPageResults(pages);
       } finally {
         setSearching(false);
       }
@@ -186,7 +189,7 @@ export function SpotlightSearch() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, isOpen]);
+  }, [query, isOpen, canReadPosts, canReadPages]);
 
   // Build result groups
   const groups: ResultGroup[] = (() => {

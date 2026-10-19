@@ -31,7 +31,7 @@ export async function getDashboardStats(permissions: string[]) {
     upcomingCelebrations,
   ] = await Promise.all([
     when(posts, () => prisma.post.groupBy({ by: ['status'], where: { type: 'post' }, _count: { id: true } }), []),
-    when(posts, () => prisma.post.count({ where: { type: 'page', status: { not: 'trash' } } }), 0),
+    when(can(PERMISSIONS.PAGE_READ), () => prisma.post.count({ where: { type: 'page', status: { not: 'trash' } } }), 0),
     when(media, () => prisma.media.aggregate({ _count: { id: true }, _sum: { size: true } }), { _count: { id: 0 }, _sum: { size: 0 } }),
     when(can(PERMISSIONS.CATEGORY_READ), () => prisma.category.count(), 0),
     when(can(PERMISSIONS.TAG_READ), () => prisma.tag.count(), 0),

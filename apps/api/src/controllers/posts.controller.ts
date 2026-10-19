@@ -5,9 +5,9 @@ import * as revisionsService from '../services/revisions.service';
 import * as postLocks from '../services/postLocks.service';
 import { sendSuccess, sendError } from '../utils/response';
 import { ApiError, ForbiddenError, parseIntParam } from '../utils/errors';
-import { PERMISSIONS } from '@headtilts/shared';
+import { contentPermission } from '@headtilts/shared';
 import { prisma } from '../config/database';
-import { loadPermissions } from '../middleware/auth';
+import { apiKeyAllowsContent, loadPermissions } from '../middleware/auth';
 
 function handleError(res: Response, error: unknown): void {
   if (error instanceof ApiError) {
@@ -19,42 +19,46 @@ function handleError(res: Response, error: unknown): void {
   }
 }
 
+const noun = (type: string) => (type === 'page' ? 'pages' : 'posts');
+
 // Checked against the DB, not the token's (possibly stale) permission claims.
-async function assertCanSetStatus(req: Request, status: string | undefined): Promise<void> {
+async function assertCanSetStatus(req: Request, status: string | undefined, type: string): Promise<void> {
   if (
     (status === 'published' || status === 'scheduled') &&
-    !(await loadPermissions(req)).includes(PERMISSIONS.POST_PUBLISH)
+    !(await loadPermissions(req)).includes(contentPermission(type, 'publish'))
   ) {
-    throw new ForbiddenError('You do not have permission to publish or schedule posts');
+    throw new ForbiddenError(`You do not have permission to publish or schedule ${noun(type)}`);
   }
 }
 
 const LIVE_STATUSES = ['published', 'scheduled'];
 
 /**
- * Ownership + workflow rules for changing existing posts:
- * - without POST_EDIT_OTHERS you may only touch posts you (co-)author;
- * - without POST_PUBLISH you may not change posts that are live or scheduled
- *   (that would publish edits — or unpublish/trash a live post — without review).
+ * Ownership + workflow rules for changing existing posts and pages (each by its
+ * own type's permissions, e.g. posts_edit_others vs pages_edit_others):
+ * - without *_update you may not change that type at all (bulk actions can mix types);
+ * - without *_edit_others you may only touch items you (co-)author;
+ * - without *_publish you may not change items that are live or scheduled
+ *   (that would publish edits — or unpublish/trash a live item — without review).
  */
 export async function assertCanModifyPosts(req: Request, ids: number[]): Promise<void> {
   const perms = await loadPermissions(req);
-  const canEditOthers = perms.includes(PERMISSIONS.POST_EDIT_OTHERS);
-  const canPublish = perms.includes(PERMISSIONS.POST_PUBLISH);
-  if (canEditOthers && canPublish) return;
-
   const userId = req.user!.sub;
   const posts = await prisma.post.findMany({
     where: { id: { in: ids } },
-    select: { id: true, authorId: true, status: true, coAuthors: { select: { userId: true } } },
+    select: { id: true, type: true, authorId: true, status: true, coAuthors: { select: { userId: true } } },
   });
   for (const post of posts) {
-    const isOwn = post.authorId === userId || post.coAuthors.some((c) => c.userId === userId);
-    if (!canEditOthers && !isOwn) {
-      throw new ForbiddenError('You can only modify your own posts');
+    const can = (action: 'update' | 'edit_others' | 'publish') => perms.includes(contentPermission(post.type, action));
+    if (!can('update')) {
+      throw new ForbiddenError(`You do not have permission to edit ${noun(post.type)}`);
     }
-    if (!canPublish && LIVE_STATUSES.includes(post.status)) {
-      throw new ForbiddenError('You do not have permission to modify published or scheduled posts');
+    const isOwn = post.authorId === userId || post.coAuthors.some((c) => c.userId === userId);
+    if (!can('edit_others') && !isOwn) {
+      throw new ForbiddenError(`You can only modify your own ${noun(post.type)}`);
+    }
+    if (!can('publish') && LIVE_STATUSES.includes(post.status)) {
+      throw new ForbiddenError(`You do not have permission to modify published or scheduled ${noun(post.type)}`);
     }
   }
 }
@@ -195,7 +199,7 @@ export async function getOne(req: Request, res: Response): Promise<void> {
 export async function create(req: Request, res: Response): Promise<void> {
   try {
     const input = postInputFromBody(req);
-    await assertCanSetStatus(req, input.status);
+    await assertCanSetStatus(req, input.status, input.type === 'page' ? 'page' : 'post');
     const post = await postsService.createPost(input, req.user!.sub);
     revisionsService.recordRevision({
       postId: post.id,
@@ -227,11 +231,11 @@ export async function update(req: Request, res: Response): Promise<void> {
       if (other) throw new ApiError('LOCKED', `${other.user.name} is editing this post now`, 423, { lock: other });
     }
     const input = postInputFromBody(req);
-    await assertCanSetStatus(req, input.status);
     const old = await postsService.getPostById(id);
+    await assertCanSetStatus(req, input.status, old.type);
     await assertCanModifyPosts(req, [id]);
-    // Only users who manage everyone's posts may reassign authorship.
-    if (!(await loadPermissions(req)).includes(PERMISSIONS.POST_EDIT_OTHERS)) {
+    // Only users who manage everyone's posts (or pages) may reassign authorship.
+    if (!(await loadPermissions(req)).includes(contentPermission(old.type, 'edit_others'))) {
       input.authorId = undefined;
     }
     const post = await postsService.updatePost(id, input, req.user!.sub);
@@ -302,9 +306,17 @@ export async function bulk(req: Request, res: Response): Promise<void> {
       sendError(res, 'VALIDATION_ERROR', 'ids must be valid post ids', 422);
       return;
     }
-    if (action === 'publish') await assertCanSetStatus(req, 'published');
-    if (action === 'delete' && !(await loadPermissions(req)).includes(PERMISSIONS.POST_DELETE)) {
-      throw new ForbiddenError('You do not have permission to delete posts');
+    // A selection can mix posts and pages: each type needs its own permission.
+    const types = [...new Set((await prisma.post.findMany({ where: { id: { in: postIds } }, select: { type: true } })).map((p) => p.type))];
+    const perms = await loadPermissions(req);
+    for (const type of types) {
+      if (!apiKeyAllowsContent(req, type, action === 'delete' ? 'delete' : 'write')) {
+        throw new ForbiddenError(`API key missing required scope: ${noun(type)}:${action === 'delete' ? 'delete' : 'write'}`);
+      }
+      if (action === 'publish') await assertCanSetStatus(req, 'published', type);
+      if (action === 'delete' && !perms.includes(contentPermission(type, 'delete'))) {
+        throw new ForbiddenError(`You do not have permission to delete ${noun(type)}`);
+      }
     }
     await assertCanModifyPosts(req, postIds);
     const count = await postsService.bulkUpdatePosts(postIds, action);

@@ -35,7 +35,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Content',
     items: [
       { label: 'Posts', to: '/admin/posts', icon: faPenToSquare, permission: PERMISSIONS.POST_READ, hotkey: 'p' },
-      { label: 'Pages', to: '/admin/pages', icon: faFileLines, permission: PERMISSIONS.POST_READ, hotkey: 'a' },
+      { label: 'Pages', to: '/admin/pages', icon: faFileLines, permission: PERMISSIONS.PAGE_READ, hotkey: 'a' },
       { label: 'Media', to: '/admin/media', icon: faImages, permission: PERMISSIONS.MEDIA_READ, hotkey: 'm' },
       { label: 'Categories', to: '/admin/categories', icon: faLayerGroup, permission: PERMISSIONS.CATEGORY_READ },
       { label: 'Tags', to: '/admin/tags', icon: faTags, permission: PERMISSIONS.TAG_READ },
@@ -105,7 +105,7 @@ export interface CreateAction {
 
 export const CREATE_ACTIONS: CreateAction[] = [
   { label: 'Post', to: '/admin/posts/new', icon: faPenToSquare, permission: PERMISSIONS.POST_CREATE },
-  { label: 'Page', to: '/admin/pages/new', icon: faFileLines, permission: PERMISSIONS.POST_CREATE },
+  { label: 'Page', to: '/admin/pages/new', icon: faFileLines, permission: PERMISSIONS.PAGE_CREATE },
   { label: 'Import posts from Word', to: '/admin/posts/import', icon: faFileImport, permission: PERMISSIONS.POST_CREATE },
   { label: 'Media upload', to: '/admin/media', icon: faUpload, permission: PERMISSIONS.MEDIA_UPLOAD },
   { label: 'Poll', to: '/admin/polls/new', icon: faChartBar, permission: PERMISSIONS.POLL_CREATE },
