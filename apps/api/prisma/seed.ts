@@ -7,18 +7,18 @@ async function seed() {
   try {
     console.log('🌱 Seeding database...');
 
-    // Create permissions
+    // Create permissions. A name splits into module + action at its first "_", but
+    // migrations may already hold one split differently (api_analytics + view), so
+    // match on the joined name first rather than creating a duplicate.
     const permissionMap: Record<string, { id: number }> = {};
+    const existing = new Map((await prisma.permission.findMany()).map((p) => [`${p.module}_${p.action}`, p]));
     for (const [, permName] of Object.entries(PERMISSIONS)) {
+      const found = existing.get(permName);
+      if (found) { permissionMap[permName] = found; continue; }
       const idx = permName.indexOf('_');
-      const module = permName.slice(0, idx);
-      const action = permName.slice(idx + 1);
-      const permission = await prisma.permission.upsert({
-        where: { module_action: { module, action } },
-        update: {},
-        create: { module, action },
+      permissionMap[permName] = await prisma.permission.create({
+        data: { module: permName.slice(0, idx), action: permName.slice(idx + 1) },
       });
-      permissionMap[permName] = permission;
     }
     console.log(`✓ Created ${Object.keys(permissionMap).length} permissions`);
 

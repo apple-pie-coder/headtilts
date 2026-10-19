@@ -1,11 +1,10 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AxiosError } from 'axios';
 import { PERMISSIONS } from '@headtilts/shared';
 import { AdminLayout } from '../components/AdminLayout';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/ToastContext';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faXmark, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import { useDensity } from '../hooks/useDensity';
 import { useAuth } from '../hooks/useAuth';
 import { Role } from '../types';
@@ -19,6 +18,7 @@ import {
   PermissionEntry,
 } from '../services/roles';
 import { Button, DensityToggle, PageHeader } from '../components/ui';
+import { RoleEditor, RolePayload } from './roles/RoleEditor';
 import styles from './Roles.module.css';
 
 function errMsg(err: unknown, fallback: string) {
@@ -42,11 +42,6 @@ export default function RolesPage() {
   const [density, setDensity] = useDensity('rolesDensity');
 
   const [modal, setModal] = useState<ModalState | null>(null);
-  const [formName, setFormName] = useState('');
-  const [formDesc, setFormDesc] = useState('');
-  const [formMfaRequired, setFormMfaRequired] = useState(false);
-  const [formPermIds, setFormPermIds] = useState<Set<number>>(new Set());
-  const [formSaving, setFormSaving] = useState(false);
 
   useEffect(() => {
     loadAll();
@@ -67,64 +62,21 @@ export default function RolesPage() {
 
   async function openEdit(role: Role) {
     try {
-      const full = await fetchRole(role.id);
-      setFormName(full.name);
-      setFormDesc(full.description || '');
-      setFormMfaRequired(full.mfaRequired ?? false);
-      setFormPermIds(new Set(full.permissions?.map((p) => p.id) ?? []));
-      setModal({ mode: 'edit', role: full });
+      setModal({ mode: 'edit', role: await fetchRole(role.id) });
     } catch (err) {
       toast.error(errMsg(err, 'Failed to load role'));
     }
   }
 
-  function openCreate() {
-    setFormName('');
-    setFormDesc('');
-    setFormMfaRequired(false);
-    setFormPermIds(new Set());
-    setModal({ mode: 'create' });
-  }
-
-  function closeModal() {
-    setModal(null);
-  }
-
-  function togglePerm(id: number) {
-    setFormPermIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleModule(ids: number[]) {
-    const allSelected = ids.every((id) => formPermIds.has(id));
-    setFormPermIds((prev) => {
-      const next = new Set(prev);
-      if (allSelected) ids.forEach((id) => next.delete(id));
-      else ids.forEach((id) => next.add(id));
-      return next;
-    });
-  }
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setFormSaving(true);
+  async function handleSave(payload: RolePayload) {
     try {
-      const payload = { name: formName.trim(), description: formDesc.trim(), permissionIds: [...formPermIds], mfaRequired: formMfaRequired };
-      if (modal?.mode === 'edit' && modal.role) {
-        await updateRole(modal.role.id, payload);
-      } else {
-        await createRole(payload);
-      }
-      closeModal();
+      if (modal?.mode === 'edit' && modal.role) await updateRole(modal.role.id, payload);
+      else await createRole(payload);
+      toast.success(modal?.mode === 'edit' ? `Saved “${payload.name}”` : `Created “${payload.name}”`);
+      setModal(null);
       await loadAll();
     } catch (err) {
       toast.error(errMsg(err, 'Failed to save role'));
-    } finally {
-      setFormSaving(false);
     }
   }
 
@@ -151,7 +103,7 @@ export default function RolesPage() {
         actions={
           <>
             <DensityToggle value={density} onChange={setDensity} />
-            {canCreate && <Button variant="primary" icon={faPlus} onClick={openCreate}>New role</Button>}
+            {canCreate && <Button variant="primary" icon={faPlus} onClick={() => setModal({ mode: 'create' })}>New role</Button>}
           </>
         }
       />
@@ -202,105 +154,16 @@ export default function RolesPage() {
         )}
       </div>
 
-      {/* Modal */}
       {modal && (
-        <div className={styles.overlay}>
-          <div className={styles.modal}>
-            <div className={styles.modalHeader}>
-              <h3>{modal.mode === 'create' ? 'Create Role' : `Edit "${modal.role?.name}"`}</h3>
-              <button className={styles.closeBtn} onClick={closeModal}><FontAwesomeIcon icon={faXmark} /></button>
-            </div>
-
-
-            <form onSubmit={handleSubmit}>
-              <div className={styles.field}>
-                <label>Role Name</label>
-                <input
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  placeholder="e.g. editor"
-                  required
-                  disabled={formSaving || (modal.mode === 'edit' && !!modal.role?.isSystem)}
-                  autoFocus
-                />
-              </div>
-
-              <div className={styles.field}>
-                <label>Description</label>
-                <input
-                  value={formDesc}
-                  onChange={(e) => setFormDesc(e.target.value)}
-                  placeholder="Optional description"
-                  disabled={formSaving}
-                />
-              </div>
-
-              <div className={styles.field}>
-                <label className={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    checked={formMfaRequired}
-                    onChange={(e) => setFormMfaRequired(e.target.checked)}
-                    disabled={formSaving}
-                  />
-                  <span>Require MFA for this role</span>
-                </label>
-                <span className={styles.fieldHint}>Users with this role must enable two-factor authentication to sign in.</span>
-              </div>
-
-              <div className={styles.permsSection}>
-                <div className={styles.permsHeader}>
-                  <span className={styles.permsLabel}>Permissions</span>
-                  <span className={styles.permsCount}>{formPermIds.size} selected</span>
-                </div>
-
-                <div className={styles.permsGrid}>
-                  {Object.entries(permsByModule).map(([module, perms]) => {
-                    const ids = perms.map((p) => p.id);
-                    const allChecked = ids.every((id) => formPermIds.has(id));
-                    const someChecked = ids.some((id) => formPermIds.has(id));
-                    return (
-                      <div key={module} className={styles.permModule}>
-                        <label className={styles.moduleLabel}>
-                          <input
-                            type="checkbox"
-                            checked={allChecked}
-                            ref={(el) => { if (el) el.indeterminate = someChecked && !allChecked; }}
-                            onChange={() => toggleModule(ids)}
-                            disabled={formSaving}
-                          />
-                          <span className={styles.moduleName}>{module}</span>
-                        </label>
-                        <div className={styles.permList}>
-                          {perms.map((perm) => (
-                            <label key={perm.id} className={styles.permItem}>
-                              <input
-                                type="checkbox"
-                                checked={formPermIds.has(perm.id)}
-                                onChange={() => togglePerm(perm.id)}
-                                disabled={formSaving}
-                              />
-                              <span>{perm.action}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className={styles.modalActions}>
-                <button type="button" className={styles.cancelBtn} onClick={closeModal} disabled={formSaving}>
-                  Cancel
-                </button>
-                <button type="submit" className={styles.saveBtn} disabled={formSaving || !formName.trim()}>
-                  {formSaving ? 'Saving…' : modal.mode === 'create' ? 'Create Role' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <RoleEditor
+          key={modal.role?.id ?? 'new'}
+          mode={modal.mode}
+          role={modal.role}
+          roles={roles}
+          permsByModule={permsByModule}
+          onClose={() => setModal(null)}
+          onSave={handleSave}
+        />
       )}
     </AdminLayout>
   );
