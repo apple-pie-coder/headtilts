@@ -30,3 +30,6 @@ scripts/
 
 # Local Word-import tooling: holds admin and email credentials and downloads
 doc_extractor/
+
+# Claude Code settings: per-machine, holds local paths
+.claude/
