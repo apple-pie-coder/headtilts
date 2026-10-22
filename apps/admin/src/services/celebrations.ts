@@ -11,6 +11,8 @@ export interface CelebrationInput {
   photo?: string | null;
   photoCredit?: string | null;
   photoCreditUrl?: string | null;
+  photoFocus?: string | null;
+  photoZoom?: number | null;
   message?: string | null;
   isActive?: boolean;
 }

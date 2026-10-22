@@ -21,6 +21,7 @@ export interface Poll {
   startsAt: string | null;
   endsAt: string | null;
   featuredImage: string | null;
+  telegramPost?: string | null;
   postId: number | null;
   createdAt: string;
   updatedAt: string;
@@ -42,6 +43,7 @@ export interface PollInput {
   startsAt?: string | null;
   endsAt?: string | null;
   featuredImage?: string | null;
+  telegramPost?: string | null;
   postId?: number | null;
   options: PollOption[];
 }

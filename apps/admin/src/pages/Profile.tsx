@@ -4,7 +4,8 @@ import { AdminLayout } from '../components/AdminLayout';
 import { useToast } from '../components/ToastContext';
 import { useAuth } from '../hooks/useAuth';
 import { fetchMe, updateMe } from '../services/profile';
-import { getMfaStatus, setupMfa, enableMfa, disableMfa } from '../services/mfa';
+import { getMfaStatus, setupMfa, enableMfa, disableMfa, regenerateBackupCodes } from '../services/mfa';
+import { PasskeysCard } from './profile/PasskeysCard';
 import { MediaPickerInput } from '../components/MediaPickerInput';
 import { User } from '../types';
 import { PageHeader } from '../components/ui';
@@ -14,7 +15,7 @@ function errMsg(err: unknown, fallback: string) {
   return (err as AxiosError<{ error: { message: string } }>).response?.data?.error?.message || fallback;
 }
 
-type MfaUiState = 'idle' | 'setup' | 'backupCodes' | 'disabling';
+type MfaUiState = 'idle' | 'setup' | 'backupCodes' | 'disabling' | 'regenerating';
 
 export default function ProfilePage() {
   useAuth();
@@ -49,8 +50,12 @@ export default function ProfilePage() {
   const [mfaSecret, setMfaSecret] = useState('');
   const [mfaOtp, setMfaOtp] = useState(['', '', '', '', '', '']);
   const [mfaBackupCodes, setMfaBackupCodes] = useState<string[]>([]);
-  const [disablePassword, setDisablePassword] = useState('');
+  // Password + current code, for turning MFA off or replacing the backup codes
+  const [mfaPassword, setMfaPassword] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
   const [mfaWorking, setMfaWorking] = useState(false);
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [passkeyCount, setPasskeyCount] = useState(0);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => { load(); }, []);
@@ -72,6 +77,8 @@ export default function ProfilePage() {
       setInstagramUrl(me.instagramUrl || '');
       setMfaEnabled(status.enabled);
       setMfaBackupRemaining(status.backupCodesRemaining);
+      setMfaRequired(status.required);
+      setPasskeyCount(status.passkeys);
     } catch (err) {
       toast.error(errMsg(err, 'Failed to load profile'));
     } finally {
@@ -164,6 +171,7 @@ export default function ProfilePage() {
       setMfaBackupCodes(result.backupCodes);
       setMfaEnabled(true);
       setMfaUi('backupCodes');
+      toast.success('Two-factor authentication is on.');
     } catch (err) {
       toast.error(errMsg(err, 'Invalid code — try again'));
       setMfaOtp(['', '', '', '', '', '']);
@@ -173,14 +181,20 @@ export default function ProfilePage() {
     }
   }
 
+  function openConfirm(ui: 'disabling' | 'regenerating') {
+    setMfaPassword('');
+    setMfaCode('');
+    setMfaUi(ui);
+  }
+
   async function handleMfaDisable(e: FormEvent) {
     e.preventDefault();
     setMfaWorking(true);
     try {
-      await disableMfa(disablePassword);
+      await disableMfa(mfaPassword, mfaCode.trim());
       setMfaEnabled(false);
-      setMfaBackupRemaining(0);
-      setDisablePassword('');
+      // Backup codes stay while passkeys remain, as their fallback.
+      if (passkeyCount === 0) setMfaBackupRemaining(0);
       setMfaUi('idle');
       toast.success('Two-factor authentication disabled.');
     } catch (err) {
@@ -190,10 +204,25 @@ export default function ProfilePage() {
     }
   }
 
+  async function handleRegenerate(e: FormEvent) {
+    e.preventDefault();
+    setMfaWorking(true);
+    try {
+      const result = await regenerateBackupCodes(mfaPassword, mfaCode.trim());
+      setMfaBackupCodes(result.backupCodes);
+      setMfaUi('backupCodes');
+      toast.success('New backup codes created. The old ones no longer work.');
+    } catch (err) {
+      toast.error(errMsg(err, 'Failed to create new backup codes'));
+    } finally {
+      setMfaWorking(false);
+    }
+  }
+
   function handleBackupDone() {
-    setMfaBackupRemaining(8);
+    setMfaBackupRemaining(mfaBackupCodes.length);
+    setMfaBackupCodes([]);
     setMfaUi('idle');
-    toast.success('MFA enabled successfully.');
   }
 
   if (loading) {
@@ -206,7 +235,7 @@ export default function ProfilePage() {
 
   return (
     <AdminLayout>
-      <PageHeader title="Your profile" subtitle="Your details, password and two-factor authentication." />
+      <PageHeader title="Your profile" subtitle="Your details, password, two-factor authentication and passkeys." />
 
       <div className={styles.grid}>
         {/* Info card */}
@@ -336,15 +365,24 @@ export default function ProfilePage() {
             {/* Idle state — show enable or disable button */}
             {mfaUi === 'idle' && (
               <>
+                {mfaRequired && (
+                  <p className={styles.mfaNote}>Your role requires a second step at sign-in — an authenticator app or a passkey.</p>
+                )}
                 <p className={styles.mfaDesc}>
                   {mfaEnabled
-                    ? `Protect your account with a time-based one-time password. You have ${mfaBackupRemaining} backup code${mfaBackupRemaining !== 1 ? 's' : ''} remaining.`
+                    ? 'Signing in with your password also asks for a code from your authenticator app.'
                     : 'Add an extra layer of security. After enabling, you\'ll need your authenticator app each time you sign in.'}
+                  {(mfaEnabled || mfaBackupRemaining > 0) && ` You have ${mfaBackupRemaining} backup code${mfaBackupRemaining !== 1 ? 's' : ''} remaining.`}
                 </p>
                 {mfaEnabled ? (
-                  <button className={styles.dangerBtn} onClick={() => setMfaUi('disabling')} disabled={mfaWorking}>
-                    Disable MFA
-                  </button>
+                  <div className={styles.buttonRow}>
+                    <button className={styles.secondaryBtn} onClick={() => openConfirm('regenerating')} disabled={mfaWorking}>
+                      New backup codes
+                    </button>
+                    <button className={styles.dangerBtn} onClick={() => openConfirm('disabling')} disabled={mfaWorking}>
+                      Disable MFA
+                    </button>
+                  </div>
                 ) : (
                   <button className={styles.saveBtn} onClick={handleMfaSetupStart} disabled={mfaWorking}>
                     {mfaWorking ? 'Loading…' : 'Enable MFA'}
@@ -415,32 +453,58 @@ export default function ProfilePage() {
               </>
             )}
 
-            {/* Disable confirmation */}
-            {mfaUi === 'disabling' && (
-              <form onSubmit={handleMfaDisable} className={styles.form}>
+            {/* Disable / new backup codes: password plus a current code */}
+            {(mfaUi === 'disabling' || mfaUi === 'regenerating') && (
+              <form onSubmit={mfaUi === 'disabling' ? handleMfaDisable : handleRegenerate} className={styles.form}>
+                {mfaUi === 'disabling' && mfaRequired && passkeyCount === 0 && (
+                  <p className={styles.mfaNote}>
+                    Your role requires two-step sign-in, so you’ll be asked to set it up again the next time you sign in.
+                  </p>
+                )}
                 <div className={styles.field}>
-                  <label>Confirm your password to disable MFA</label>
+                  <label htmlFor="mfa-confirm-password">Password</label>
                   <input
+                    id="mfa-confirm-password"
                     type="password"
-                    value={disablePassword}
-                    onChange={(e) => setDisablePassword(e.target.value)}
+                    value={mfaPassword}
+                    onChange={(e) => setMfaPassword(e.target.value)}
                     required
                     disabled={mfaWorking}
                     autoFocus
                     autoComplete="current-password"
                   />
                 </div>
-                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-                  <button type="button" className={styles.saveBtn} onClick={() => setMfaUi('idle')} disabled={mfaWorking}>
+                <div className={styles.field}>
+                  <label htmlFor="mfa-confirm-code">Code from your authenticator app, or a backup code</label>
+                  <input
+                    id="mfa-confirm-code"
+                    value={mfaCode}
+                    onChange={(e) => setMfaCode(e.target.value)}
+                    required
+                    disabled={mfaWorking}
+                    autoComplete="one-time-code"
+                    spellCheck={false}
+                  />
+                </div>
+                <div className={styles.buttonRow}>
+                  <button type="button" className={styles.secondaryBtn} onClick={() => setMfaUi('idle')} disabled={mfaWorking}>
                     Cancel
                   </button>
-                  <button type="submit" className={styles.dangerBtn} disabled={mfaWorking || !disablePassword}>
-                    {mfaWorking ? 'Disabling…' : 'Disable MFA'}
-                  </button>
+                  {mfaUi === 'disabling' ? (
+                    <button type="submit" className={styles.dangerBtn} disabled={mfaWorking || !mfaPassword || !mfaCode.trim()}>
+                      {mfaWorking ? 'Disabling…' : 'Disable MFA'}
+                    </button>
+                  ) : (
+                    <button type="submit" className={styles.saveBtn} disabled={mfaWorking || !mfaPassword || !mfaCode.trim()}>
+                      {mfaWorking ? 'Creating…' : 'Create new codes'}
+                    </button>
+                  )}
                 </div>
               </form>
             )}
           </div>
+
+          <PasskeysCard required={mfaRequired} appEnabled={mfaEnabled} onCountChange={setPasskeyCount} />
         </div>
       </div>
     </AdminLayout>

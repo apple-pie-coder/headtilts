@@ -73,6 +73,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const [logoDark, setLogoDark] = useState('');
   const [siteTitle, setSiteTitle] = useState('');
   const [adminLogoHeight, setAdminLogoHeight] = useState('');
+  // Square mark for the collapsed rail: its own setting, else the admin or site favicon.
+  const [railIcon, setRailIcon] = useState('');
   const [showBreadcrumbs, setShowBreadcrumbs] = useState(true);
 
   useEffect(() => {
@@ -82,6 +84,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         setLogoDark(s.site_logo_dark || '');
         setSiteTitle(s.site_title || '');
         setAdminLogoHeight(s.admin_logo_height || '');
+        setRailIcon(s.admin_logo_icon || s.admin_favicon || s.site_favicon || '');
         setShowBreadcrumbs(s.show_breadcrumbs !== 'no');
       })
       .catch(() => {});
@@ -187,7 +190,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 style={adminLogoHeight ? { maxHeight: `${adminLogoHeight}px` } : undefined} />
             ) : (
               <>
-                <span className={styles.brandIcon}><FontAwesomeIcon icon={faFeather} /></span>
+                <span className={styles.brandIcon}>
+                  {collapsed && railIcon
+                    ? <img className={styles.brandMark} src={resolveMediaUrl(railIcon)} alt="" />
+                    : <FontAwesomeIcon icon={faFeather} />}
+                </span>
                 <span className={styles.brandName}>{siteTitle || 'Headtilts'}</span>
               </>
             )}

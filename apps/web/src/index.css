@@ -221,6 +221,13 @@ button { cursor: pointer; font-family: inherit; }
   .footer-bottom { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
 }
 
+/* Phones: 16px text in fields stops iOS zooming the page on focus. */
+@media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select,
+  textarea { font-size: 16px !important; }
+}
+
 /* Per-widget "Hide on mobile" option (toggled in the admin widget editor). */
 @media (max-width: 768px) {
   .widget-hide-mobile { display: none; }
@@ -2123,6 +2130,16 @@ button { cursor: pointer; font-family: inherit; }
   gap: 0.75rem;
 }
 
+/* Small phones (320px wide): logo, search, theme switch and menu only fit
+   side by side with tighter gaps. */
+@media (max-width: 400px) {
+  .header-inner { gap: 0.75rem; }
+  .header-right { gap: 0.5rem; flex-shrink: 0; }
+  /* A long text title (no logo) gives way rather than pushing the buttons off screen. */
+  .site-brand-wrap { min-width: 0; }
+  .site-brand, .site-tagline { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
 .theme-switch {
   display: inline-flex;
   align-items: center;
@@ -2712,12 +2729,13 @@ button { cursor: pointer; font-family: inherit; }
 .celebration-card {
   position: relative;
   width: 100%;
-  max-width: 440px;
+  max-width: 460px;
+  max-height: calc(100vh - 2.5rem);
+  overflow-y: auto;
   background: #fff;
   border-radius: 22px;
-  padding: 2.25rem 1.75rem 2rem;
+  padding: 1.25rem 1.25rem 1.75rem;
   text-align: center;
-  overflow: hidden;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
   animation: celebration-card-in 0.45s cubic-bezier(0.21, 1.02, 0.73, 1) both;
 }
@@ -2733,29 +2751,47 @@ button { cursor: pointer; font-family: inherit; }
 .celebration-card--birthday::before { background: radial-gradient(120% 100% at 50% 0, rgba(255, 145, 76, 0.28), transparent 70%); }
 .celebration-card--remembrance::before { background: radial-gradient(120% 100% at 50% 0, rgba(120, 140, 200, 0.22), transparent 70%); }
 
-/* Photo */
+/* Photo — the main point of the popup, so it fills the card width. Framing
+   (focus point + zoom) is set per celebration in the admin. */
 .celebration-photo-wrap {
   position: relative;
+  margin: 0 0 1.25rem;
+}
+.celebration-photo-wrap--empty {
   width: 144px;
   height: 144px;
   margin: 0 auto 1.25rem;
 }
 
-.celebration-photo {
-  width: 144px;
-  height: 144px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 4px solid #fff;
+.celebration-photo-frame {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  max-height: min(56vh, 540px);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #f0f0f3;
   box-shadow: 0 8px 26px rgba(0, 0, 0, 0.22);
-  animation: celebration-kenburns 12s ease-in-out infinite alternate;
 }
-.celebration-card--birthday .celebration-photo {
+.celebration-card--birthday .celebration-photo-frame {
   box-shadow: 0 0 0 4px rgba(255, 201, 58, 0.55), 0 8px 26px rgba(0, 0, 0, 0.22);
-  animation: celebration-kenburns 12s ease-in-out infinite alternate, celebration-glow 3s ease-in-out infinite;
+  animation: celebration-glow 3s ease-in-out infinite;
+}
+
+.celebration-photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(var(--zoom, 1));
+  animation: celebration-kenburns 12s ease-in-out infinite alternate;
 }
 
 .celebration-photo--placeholder {
+  width: 144px;
+  height: 144px;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.22);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2766,12 +2802,13 @@ button { cursor: pointer; font-family: inherit; }
 /* Candle (remembrance) */
 .celebration-candle {
   position: absolute;
-  bottom: -10px;
-  right: -6px;
-  width: 34px;
-  height: 60px;
+  bottom: -18px;
+  right: 14px;
+  width: 40px;
+  height: 70px;
   filter: drop-shadow(0 0 6px rgba(255, 170, 60, 0.5));
 }
+.celebration-photo-wrap--empty .celebration-candle { bottom: -10px; right: -6px; width: 34px; height: 60px; }
 .celebration-candle-body { fill: #f3ede1; }
 .celebration-wick { fill: #4a4a4a; }
 .celebration-flame-outer { fill: #ff9d34; }
@@ -2808,7 +2845,7 @@ button { cursor: pointer; font-family: inherit; }
 
 .celebration-message {
   margin: 0 auto;
-  max-width: 320px;
+  max-width: 360px;
   font-size: 1rem;
   line-height: 1.55;
   color: #3a3a3c;
@@ -2817,8 +2854,8 @@ button { cursor: pointer; font-family: inherit; }
 /* Close */
 .celebration-close {
   position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
+  top: 1.75rem;
+  right: 1.75rem;
   z-index: 3;
   width: 2rem;
   height: 2rem;
@@ -2827,12 +2864,15 @@ button { cursor: pointer; font-family: inherit; }
   justify-content: center;
   border: none;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.06);
-  color: #3a3a3c;
+  /* Sits over the photo, so it needs its own backdrop. */
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: #fff;
   font-size: 1rem;
   transition: background 0.15s;
 }
-.celebration-close:hover { background: rgba(0, 0, 0, 0.12); }
+.celebration-close:hover { background: rgba(0, 0, 0, 0.6); }
 
 /* Carousel controls */
 .celebration-nav {
@@ -2915,7 +2955,7 @@ button { cursor: pointer; font-family: inherit; }
 @keyframes celebration-fall {
   0% { transform: translateY(0) rotate(var(--rot)); opacity: 0.95; }
   90% { opacity: 0.95; }
-  100% { transform: translateY(620px) rotate(calc(var(--rot) + 360deg)); opacity: 0; }
+  100% { transform: translateY(900px) rotate(calc(var(--rot) + 360deg)); opacity: 0; }
 }
 @keyframes celebration-rise {
   0% { transform: translateY(0) scale(1); opacity: 0; }
@@ -2928,7 +2968,7 @@ button { cursor: pointer; font-family: inherit; }
   50% { transform: scale(0.96, 1.06) rotate(-1.5deg); opacity: 1; }
   75% { transform: scale(1.03, 0.98) rotate(1deg); opacity: 0.95; }
 }
-@keyframes celebration-kenburns { from { transform: scale(1); } to { transform: scale(1.07); } }
+@keyframes celebration-kenburns { from { transform: scale(var(--zoom, 1)); } to { transform: scale(calc(var(--zoom, 1) * 1.07)); } }
 @keyframes celebration-glow {
   0%, 100% { box-shadow: 0 0 0 4px rgba(255, 201, 58, 0.4), 0 8px 26px rgba(0, 0, 0, 0.22); }
   50% { box-shadow: 0 0 0 7px rgba(255, 201, 58, 0.6), 0 8px 30px rgba(0, 0, 0, 0.25); }
@@ -2938,6 +2978,7 @@ button { cursor: pointer; font-family: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .celebration-overlay,
   .celebration-card,
+  .celebration-photo-frame,
   .celebration-photo { animation: none; }
   .celebration-confetti-layer,
   .celebration-ember-layer,
@@ -2946,15 +2987,13 @@ button { cursor: pointer; font-family: inherit; }
 
 /* Dark theme */
 [data-theme='dark'] .celebration-card { background: #1c1c1e; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6); }
-[data-theme='dark'] .celebration-photo { border-color: #2c2c2e; }
-[data-theme='dark'] .celebration-photo--placeholder { background: linear-gradient(135deg, #2c2c2e, #1c1c1e); }
+[data-theme='dark'] .celebration-photo-frame { background: #2c2c2e; }
+[data-theme='dark'] .celebration-photo--placeholder { border-color: #2c2c2e; background: linear-gradient(135deg, #2c2c2e, #1c1c1e); }
 [data-theme='dark'] .celebration-name { color: #f5f5f7; }
 [data-theme='dark'] .celebration-message { color: #d1d1d6; }
 [data-theme='dark'] .celebration-meta { color: #8e8e93; }
 [data-theme='dark'] .celebration-card--birthday .celebration-eyebrow { color: #ffb340; }
 [data-theme='dark'] .celebration-card--remembrance .celebration-eyebrow { color: #9fb0e0; }
-[data-theme='dark'] .celebration-close { background: rgba(255, 255, 255, 0.1); color: #f5f5f7; }
-[data-theme='dark'] .celebration-close:hover { background: rgba(255, 255, 255, 0.18); }
 [data-theme='dark'] .celebration-nav { background: rgba(44, 44, 46, 0.95); color: #f5f5f7; }
 [data-theme='dark'] .celebration-nav:hover { background: #3a3a3c; }
 [data-theme='dark'] .celebration-dot { background: rgba(255, 255, 255, 0.25); }

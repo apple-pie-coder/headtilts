@@ -8,6 +8,7 @@ import { faPlus, faTrash, faArrowLeft } from '@fortawesome/free-solid-svg-icons'
 import { AdminLayout } from '../components/AdminLayout';
 import { useToast } from '../components/ToastContext';
 import { MediaPickerInput } from '../components/MediaPickerInput';
+import { TelegramPanel, TelegramChoice, fromTelegramChoice, toTelegramChoice } from '../components/TelegramPanel';
 import {
   fetchEvent, createEvent, updateEvent,
   EventInput, TicketTier, Speaker, AgendaItem, CustomField,
@@ -63,6 +64,8 @@ export default function EventEditorPage() {
   const [metaTitle, setMetaTitle]       = useState('');
   const [metaDescription, setMetaDescription] = useState('');
   const [ogImage, setOgImage]           = useState<string | null>(null);
+  const [telegramPost, setTelegramPost] = useState<TelegramChoice>('default');
+  const [savedAt, setSavedAt]           = useState(0);
 
   // — Date & Location
   const [startAt, setStartAt]           = useState('');
@@ -91,6 +94,9 @@ export default function EventEditorPage() {
   const [registrationDeadline, setRegistrationDeadline] = useState('');
   const [maxAttendees, setMaxAttendees] = useState('');
   const [requireApproval, setRequireApproval] = useState(false);
+  const [maxTicketsPerPerson, setMaxTicketsPerPerson] = useState('');
+  const [requireEmailConfirmation, setRequireEmailConfirmation] = useState(false);
+  const [liveTicketQr, setLiveTicketQr] = useState(false);
   const [showAttendeesCount, setShowAttendeesCount] = useState(true);
   const [showAttendeesNames, setShowAttendeesNames] = useState(false);
 
@@ -134,6 +140,7 @@ export default function EventEditorPage() {
       setMetaTitle(ev.metaTitle ?? '');
       setMetaDescription(ev.metaDescription ?? '');
       setOgImage(ev.ogImage ?? null);
+      setTelegramPost(toTelegramChoice(ev.telegramPost));
 
       setStartAt(toLocalDt(ev.startAt));
       setEndAt(toLocalDt(ev.endAt));
@@ -159,6 +166,9 @@ export default function EventEditorPage() {
       setRegistrationDeadline(toLocalDt(ev.registrationDeadline));
       setMaxAttendees(ev.maxAttendees ? String(ev.maxAttendees) : '');
       setRequireApproval(ev.requireApproval);
+      setMaxTicketsPerPerson(ev.maxTicketsPerPerson ? String(ev.maxTicketsPerPerson) : '');
+      setRequireEmailConfirmation(ev.requireEmailConfirmation);
+      setLiveTicketQr(ev.liveTicketQr);
       setShowAttendeesCount(ev.showAttendeesCount);
       setShowAttendeesNames(ev.showAttendeesNames);
 
@@ -200,6 +210,8 @@ export default function EventEditorPage() {
       isRegistrationRequired,
       registrationDeadline: registrationDeadline ? fromLocalDt(registrationDeadline) : null,
       requireApproval, showAttendeesCount, showAttendeesNames, isFeatured,
+      maxTicketsPerPerson: maxTicketsPerPerson ? Number(maxTicketsPerPerson) : null,
+      requireEmailConfirmation, liveTicketQr,
       isRecurring,
       ...(isRecurring ? {
         recurrenceType,
@@ -210,6 +222,7 @@ export default function EventEditorPage() {
       metaTitle: metaTitle || undefined,
       metaDescription: metaDescription || undefined,
       ogImage: ogImage ?? undefined,
+      telegramPost: fromTelegramChoice(telegramPost),
       ticketTiers, speakers, agendaItems, customFields,
     };
   }
@@ -226,6 +239,7 @@ export default function EventEditorPage() {
       } else {
         await updateEvent(Number(id), buildInput());
         toast.success('Event saved');
+        setSavedAt(Date.now());
       }
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message;
@@ -375,6 +389,20 @@ export default function EventEditorPage() {
                   <label className={styles.label}>Banner Image (hero)</label>
                   <MediaPickerInput value={bannerImage ?? ''} onChange={(v) => setBannerImage(v || null)} />
                 </div>
+              </div>
+            </div>
+
+            <div className={styles.section}>
+              <h2 className={styles.sectionTitle}>Telegram</h2>
+              <div className={styles.field}>
+                <TelegramPanel
+                  kind="event"
+                  id={isNew ? undefined : Number(id)}
+                  value={telegramPost}
+                  onChange={setTelegramPost}
+                  refreshKey={savedAt}
+                  disabled={saving}
+                />
               </div>
             </div>
 
@@ -567,6 +595,34 @@ export default function EventEditorPage() {
                     <input type="checkbox" checked={showAttendeesNames} onChange={(e) => setShowAttendeesNames(e.target.checked)} />
                     <span className={styles.checkLabel}>Show attendee names publicly (up to 50)</span>
                   </label>
+                </div>
+
+                <h2 className={styles.sectionTitle}>Tickets at the door</h2>
+                <div className={styles.field}>
+                  <label className={styles.label} htmlFor="max-per-person">Most tickets per person</label>
+                  <input
+                    id="max-per-person" className={styles.input} type="number" min={1} max={100}
+                    value={maxTicketsPerPerson} onChange={(e) => setMaxTicketsPerPerson(e.target.value)} placeholder="Leave blank for no limit"
+                  />
+                  <span className={styles.hint}>Counted across all of someone’s bookings, by email address and by phone number. Stops one person buying up tickets to resell.</span>
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.checkbox}>
+                    <input type="checkbox" checked={requireEmailConfirmation} onChange={(e) => setRequireEmailConfirmation(e.target.checked)} />
+                    <span className={styles.checkLabel}>Free tickets: send the ticket only after the person confirms their email</span>
+                  </label>
+                  <span className={styles.hint}>Made-up email addresses can’t fill the event: an unconfirmed sign-up holds no place. Paid tickets are confirmed by the payment.</span>
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.checkbox}>
+                    <input type="checkbox" checked={liveTicketQr} onChange={(e) => setLiveTicketQr(e.target.checked)} />
+                    <span className={styles.checkLabel}>Live tickets: the QR code changes every 15 seconds</span>
+                  </label>
+                  <span className={styles.hint}>
+                    Screenshots and forwarded QR codes stop working within a minute, so tickets can’t be resold as pictures.
+                    People open their ticket from the link in their email instead of showing a QR in the email, so ask them
+                    to load it before they queue. Tickets already sent keep working: their link opens the live ticket.
+                  </span>
                 </div>
               </>
             )}

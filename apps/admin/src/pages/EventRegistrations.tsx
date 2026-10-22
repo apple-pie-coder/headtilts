@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { AxiosError } from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faArrowLeft, faDownload, faCheck, faBan, faUserCheck, faEnvelope, faCopy, faUsers, faMagnifyingGlass,
+  faArrowLeft, faDownload, faCheck, faBan, faUserCheck, faEnvelope, faCopy, faUsers, faMagnifyingGlass, faQrcode,
 } from '@fortawesome/free-solid-svg-icons';
 import { AdminLayout } from '../components/AdminLayout';
 import { useToast } from '../components/ToastContext';
@@ -15,6 +15,8 @@ import {
 import t from '../components/ui/table.module.css';
 import { useUrlState } from '../hooks/useUrlState';
 import { fetchEvent, fetchRegistrations, patchRegistration, exportRegistrationsUrl, Registration, EventSummary } from '../services/events';
+import { DoorLog } from './scan/DoorLog';
+import type { DoorStats } from '../services/checkIn';
 import styles from './EventRegistrations.module.css';
 
 const STATUS_META: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' | 'info' }> = {
@@ -22,16 +24,25 @@ const STATUS_META: Record<string, { label: string; tone: 'success' | 'warning' |
   confirmed: { label: 'Confirmed', tone: 'success' },
   waitlisted: { label: 'Waitlisted', tone: 'info' },
   cancelled: { label: 'Cancelled', tone: 'neutral' },
+  unconfirmed: { label: 'Email not confirmed', tone: 'neutral' },
 };
 const PAY_LABELS: Record<string, string> = {
   free: 'Free', pending: 'Payment pending', paid: 'Paid', refunded: 'Refunded',
+  partially_refunded: 'Partly refunded', disputed: 'Payment disputed',
 };
+/** Payments the door flags amber, or that cancelled the ticket. */
+const PAY_TROUBLE = new Set(['refunded', 'partially_refunded', 'disputed']);
 type Action = 'approve' | 'cancel' | 'check-in';
 const ACTION_DONE: Record<Action, string> = { approve: 'Approved', cancel: 'Cancelled', 'check-in': 'Checked in' };
 
 /** The API only confirms free or paid orders that aren't cancelled. */
 function canApprove(r: Registration): boolean {
   return (r.status === 'pending' || r.status === 'waitlisted') && (r.paymentStatus === 'free' || r.paymentStatus === 'paid');
+}
+
+/** Same rule as the door: a valid ticket with people still to come in. */
+function canCheckIn(r: Registration): boolean {
+  return r.status === 'confirmed' && (r.paymentStatus === 'free' || r.paymentStatus === 'paid') && r.checkedInCount < r.quantity;
 }
 
 function errorMessage(err: unknown, fallback: string): string {
@@ -54,6 +65,8 @@ export default function EventRegistrationsPage() {
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [door, setDoor] = useState<DoorStats | null>(null);
+  const [doorRefresh, setDoorRefresh] = useState(0);
   const reqId = useRef(0);
 
   useEffect(() => {
@@ -105,13 +118,14 @@ export default function EventRegistrationsPage() {
     } finally {
       setBusy(false);
       load();
+      setDoorRefresh((n) => n + 1);
     }
   }
 
   function menu(r: Registration): MenuItem[] {
     return [
       { label: 'Approve', icon: faCheck, onClick: () => act([r], 'approve'), hidden: !canApprove(r) },
-      { label: 'Check in', icon: faUserCheck, onClick: () => act([r], 'check-in'), hidden: r.status !== 'confirmed' || !!r.checkInAt },
+      { label: 'Check in', icon: faUserCheck, onClick: () => act([r], 'check-in'), hidden: !canCheckIn(r) },
       { label: 'Email attendee', icon: faEnvelope, onClick: () => { window.location.href = `mailto:${r.email}?subject=${encodeURIComponent(event?.title ?? 'Your registration')}`; } },
       {
         label: 'Copy ticket code',
@@ -123,7 +137,6 @@ export default function EventRegistrationsPage() {
   }
 
   const selected = regs.filter((r) => sel.selected.has(r.id));
-  const checkedInOnPage = regs.filter((r) => r.checkInAt).length;
   const seats = regs.filter((r) => r.status === 'confirmed').reduce((n, r) => n + r.quantity, 0);
 
   return (
@@ -135,16 +148,21 @@ export default function EventRegistrationsPage() {
           ? `${new Date(event.startAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} · ${total} registration${total === 1 ? '' : 's'}${event.maxAttendees ? ` · capacity ${event.maxAttendees}` : ''}`
           : `${total} registration${total === 1 ? '' : 's'}`}
         actions={
-          <a href={exportRegistrationsUrl(eventId)} download className={styles.exportBtn}>
-            <FontAwesomeIcon icon={faDownload} /> Export CSV
-          </a>
+          <>
+            <Link to={`/admin/scan/${eventId}`} className={styles.exportBtn}>
+              <FontAwesomeIcon icon={faQrcode} /> Scan tickets
+            </Link>
+            <a href={exportRegistrationsUrl(eventId)} download className={styles.exportBtn}>
+              <FontAwesomeIcon icon={faDownload} /> Export CSV
+            </a>
+          </>
         }
       />
 
       {loaded && regs.length > 0 && (
         <div className={styles.stats}>
           <div><strong>{seats}</strong><span>seats confirmed{q.page !== '1' || total > LIMIT ? ' (this page)' : ''}</span></div>
-          <div><strong>{checkedInOnPage}</strong><span>checked in</span></div>
+          {door && <div><strong>{door.checkedIn}</strong><span>of {door.expected} people in</span></div>}
           {event?.maxAttendees ? (
             <div className={styles.capWrap}>
               <span className={styles.cap}><span style={{ width: `${Math.min(100, (seats / event.maxAttendees) * 100)}%` }} /></span>
@@ -202,7 +220,7 @@ export default function EventRegistrationsPage() {
                       <span>{r.ticketTier?.name ?? 'General'}</span>
                       <span className={t.secondary}>
                         <span className={t.mono}>{r.ticketCode}</span>
-                        <span className={r.paymentStatus === 'paid' ? styles.paid : undefined}>
+                        <span className={r.paymentStatus === 'paid' ? styles.paid : PAY_TROUBLE.has(r.paymentStatus) ? styles.payTrouble : undefined}>
                           · {PAY_LABELS[r.paymentStatus] ?? r.paymentStatus}
                           {r.paymentAmount ? ` ₹${(r.paymentAmount / 100).toFixed(0)}` : ''}
                         </span>
@@ -212,8 +230,20 @@ export default function EventRegistrationsPage() {
                   <td><StatusBadge tone={STATUS_META[r.status]?.tone ?? 'neutral'}>{STATUS_META[r.status]?.label ?? r.status}</StatusBadge></td>
                   <td className={`${t.muted} ${t.hideSm} ${t.nowrap}`} title={absoluteTime(r.registeredAt)}>{relativeTime(r.registeredAt)}</td>
                   <td>
-                    {r.checkInAt ? (
-                      <span className={styles.checkedIn} title={absoluteTime(r.checkInAt)}><FontAwesomeIcon icon={faUserCheck} /> {relativeTime(r.checkInAt)}</span>
+                    {r.checkInAt && !canCheckIn(r) ? (
+                      <span className={styles.checkedIn} title={absoluteTime(r.checkInAt)}>
+                        <FontAwesomeIcon icon={faUserCheck} /> {r.quantity > 1 ? `${r.checkedInCount}/${r.quantity} · ` : ''}{relativeTime(r.checkInAt)}
+                      </span>
+                    ) : canCheckIn(r) ? (
+                      r.checkedInCount > 0 ? (
+                        <Button size="sm" icon={faUserCheck} disabled={busy} onClick={() => act([r], 'check-in')}>
+                          {r.checkedInCount}/{r.quantity} in · rest
+                        </Button>
+                      ) : (
+                        <Button size="sm" icon={faUserCheck} disabled={busy} onClick={() => act([r], 'check-in')}>Check in</Button>
+                      )
+                    ) : r.status === 'confirmed' && PAY_TROUBLE.has(r.paymentStatus) ? (
+                      <span className={styles.payTrouble}>{PAY_LABELS[r.paymentStatus]}</span>
                     ) : r.status === 'confirmed' ? (
                       <Button size="sm" icon={faUserCheck} disabled={busy} onClick={() => act([r], 'check-in')}>Check in</Button>
                     ) : canApprove(r) ? (
@@ -243,9 +273,11 @@ export default function EventRegistrationsPage() {
         <Pagination page={page} pageSize={LIMIT} total={total} onPage={(p) => setQ({ page: String(p) })} />
       )}
 
+      <DoorLog eventId={eventId} onStats={setDoor} refreshKey={doorRefresh} />
+
       <BulkBar count={sel.selected.size} noun="registration" onClear={sel.clear}>
         <Button size="sm" icon={faCheck} disabled={busy} onClick={() => act(selected.filter(canApprove), 'approve')}>Approve</Button>
-        <Button size="sm" icon={faUserCheck} disabled={busy} onClick={() => act(selected.filter((r) => r.status === 'confirmed' && !r.checkInAt), 'check-in')}>Check in</Button>
+        <Button size="sm" icon={faUserCheck} disabled={busy} onClick={() => act(selected.filter(canCheckIn), 'check-in')}>Check in</Button>
         <Button size="sm" variant="danger" icon={faBan} disabled={busy} onClick={() => act(selected.filter((r) => r.status !== 'cancelled'), 'cancel')}>Cancel</Button>
       </BulkBar>
     </AdminLayout>

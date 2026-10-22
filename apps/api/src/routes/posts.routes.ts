@@ -1,6 +1,8 @@
 import { Router, IRouter } from 'express';
 import * as postsController from '../controllers/posts.controller';
 import * as revisionsController from '../controllers/revisions.controller';
+import * as liveUpdatesController from '../controllers/liveUpdates.controller';
+import * as telegramController from '../controllers/telegram.controller';
 import { authenticate, requireAnyPermission, requireContentPermission, requirePermission } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import { PERMISSIONS } from '@headtilts/shared';
@@ -25,6 +27,15 @@ router.post('/:id/duplicate', requireContentPermission('create', 'id'), asyncHan
 router.put('/:id', requireContentPermission('update', 'id'), asyncHandler(postsController.update));
 router.post('/:id/lock', requireContentPermission('update', 'id'), asyncHandler(postsController.acquireLock));
 router.delete('/:id/lock', requireContentPermission('update', 'id'), asyncHandler(postsController.releaseLock));
+// Live blog desk: updates are saved on their own, without the post's edit lock.
+router.get('/:id/live-updates', requireContentPermission('read', 'id'), asyncHandler(liveUpdatesController.list));
+router.post('/:id/live-updates', requireContentPermission('update', 'id'), asyncHandler(liveUpdatesController.create));
+router.put('/:id/live-updates/:updateId', requireContentPermission('update', 'id'), asyncHandler(liveUpdatesController.update));
+router.delete('/:id/live-updates/:updateId', requireContentPermission('update', 'id'), asyncHandler(liveUpdatesController.remove));
+router.put('/:id/live-coverage', requireContentPermission('update', 'id'), asyncHandler(liveUpdatesController.coverage));
+// Telegram channel: what was sent, a preview, and Post now.
+router.get('/:id/telegram', requireContentPermission('read', 'id'), asyncHandler(telegramController.itemStatus('post')));
+router.post('/:id/telegram', requireContentPermission('update', 'id'), asyncHandler(telegramController.itemSend('post')));
 router.delete('/:id', requireContentPermission('delete', 'id'), asyncHandler(postsController.remove));
 
 export default router;

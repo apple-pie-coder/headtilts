@@ -48,6 +48,9 @@ import HealthPage from './pages/Health';
 import FeedbackPage from './pages/Feedback';
 import IssuesPage from './pages/Issues';
 import FrontPageEditorPage from './pages/FrontPageEditor';
+import ScanEventsPage from './pages/scan/ScanEvents';
+import ScannerPage from './pages/scan/Scanner';
+import { useAuth } from './hooks/useAuth';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'http://localhost:3000';
@@ -76,6 +79,15 @@ function useFaviconFromSettings() {
 }
 
 /** Everything inside the router: global search plus the current page. */
+/** Door staff land on the scanner: the dashboard has nothing for them. */
+function HomeRoute() {
+  const { hasPermission } = useAuth();
+  const doorOnly = hasPermission(PERMISSIONS.EVENT_CHECK_IN)
+    && !hasPermission(PERMISSIONS.EVENT_READ)
+    && !hasPermission(PERMISSIONS.POST_READ);
+  return doorOnly ? <Navigate to="/admin/scan" replace /> : <DashboardPage />;
+}
+
 function RouterShell() {
   return (
     <SpotlightProvider>
@@ -98,7 +110,23 @@ const router = createBrowserRouter(createRoutesFromElements(
       path="/admin"
       element={
         <ProtectedRoute>
-          <DashboardPage />
+          <HomeRoute />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/admin/scan"
+      element={
+        <ProtectedRoute requiredPermission={PERMISSIONS.EVENT_CHECK_IN}>
+          <ScanEventsPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/admin/scan/:id"
+      element={
+        <ProtectedRoute requiredPermission={PERMISSIONS.EVENT_CHECK_IN}>
+          <ScannerPage />
         </ProtectedRoute>
       }
     />

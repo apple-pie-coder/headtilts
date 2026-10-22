@@ -18,6 +18,8 @@ export const postPublicSelect = {
   categories: { select: { category: { select: { id: true, name: true, slug: true, icon: true, iconSvg: true } } } },
   tags: { select: { tag: { select: { id: true, name: true, slug: true } } } },
   articleType: true,
+  // Cards show a LIVE badge only while coverage is open.
+  liveEndedAt: true,
   // Cards show the verdict at a glance; the full review comes with the post itself.
   review: { select: { subjectType: true, subjectTitle: true, artist: true, rating: true, coverImage: true } },
 } as const;

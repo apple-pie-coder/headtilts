@@ -1,4 +1,4 @@
-import { KeyboardEvent, PointerEvent, useRef } from 'react';
+import { CSSProperties, KeyboardEvent, PointerEvent, useRef } from 'react';
 import styles from './FocusPicker.module.css';
 
 /** "x% y%" → [x, y]; anything else is the centre. */
@@ -10,24 +10,48 @@ export function parseFocus(value: string | null | undefined): [number, number] {
 const toFocus = (x: number, y: number) => (Math.round(x) === 50 && Math.round(y) === 50 ? null : `${Math.round(x)}% ${Math.round(y)}%`);
 const clamp = (n: number) => Math.min(100, Math.max(0, n));
 
+/** Inline style that crops an object-fit: cover image to a focus point, zoomed in around it. */
+export function framingStyle(focus: string | null | undefined, zoom?: number | null): CSSProperties {
+  const position = `${parseFocus(focus).join('% ')}%`;
+  return zoom && zoom > 1
+    ? { objectPosition: position, transform: `scale(${zoom})`, transformOrigin: position }
+    : { objectPosition: position };
+}
+
+export interface CropPreview {
+  label: string;
+  ratio: string;
+  /** Relative column width in the preview row. */
+  size: number;
+  round?: boolean;
+}
+
 // The crop shapes the public site uses for featured images.
-const PREVIEWS = [
-  { label: 'Banner', ratio: '16 / 9' },
-  { label: 'Hero', ratio: '21 / 9' },
-  { label: 'Thumbnail', ratio: '1 / 1' },
+const FEATURED_PREVIEWS: CropPreview[] = [
+  { label: 'Banner', ratio: '16 / 9', size: 1 },
+  { label: 'Hero', ratio: '21 / 9', size: 1.2 },
+  { label: 'Thumbnail', ratio: '1 / 1', size: 0.6 },
 ];
 
+export const MAX_ZOOM = 3;
+
 /**
- * Pick the part of the featured image that must stay visible when it's cropped.
+ * Pick the part of an image that must stay visible when it's cropped.
  * Click or drag on the image, or focus the marker and use the arrow keys.
+ * Pass zoom/onZoomChange to also let the editor zoom in around that point.
  */
-export function FocusPicker({ src, value, onChange, disabled }: {
+export function FocusPicker({ src, value, onChange, disabled, zoom, onZoomChange, previews = FEATURED_PREVIEWS, alt = 'Featured image' }: {
   src: string;
   value: string | null;
   onChange: (focus: string | null) => void;
   disabled?: boolean;
+  zoom?: number | null;
+  onZoomChange?: (zoom: number | null) => void;
+  previews?: CropPreview[];
+  alt?: string;
 }) {
   const [x, y] = parseFocus(value);
+  const scale = zoom ?? 1;
   const frame = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
 
@@ -46,7 +70,7 @@ export function FocusPicker({ src, value, onChange, disabled }: {
     onChange(toFocus(clamp(x + d[0]), clamp(y + d[1])));
   }
 
-  const position = `${x}% ${y}%`;
+  const preview = framingStyle(value, scale);
   return (
     <div className={styles.root}>
       <div
@@ -62,7 +86,7 @@ export function FocusPicker({ src, value, onChange, disabled }: {
         onPointerUp={() => { dragging.current = false; }}
         onPointerCancel={() => { dragging.current = false; }}
       >
-        <img src={src} alt="Featured image" draggable={false} />
+        <img src={src} alt={alt} draggable={false} />
         <button
           type="button"
           className={styles.marker}
@@ -74,16 +98,47 @@ export function FocusPicker({ src, value, onChange, disabled }: {
         />
       </div>
       <div className={styles.bar}>
-        <span className={styles.hint}>Click or drag to choose what stays in view when the image is cropped.</span>
-        {value && (
-          <button type="button" className={styles.reset} onClick={() => onChange(null)} disabled={disabled}>Centre</button>
+        <span className={styles.hint}>
+          Click or drag to choose what stays in view when the image is cropped{onZoomChange ? ', then zoom in to frame it tighter' : ''}.
+        </span>
+        {(value || scale > 1) && (
+          <button
+            type="button"
+            className={styles.reset}
+            onClick={() => { onChange(null); onZoomChange?.(null); }}
+            disabled={disabled}
+          >
+            Reset
+          </button>
         )}
       </div>
-      <div className={styles.previews} aria-label="Crop previews">
-        {PREVIEWS.map((p) => (
+      {onZoomChange && (
+        <label className={styles.zoom}>
+          <span>Zoom</span>
+          <input
+            type="range"
+            min={1}
+            max={MAX_ZOOM}
+            step={0.05}
+            value={scale}
+            onChange={(e) => {
+              const z = Math.round(Number(e.target.value) * 100) / 100;
+              onZoomChange(z > 1 ? z : null);
+            }}
+            disabled={disabled}
+          />
+          <output>{scale.toFixed(1)}×</output>
+        </label>
+      )}
+      <div
+        className={styles.previews}
+        style={{ gridTemplateColumns: previews.map((p) => `${p.size}fr`).join(' ') }}
+        aria-label="Crop previews"
+      >
+        {previews.map((p) => (
           <figure key={p.label} className={styles.preview}>
-            <div className={styles.previewBox} style={{ aspectRatio: p.ratio }}>
-              <img src={src} alt="" style={{ objectPosition: position }} />
+            <div className={`${styles.previewBox} ${p.round ? styles.round : ''}`} style={{ aspectRatio: p.ratio }}>
+              <img src={src} alt="" style={preview} />
             </div>
             <figcaption>{p.label}</figcaption>
           </figure>

@@ -4,7 +4,7 @@ import { PERMISSIONS } from '@headtilts/shared';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faUserPlus, faPen, faTrashCan, faUserSlash, faUserCheck, faEnvelope, faKey, faCopy,
-  faMagnifyingGlass, faUsers, faShieldHalved,
+  faMagnifyingGlass, faUsers, faShieldHalved, faRotateLeft,
 } from '@fortawesome/free-solid-svg-icons';
 import { AdminLayout } from '../components/AdminLayout';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -20,7 +20,7 @@ import { useDensity } from '../hooks/useDensity';
 import { useHotkeys } from '../hooks/useHotkeys';
 import { useUrlState } from '../hooks/useUrlState';
 import { Role, User } from '../types';
-import { deleteUser, fetchRoles, fetchUsers, updateUser } from '../services/users';
+import { deleteUser, fetchRoles, fetchUsers, resetUserMfa, updateUser } from '../services/users';
 import { requestPasswordReset } from '../services/auth';
 import { resolveMediaUrl } from '../services/media';
 
@@ -105,6 +105,23 @@ export default function UsersPage() {
     }
   }
 
+  async function handleResetMfa(u: User) {
+    if (!(await confirm({
+      title: `Reset two-step sign-in for ${u.username}?`,
+      message: 'This removes their authenticator app, backup codes and passkeys, so they can sign in with just their password. '
+        + 'If their role requires two-step sign-in, they will be asked to set it up again. Only do this once you are sure who is asking.',
+      confirmLabel: 'Reset',
+      danger: true,
+    }))) return;
+    try {
+      await resetUserMfa(u.id);
+      toast.success(`Two-step sign-in reset for ${u.username}`);
+      load();
+    } catch (err) {
+      toast.error(errorMessage(err, 'Failed to reset two-step sign-in'));
+    }
+  }
+
   async function handleDelete(u: User) {
     if (!(await confirm({
       title: `Delete ${u.username}?`,
@@ -126,6 +143,12 @@ export default function UsersPage() {
     return [
       { label: 'Edit', icon: faPen, onClick: () => setModalUser(u), hidden: !canEdit },
       { label: 'Send password reset', icon: faKey, onClick: () => sendReset(u), hidden: !canEdit },
+      {
+        label: 'Reset two-step sign-in',
+        icon: faRotateLeft,
+        onClick: () => handleResetMfa(u),
+        hidden: !canEdit || isMe || !(u.mfaEnabled || u.passkeyCount),
+      },
       { label: 'Email user', icon: faEnvelope, onClick: () => { window.location.href = `mailto:${u.email}`; } },
       {
         label: 'Copy email',
@@ -205,8 +228,14 @@ export default function UsersPage() {
                       <span className={t.chips}>
                         {u.roles.length === 0 && <span className={t.faint}>No role</span>}
                         {u.roles.map((r) => <span key={r.id} className={`${t.chip} ${t.chipAccent}`}>{r.name}</span>)}
-                        {u.mfaEnabled && (
-                          <span className={t.chip} title="Two-factor authentication enabled">
+                        {(u.mfaEnabled || !!u.passkeyCount) && (
+                          <span
+                            className={t.chip}
+                            title={[
+                              u.mfaEnabled && 'Authenticator app',
+                              u.passkeyCount && `${u.passkeyCount} passkey${u.passkeyCount === 1 ? '' : 's'}`,
+                            ].filter(Boolean).join(' · ')}
+                          >
                             <FontAwesomeIcon icon={faShieldHalved} /> 2FA
                           </span>
                         )}

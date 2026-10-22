@@ -41,6 +41,11 @@ export async function updateUser(id: string, input: UpdateUserInput): Promise<Us
   return response.data.data;
 }
 
+/** Removes the user's authenticator app, backup codes and passkeys (for a locked-out user). */
+export async function resetUserMfa(id: string): Promise<void> {
+  await apiClient.post(`/users/${id}/reset-mfa`);
+}
+
 export async function deleteUser(id: string): Promise<void> {
   await apiClient.delete(`/users/${id}`);
 }

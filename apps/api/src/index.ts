@@ -2,11 +2,13 @@ import http from 'http';
 import { createApp } from './app';
 import { connectDatabase, disconnectDatabase } from './config/database';
 import { publishDuePosts } from './services/posts.service';
+import { applySchedules as applyPollSchedules } from './services/polls.service';
+import { failInterruptedDeliveries, retryDueDeliveries } from './services/telegram.service';
 import { initRealtime } from './realtime/notifications.gateway';
 import { prisma } from './config/database';
 import { startBackupScheduler, } from './services/backupScheduler';
 import { heartbeat, startHealthSampler } from './services/healthMonitor';
-import { seedSmtpFromEnv } from './services/settings.service';
+import { seedSmtpFromEnv, seedTelegramFromEnv } from './services/settings.service';
 import { reconcileBackupRecords } from './services/backup.service';
 import { startLogPrivacySweep } from './services/logger.service';
 import { startStorageWatch } from './services/storageWatch';
@@ -40,8 +42,10 @@ const PORT = parseInt(process.env.API_PORT || '3000', 10);
 const SCHEDULED_PUBLISH_INTERVAL_MS = 60 * 1000;
 
 function startScheduledPublisher(): NodeJS.Timeout {
+  // Scheduled posts and polls go live here, which is also when they're announced
+  // on Telegram; failed Telegram sends are retried on the same tick.
   const run = () =>
-    (heartbeat('publisher'), publishDuePosts()).catch((error) => {
+    (heartbeat('publisher'), Promise.all([publishDuePosts(), applyPollSchedules()]).then(() => retryDueDeliveries())).catch((error) => {
       console.error('Scheduled publish check failed:', error);
     });
   run();
@@ -54,6 +58,8 @@ async function start(): Promise<void> {
     // Connect to database
     await connectDatabase();
     await seedSmtpFromEnv();
+    await seedTelegramFromEnv();
+    await failInterruptedDeliveries();
     await reconcileBackupRecords();
 
     // Create the Express app and wrap it in an HTTP server so Socket.IO can

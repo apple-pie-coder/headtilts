@@ -470,7 +470,8 @@ a:hover > .story-media img { transform: scale(1.03); }
 .fp-poll { max-width: 680px; }
 .fp-otd { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 1rem 2rem; }
 .fp-otd-item { display: flex; align-items: center; gap: 0.9rem; }
-.fp-otd-item img, .fp-otd-ph { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: var(--n-tile); display: grid; place-items: center; font-size: 1.5rem; }
+.fp-otd-photo, .fp-otd-ph { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: var(--n-tile); display: grid; place-items: center; font-size: 1.5rem; }
+.fp-otd-photo img { width: 100%; height: 100%; object-fit: cover; transform: scale(var(--zoom, 1)); }
 .fp-otd-item strong { display: block; font-size: 1rem; color: var(--n-ink); }
 .fp-otd-item span span { font-size: 0.8125rem; color: var(--n-muted); }
 

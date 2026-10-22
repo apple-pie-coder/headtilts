@@ -4,6 +4,7 @@ import { ValidationError, NotFoundError, ConflictError } from '../utils/errors';
 import { slugify } from '@headtilts/shared';
 import { buildPostPath, getPermalinkStructure } from '../utils/permalinks';
 import * as notifications from './notifications.service';
+import * as telegram from './telegram.service';
 import { PostExtrasInput, assertPublishable, prepareExtras, saveExtras } from './postExtras';
 import { getDefaultCategoryId, withDefaultCategory } from './defaultCategory';
 
@@ -73,7 +74,7 @@ export async function publishDuePosts(): Promise<void> {
   // working link, then flip them to published.
   const due = await prisma.post.findMany({
     where: { status: 'scheduled', scheduledFor: { lte: new Date() } },
-    select: { id: true, title: true, authorId: true },
+    select: { id: true, title: true, authorId: true, type: true },
   });
   if (due.length === 0) return;
 
@@ -87,6 +88,7 @@ export async function publishDuePosts(): Promise<void> {
     notifications
       .notifyPostPublished({ id: post.id, title: post.title, authorId: post.authorId })
       .catch((error) => console.error('Post-published notification failed:', error));
+    if (post.type === 'post') telegram.announce('post', post.id);
   }
 }
 
@@ -187,6 +189,8 @@ interface PostInput extends PostExtrasInput {
   showSidebar?: boolean;
   commentStatus?: string | null;
   showToc?: string | null;
+  telegramPost?: string | null;
+  telegramLiveUpdates?: boolean;
   categoryIds?: number[];
   tagNames?: string[];
   authorId?: string | null;
@@ -314,6 +318,8 @@ export async function createPost(input: PostInput, authorId: string) {
         showSidebar: input.showSidebar ?? false,
         commentStatus: input.commentStatus ?? null,
         showToc: input.showToc ?? null,
+        telegramPost: input.telegramPost ?? null,
+        telegramLiveUpdates: input.telegramLiveUpdates ?? true,
         metaTitle: input.metaTitle || undefined,
         metaDescription: input.metaDescription || undefined,
         metaKeywords: input.metaKeywords || undefined,
@@ -360,6 +366,7 @@ export async function createPost(input: PostInput, authorId: string) {
 
   const post = await prisma.post.findUniqueOrThrow({ where: { id: createdId }, include: postInclude });
   if (post.status === 'scheduled' && post.scheduledFor) announceScheduled(post, authorId);
+  if (post.type === 'post' && post.status === 'published') telegram.announce('post', post.id);
   return withPublicUrl(post);
 }
 
@@ -418,6 +425,8 @@ export async function updatePost(id: number, input: PostInput, actorId?: string)
         ...(input.showSidebar !== undefined ? { showSidebar: input.showSidebar } : {}),
         ...(input.commentStatus !== undefined ? { commentStatus: input.commentStatus } : {}),
         ...(input.showToc !== undefined ? { showToc: input.showToc } : {}),
+        ...(input.telegramPost !== undefined ? { telegramPost: input.telegramPost } : {}),
+        ...(input.telegramLiveUpdates !== undefined ? { telegramLiveUpdates: input.telegramLiveUpdates } : {}),
         ...(input.authorId !== undefined ? { authorId: input.authorId || null } : {}),
         ...(resolvedStatus
           ? {
@@ -481,6 +490,9 @@ export async function updatePost(id: number, input: PostInput, actorId?: string)
     && (existing.status !== 'scheduled' || existing.scheduledFor?.getTime() !== post.scheduledFor.getTime())) {
     announceScheduled(post, actorId);
   }
+  if (post.type === 'post' && existing.status !== 'published' && post.status === 'published') {
+    telegram.announce('post', post.id);
+  }
   if (post.type === 'post' && existing.status === 'published' && post.status === 'published'
     && existing.publishedAt && post.publishedAt && existing.publishedAt.getTime() !== post.publishedAt.getTime()) {
     await redirectMovedPost(existing, post);
@@ -540,6 +552,8 @@ export async function duplicatePost(id: number, authorId: string) {
       showSidebar: original.showSidebar,
       commentStatus: original.commentStatus,
       showToc: original.showToc,
+      telegramPost: original.telegramPost,
+      telegramLiveUpdates: original.telegramLiveUpdates,
       metaTitle: original.metaTitle,
       metaDescription: original.metaDescription,
       metaKeywords: original.metaKeywords,
@@ -590,11 +604,16 @@ export async function bulkUpdatePosts(ids: number[], action: string) {
   const status = statusMap[action];
   if (!status) throw new ValidationError(`Unknown action: ${action}`);
   if (action === 'publish') {
+    const newlyLive = await prisma.post.findMany({
+      where: { id: { in: ids }, type: 'post', status: { not: 'published' } },
+      select: { id: true },
+    });
     // Already-published posts keep their date; only posts without one get today's.
     const [dated, undated] = await prisma.$transaction([
       prisma.post.updateMany({ where: { id: { in: ids }, publishedAt: { not: null } }, data: { status, scheduledFor: null } }),
       prisma.post.updateMany({ where: { id: { in: ids }, publishedAt: null }, data: { status, publishedAt: new Date(), scheduledFor: null } }),
     ]);
+    for (const { id } of newlyLive) telegram.announce('post', id);
     return dated.count + undated.count;
   }
   const { count } = await prisma.post.updateMany({ where: { id: { in: ids } }, data: { status } });

@@ -8,7 +8,9 @@ import { validateEmail, validatePassword, validateUsername } from '@headtilts/sh
 import { sendBuilt } from './mail.service';
 import { passwordReset } from './emailContent';
 import * as mfaService from './mfa.service';
+import * as passkeyService from './passkey.service';
 import { accountChanged } from './security.service';
+import type { RegistrationResponseJSON } from '@simplewebauthn/server';
 
 // Compared against when the account doesn't exist, so a login attempt takes
 // the same time either way and can't be used to discover valid usernames.
@@ -200,13 +202,22 @@ export async function login(identifier: string, password: string) {
   const isPasswordValid = await bcrypt.compare(String(password), user?.password ?? DUMMY_PASSWORD_HASH);
   if (!user || !isPasswordValid || !user.isActive) throw new UnauthorizedError('Invalid credentials');
 
-  if (user.mfaEnabled) {
-    return { mfaRequired: true, mfaToken: signMfaToken(user.id) };
-  }
-  // The user's role requires MFA but they haven't set it up yet: let them
-  // enrol now (via the MFA token) instead of locking them out.
-  if (await mfaService.isMfaRequiredForUser(user.id)) {
-    return { mfaRequired: true, mfaSetupRequired: true, mfaToken: signMfaToken(user.id) };
+  // A second step is needed when the user turned on an authenticator app or
+  // their role requires it; a passkey or backup code can stand in for the app.
+  const requiredByRole = !user.mfaEnabled && await mfaService.isMfaRequiredForUser(user.id);
+  if (user.mfaEnabled || requiredByRole) {
+    const passkeys = await passkeyService.countPasskeys(user.id);
+    // The role requires MFA but nothing is set up yet: let them enrol now
+    // (via the MFA token) instead of locking them out.
+    if (!user.mfaEnabled && !passkeys) {
+      return { mfaRequired: true, mfaSetupRequired: true, mfaToken: signMfaToken(user.id) };
+    }
+    const methods = [
+      ...(user.mfaEnabled ? ['totp'] : []),
+      ...(passkeys ? ['passkey'] : []),
+      ...(mfaService.backupCodesRemaining(user.mfaBackupCodes) ? ['backup'] : []),
+    ];
+    return { mfaRequired: true, mfaToken: signMfaToken(user.id), methods };
   }
 
   const { accessToken, refreshToken } = buildTokensForUser(user as Parameters<typeof buildTokensForUser>[0]);
@@ -263,10 +274,19 @@ export async function enableMfa(userId: string, totpCode: string) {
  * set it up yet. Only usable with the short-lived MFA token from login (i.e.
  * after the password was verified) and only while MFA is not yet enabled.
  */
-export async function startMfaEnrollment(userId: string) {
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, mfaEnabled: true, isActive: true } });
+async function assertNothingEnrolled(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, mfaEnabled: true, isActive: true, _count: { select: { passkeys: true } } },
+  });
   if (!user || !user.isActive) throw new UnauthorizedError('User not found');
-  if (user.mfaEnabled) throw new ApiError('MFA_ALREADY_ENABLED', 'MFA is already enabled', 409);
+  // Once any second step exists, the password alone must not be able to add another.
+  if (user.mfaEnabled || user._count.passkeys) throw new ApiError('MFA_ALREADY_ENABLED', 'MFA is already enabled', 409);
+  return user;
+}
+
+export async function startMfaEnrollment(userId: string) {
+  const user = await assertNothingEnrolled(userId);
 
   const secret = mfaService.generateSecret();
   const otpauthUrl = mfaService.getOtpAuthUrl(secret, user.email);
@@ -276,9 +296,80 @@ export async function startMfaEnrollment(userId: string) {
 }
 
 export async function completeMfaEnrollment(userId: string, code: string) {
+  await assertNothingEnrolled(userId);
   const { backupCodes } = await enableMfa(userId, code);
   const session = await completeMfaLogin(userId);
   return { ...session, backupCodes };
+}
+
+/** Login-time enrolment with a passkey instead of an authenticator app. */
+export async function startPasskeyEnrollment(userId: string) {
+  await assertNothingEnrolled(userId);
+  return passkeyService.registrationOptions(userId);
+}
+
+export async function completePasskeyEnrollment(
+  userId: string,
+  challengeId: unknown,
+  response: RegistrationResponseJSON,
+  name: string,
+) {
+  await assertNothingEnrolled(userId);
+  await passkeyService.registerPasskey(userId, challengeId, response, name);
+  // Backup codes are the way back in if the passkey is lost.
+  const { plain, hashed } = mfaService.generateBackupCodes();
+  await prisma.user.update({ where: { id: userId }, data: { mfaBackupCodes: JSON.stringify(hashed) } });
+  await accountChanged(userId, 'passkey_added');
+  const session = await completeMfaLogin(userId);
+  return { ...session, backupCodes: plain };
+}
+
+/** Password plus a current authenticator or backup code, for changes a stolen session must not make. */
+async function confirmPasswordAndCode(
+  userId: string,
+  user: { password: string; mfaSecret: string | null },
+  password: string,
+  code: string,
+) {
+  const isPasswordValid = await bcrypt.compare(String(password), user.password);
+  if (!isPasswordValid) throw new ValidationError('Incorrect password');
+  const codeOk = (user.mfaSecret && await mfaService.verifyAndConsumeTotp(userId, user.mfaSecret, code))
+    || await mfaService.consumeBackupCode(userId, code);
+  if (!codeOk) throw new ValidationError('Invalid authentication code');
+}
+
+export async function regenerateBackupCodes(userId: string, password: string, code: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { password: true, mfaEnabled: true, mfaSecret: true } });
+  if (!user) throw new ApiError('NOT_FOUND', 'User not found', 404);
+  if (!user.mfaEnabled) throw new ApiError('MFA_NOT_ENABLED', 'MFA is not enabled', 400);
+  await confirmPasswordAndCode(userId, user, password, code);
+
+  const { plain, hashed } = mfaService.generateBackupCodes();
+  await prisma.user.update({ where: { id: userId }, data: { mfaBackupCodes: JSON.stringify(hashed) } });
+  return { backupCodes: plain };
+}
+
+// ── Passkeys (signed in) ─────────────────────────────────────────────────────
+
+/** Adding a passkey needs the password: a stolen session must not be able to plant one. */
+export async function passkeyRegistrationOptions(userId: string, password: unknown) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { password: true } });
+  if (!user) throw new ApiError('NOT_FOUND', 'User not found', 404);
+  if (typeof password !== 'string' || !(await bcrypt.compare(password, user.password))) {
+    throw new ValidationError('Incorrect password');
+  }
+  return passkeyService.registrationOptions(userId);
+}
+
+export async function addPasskey(userId: string, challengeId: unknown, response: RegistrationResponseJSON, name: string) {
+  const passkey = await passkeyService.registerPasskey(userId, challengeId, response, name);
+  await accountChanged(userId, 'passkey_added');
+  return passkey;
+}
+
+export async function removePasskey(userId: string, id: number) {
+  await passkeyService.deletePasskey(userId, id);
+  await accountChanged(userId, 'passkey_removed');
 }
 
 export async function disableMfa(userId: string, password: string, code: string) {
@@ -286,17 +377,14 @@ export async function disableMfa(userId: string, password: string, code: string)
   if (!user) throw new ApiError('NOT_FOUND', 'User not found', 404);
   if (!user.mfaEnabled) throw new ApiError('MFA_NOT_ENABLED', 'MFA is not enabled', 400);
 
-  const isPasswordValid = await bcrypt.compare(String(password), user.password);
-  if (!isPasswordValid) throw new UnauthorizedError('Invalid password');
-
   // A stolen session + password must not be enough to strip the second factor.
-  const codeOk = (user.mfaSecret && await mfaService.verifyAndConsumeTotp(userId, user.mfaSecret, code))
-    || await mfaService.consumeBackupCode(userId, code);
-  if (!codeOk) throw new UnauthorizedError('Invalid authentication code');
+  await confirmPasswordAndCode(userId, user, password, code);
 
+  // Backup codes still cover lost passkeys, so they stay while any remain.
+  const keepBackupCodes = await passkeyService.countPasskeys(userId) > 0;
   await prisma.user.update({
     where: { id: userId },
-    data: { mfaEnabled: false, mfaSecret: null, mfaBackupCodes: null },
+    data: { mfaEnabled: false, mfaSecret: null, ...(keepBackupCodes ? {} : { mfaBackupCodes: null }) },
   });
   await accountChanged(userId, 'mfa_off');
 }

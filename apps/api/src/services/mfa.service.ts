@@ -1,4 +1,4 @@
-import { generateSecret as otpGenerateSecret, generateSync, verifySync, generateURI } from 'otplib';
+import { generateSecret as otpGenerateSecret, verifySync, generateURI } from 'otplib';
 import * as qrcode from 'qrcode';
 import crypto from 'crypto';
 import { prisma } from '../config/database';
@@ -74,12 +74,25 @@ export async function consumeBackupCode(userId: string, inputCode: string): Prom
   return count === 1;
 }
 
-export async function getMfaStatus(userId: string): Promise<{ enabled: boolean; backupCodesRemaining: number }> {
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { mfaEnabled: true, mfaBackupCodes: true } });
+export function backupCodesRemaining(stored: string | null): number {
+  return stored ? (JSON.parse(stored) as string[]).length : 0;
+}
+
+export async function getMfaStatus(userId: string): Promise<{
+  enabled: boolean; backupCodesRemaining: number; passkeys: number; required: boolean;
+}> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { mfaEnabled: true, mfaBackupCodes: true, _count: { select: { passkeys: true } } },
+  });
   if (!user) throw new ApiError('USER_NOT_FOUND', 'User not found', 404);
 
-  const backupCodesRemaining = user.mfaBackupCodes ? (JSON.parse(user.mfaBackupCodes) as string[]).length : 0;
-  return { enabled: user.mfaEnabled, backupCodesRemaining };
+  return {
+    enabled: user.mfaEnabled,
+    backupCodesRemaining: backupCodesRemaining(user.mfaBackupCodes),
+    passkeys: user._count.passkeys,
+    required: await isMfaRequiredForUser(userId),
+  };
 }
 
 export async function isMfaRequiredForUser(userId: string): Promise<boolean> {
@@ -89,6 +102,3 @@ export async function isMfaRequiredForUser(userId: string): Promise<boolean> {
   });
   return userRoles.some((ur) => ur.role.mfaRequired);
 }
-
-// Suppress unused import warning — generateSync is available for future use
-void generateSync;

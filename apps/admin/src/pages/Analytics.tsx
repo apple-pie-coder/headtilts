@@ -755,16 +755,16 @@ export default function AnalyticsPage() {
               disabled={refreshing} title="Refresh now">
               <FontAwesomeIcon icon={faRotate} className={refreshing ? styles.spin : ''} />
             </button>
-            <button type="button" className={styles.exportBtn} onClick={handleExport}>
-              <FontAwesomeIcon icon={faDownload} /> Export CSV
+            <button type="button" className={styles.exportBtn} onClick={handleExport} aria-label="Export CSV">
+              <FontAwesomeIcon icon={faDownload} /> <span className={styles.exportLabel}>Export CSV</span>
             </button>
           </div>
         </div>
 
         {/* Tab bar */}
-        <div className={styles.tabBar}>
+        <div className={styles.tabBar} role="tablist">
           {visibleTabs.map((t) => (
-            <button key={t.id} type="button"
+            <button key={t.id} type="button" role="tab" aria-selected={tab === t.id}
               className={`${styles.tabBtn} ${tab === t.id ? styles.tabBtnActive : ''}`}
               onClick={() => setTab(t.id)}>
               <FontAwesomeIcon icon={t.icon} />

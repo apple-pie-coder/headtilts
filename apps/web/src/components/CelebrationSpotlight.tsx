@@ -5,6 +5,7 @@ import { faXmark, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-
 import { resolveMediaUrl } from '../services/api';
 import { fetchTodaysCelebrations } from '../services/celebrations';
 import { Celebration } from '../types';
+import { framingStyle } from '../utils/focus';
 
 const ROTATE_MS = 6000;
 const CONFETTI_COLORS = ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93', '#ff924c'];
@@ -43,11 +44,18 @@ function CelebrationSlide({ item }: { item: Celebration }) {
 
   return (
     <div className={`celebration-slide celebration-slide--${item.type}`}>
-      <div className="celebration-photo-wrap">
+      <div className={`celebration-photo-wrap${item.photo ? '' : ' celebration-photo-wrap--empty'}`}>
         {item.photo ? (
-          <img className="celebration-photo" src={resolveMediaUrl(item.photo)} alt={item.name} />
+          <div className="celebration-photo-frame">
+            <img
+              className="celebration-photo"
+              src={resolveMediaUrl(item.photo)}
+              alt={item.name}
+              style={framingStyle(item.photoFocus, item.photoZoom)}
+            />
+          </div>
         ) : (
-          <div className="celebration-photo celebration-photo--placeholder" aria-hidden>
+          <div className="celebration-photo--placeholder" aria-hidden>
             {isBirthday ? '🎂' : '🕯️'}
           </div>
         )}

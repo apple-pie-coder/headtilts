@@ -56,6 +56,7 @@ export const ARTICLE_TYPE_OPTIONS: Option[] = [
   { value: 'news', label: 'News' },
   { value: 'review', label: 'Reviews' },
   { value: 'qna', label: 'Q&A interviews' },
+  { value: 'live', label: 'Live coverage' },
   { value: 'article', label: 'Articles' },
 ];
 

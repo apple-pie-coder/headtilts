@@ -59,6 +59,7 @@ export async function registerForEvent(
     ticketTierId?: number;
     quantity?: number;
     customData?: Record<string, unknown>;
+    turnstileToken?: string;
   },
 ): Promise<EventRegistrationResult> {
   return post<EventRegistrationResult>(`/public/events/${slug}/register`, input);
@@ -77,16 +78,40 @@ export async function verifyEventPayment(
 }
 
 export interface Booking {
+  id: number;
   ticketCode: string;
   name: string;
   quantity: number;
   status: 'confirmed' | 'pending' | 'waitlisted' | 'cancelled';
-  event: { slug: string; title: string; startAt: string };
+  tier: string | null;
+  checkedInCount: number;
+  paymentStatus: string;
+  event: { slug: string; title: string; startAt: string; endAt: string; timezone: string; venueName: string | null; venueCity: string | null };
   canCancel: boolean;
+  /** Set when the booking gets you in: what to show at the door. */
+  ticket: { live: boolean } | null;
 }
 
-export async function fetchBooking(ticketCode: string): Promise<Booking> {
-  return get<Booking>(`/public/events/ticket/${encodeURIComponent(ticketCode)}`);
+/**
+ * The booking behind a ticket link, plus how far this phone's clock is from
+ * the server's: a live ticket's code depends on the time, and a phone clock
+ * a minute out would make every code look expired at the door.
+ */
+export async function fetchBooking(ticketCode: string): Promise<{ booking: Booking; clockOffset: number }> {
+  const sent = Date.now();
+  const res = await fetch(`${BASE}/public/events/ticket/${encodeURIComponent(ticketCode)}`, { cache: 'no-store' });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error?.message ?? `Request failed: ${res.status}`);
+  const received = Date.now();
+  // The Date header is whole seconds, so on average half a second behind.
+  const serverTime = Date.parse(res.headers.get('Date') ?? '') + 500;
+  const clockOffset = Number.isNaN(serverTime) ? 0 : serverTime - (sent + received) / 2;
+  return { booking: json.data as Booking, clockOffset: Math.abs(clockOffset) < 1500 ? 0 : clockOffset };
+}
+
+/** The link in the "confirm your email" message: confirms and returns the new ticket. */
+export async function confirmRegistrationEmail(token: string): Promise<{ ticketCode: string; slug: string }> {
+  return post<{ ticketCode: string; slug: string }>('/public/events/confirm-email', { token });
 }
 
 export async function cancelRegistration(ticketCode: string): Promise<Booking> {

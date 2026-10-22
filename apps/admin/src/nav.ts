@@ -3,7 +3,7 @@ import {
   faGaugeHigh, faPenToSquare, faFileLines, faImages, faComments, faLayerGroup,
   faTags, faBars, faPuzzlePiece, faUsers, faUserShield, faSitemap, faEnvelope,
   faSliders, faCakeCandles, faChartBar, faKey, faArrowRight, faChartLine, faChartPie,
-  faBoxArchive, faClipboardList, faCalendarAlt, faHeartPulse, faUpload, faFileImport, faCommentDots, faListCheck, faTableCellsLarge
+  faBoxArchive, faClipboardList, faCalendarAlt, faHeartPulse, faUpload, faFileImport, faCommentDots, faListCheck, faTableCellsLarge, faQrcode
 } from '@fortawesome/free-solid-svg-icons';
 import { PERMISSIONS } from '@headtilts/shared';
 
@@ -49,6 +49,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: 'Contact', to: '/admin/contact', icon: faEnvelope, permission: PERMISSIONS.CONTACT_READ, badge: 'contact', hotkey: 'i' },
       { label: 'Polls', to: '/admin/polls', icon: faChartBar, permission: PERMISSIONS.POLL_READ },
       { label: 'Events', to: '/admin/events', icon: faCalendarAlt, permission: PERMISSIONS.EVENT_READ, hotkey: 'e' },
+      { label: 'Scan tickets', to: '/admin/scan', icon: faQrcode, permission: PERMISSIONS.EVENT_CHECK_IN },
       { label: 'Celebrations', to: '/admin/celebrations', icon: faCakeCandles, permission: PERMISSIONS.CELEBRATION_READ },
     ],
   },

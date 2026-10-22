@@ -4,7 +4,7 @@
  * Keep in step with Settings.tsx when adding fields.
  */
 export interface SettingEntry {
-  tab: 'General' | 'Reading' | 'Discussion' | 'Media' | 'Permalinks' | 'Analytics' | 'Email' | 'Notifications';
+  tab: 'General' | 'Reading' | 'Discussion' | 'Media' | 'Permalinks' | 'Analytics' | 'Email' | 'Telegram' | 'Notifications';
   label: string;
   section: string;
   id?: string;
@@ -24,6 +24,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { tab: 'General', section: 'Site Identity', label: 'Dark mode logo', keywords: 'brand image night' },
   { tab: 'General', section: 'Site Identity', label: 'Site favicon', keywords: 'icon tab browser' },
   { tab: 'General', section: 'Site Identity', label: 'Admin favicon', keywords: 'icon tab browser' },
+  { tab: 'General', section: 'Site Identity', label: 'Collapsed sidebar icon', keywords: 'logo admin rail mark' },
   { tab: 'General', section: 'Site Identity', label: 'Public logo height', id: 'site_logo_height', keywords: 'size' },
   { tab: 'General', section: 'Site Identity', label: 'Admin logo height', id: 'admin_logo_height', keywords: 'size sidebar' },
   { tab: 'General', section: 'Site Identity', label: 'Site description', id: 'site_description', keywords: 'seo meta about' },
@@ -75,6 +76,15 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { tab: 'Email', section: 'Credentials', label: 'SMTP password', id: 'smtp_pass', keywords: 'login' },
   { tab: 'Email', section: 'Sender', label: 'From address', id: 'smtp_from', keywords: 'sender reply' },
   { tab: 'Email', section: 'Email Sending', label: 'Send a test email', keywords: 'check smtp test' },
+
+  // Telegram
+  { tab: 'Telegram', section: 'Posting', label: 'Post to a Telegram channel', keywords: 'telegram channel announce share social auto post' },
+  { tab: 'Telegram', section: 'Bot and channel', label: 'Telegram bot token', id: 'telegram_bot_token', keywords: 'botfather telegram token' },
+  { tab: 'Telegram', section: 'Bot and channel', label: 'Telegram channel', id: 'telegram_chat_id', keywords: 'telegram channel chat id username' },
+  { tab: 'Telegram', section: 'What gets posted', label: 'Which posts, events and polls go to Telegram', keywords: 'telegram news reviews interviews articles events polls types' },
+  { tab: 'Telegram', section: 'What gets posted', label: 'Telegram live blog updates', id: 'telegram_live_updates', keywords: 'telegram live blog thread replies' },
+  { tab: 'Telegram', section: 'What gets posted', label: 'Send Telegram messages silently', id: 'telegram_silent', keywords: 'telegram notification sound quiet' },
+  { tab: 'Telegram', section: 'Recent messages', label: 'Telegram messages sent and failed', keywords: 'telegram log history retry failed' },
 
   // Notifications
   { tab: 'Notifications', section: 'Notification Preferences', label: 'Notification preferences', keywords: 'alerts email in-app bell' },

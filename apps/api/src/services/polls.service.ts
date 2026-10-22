@@ -1,6 +1,7 @@
 import { prisma } from '../config/database';
 import { ValidationError, NotFoundError } from '../utils/errors';
 import { slugify } from '@headtilts/shared';
+import * as telegram from './telegram.service';
 
 const OPTION_SELECT = {
   id: true,
@@ -24,6 +25,7 @@ const POLL_SELECT = {
   startsAt: true,
   endsAt: true,
   featuredImage: true,
+  telegramPost: true,
   postId: true,
   createdAt: true,
   updatedAt: true,
@@ -45,6 +47,8 @@ export interface PollInput {
   startsAt?: string | null;
   endsAt?: string | null;
   featuredImage?: string | null;
+  /** "yes" / "no" overrides the Telegram setting for polls; null follows it. */
+  telegramPost?: string | null;
   postId?: number | null;
   options: { id?: number; text: string; order: number }[];
 }
@@ -83,7 +87,7 @@ export async function createPoll(input: PollInput) {
   const existing = await prisma.poll.findUnique({ where: { slug } });
   if (existing) throw new ValidationError(`Slug "${slug}" is already in use`);
 
-  return prisma.poll.create({
+  const created = await prisma.poll.create({
     data: {
       title: input.title.trim(),
       question: input.question.trim(),
@@ -98,6 +102,7 @@ export async function createPoll(input: PollInput) {
       startsAt: input.startsAt ? new Date(input.startsAt) : null,
       endsAt: input.endsAt ? new Date(input.endsAt) : null,
       featuredImage: input.featuredImage || null,
+      telegramPost: telegramOverride(input.telegramPost) ?? null,
       postId: input.postId || null,
       options: {
         create: input.options.map((o) => ({ text: o.text.trim(), order: o.order })),
@@ -105,7 +110,12 @@ export async function createPoll(input: PollInput) {
     },
     select: POLL_SELECT,
   });
+  if (created.status === 'open') telegram.announce('poll', created.id);
+  return created;
 }
+
+const telegramOverride = (v: string | null | undefined) =>
+  v === undefined ? undefined : v === 'yes' || v === 'no' ? v : null;
 
 export async function updatePoll(id: number, input: Partial<PollInput>) {
   const poll = await prisma.poll.findUnique({ where: { id } });
@@ -129,7 +139,7 @@ export async function updatePoll(id: number, input: Partial<PollInput>) {
     }
   }
 
-  return prisma.poll.update({
+  const updated = await prisma.poll.update({
     where: { id },
     data: {
       ...(input.title && { title: input.title.trim() }),
@@ -145,10 +155,13 @@ export async function updatePoll(id: number, input: Partial<PollInput>) {
       ...(input.startsAt !== undefined && { startsAt: input.startsAt ? new Date(input.startsAt) : null }),
       ...(input.endsAt !== undefined && { endsAt: input.endsAt ? new Date(input.endsAt) : null }),
       ...(input.featuredImage !== undefined && { featuredImage: input.featuredImage || null }),
+      ...(input.telegramPost !== undefined && { telegramPost: telegramOverride(input.telegramPost) }),
       ...(input.postId !== undefined && { postId: input.postId || null }),
     },
     select: POLL_SELECT,
   });
+  if (poll.status !== 'open' && updated.status === 'open') telegram.announce('poll', id);
+  return updated;
 }
 
 export async function deletePoll(id: number) {
@@ -251,6 +264,7 @@ export async function getPublicPoll(slug: string, voterIdentifier?: string) {
   if (poll.status === 'scheduled' && poll.startsAt && poll.startsAt <= now) {
     await prisma.poll.update({ where: { id: poll.id }, data: { status: 'open' } });
     poll.status = 'open';
+    telegram.announce('poll', poll.id);
   }
   if (poll.status === 'open' && poll.endsAt && poll.endsAt < now) {
     await prisma.poll.update({ where: { id: poll.id }, data: { status: 'closed' } });
@@ -309,10 +323,14 @@ export async function getPublicPoll(slug: string, voterIdentifier?: string) {
   };
 }
 
-/** Open or close polls whose schedule has passed, so lists are accurate. */
-async function applySchedules() {
+/** Open or close polls whose schedule has passed, so lists are accurate. Also run by the publisher every minute. */
+export async function applySchedules() {
   const now = new Date();
-  await prisma.poll.updateMany({ where: { status: 'scheduled', startsAt: { lte: now } }, data: { status: 'open' } });
+  const opening = await prisma.poll.findMany({ where: { status: 'scheduled', startsAt: { lte: now } }, select: { id: true } });
+  if (opening.length) {
+    await prisma.poll.updateMany({ where: { id: { in: opening.map((p) => p.id) }, status: 'scheduled' }, data: { status: 'open' } });
+    for (const { id } of opening) telegram.announce('poll', id);
+  }
   await prisma.poll.updateMany({ where: { status: 'open', endsAt: { lt: now } }, data: { status: 'closed' } });
 }
 

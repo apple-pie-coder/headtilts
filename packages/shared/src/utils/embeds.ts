@@ -28,7 +28,7 @@ export const STREAMING_SERVICES: StreamingServiceInfo[] = [
 
 export type StreamingLinks = Partial<Record<StreamingService, string>>;
 
-export const ARTICLE_TYPES = ['article', 'news', 'review', 'qna'] as const;
+export const ARTICLE_TYPES = ['article', 'news', 'review', 'qna', 'live'] as const;
 export type ArticleType = (typeof ARTICLE_TYPES)[number];
 
 export const REVIEW_SUBJECTS = ['album', 'ep', 'single'] as const;

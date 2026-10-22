@@ -21,13 +21,18 @@ const ALLOWED_SETTING_KEYS = new Set([
   // requires the system_backup permission. Otherwise SETTING_EDIT could redirect
   // backups (full DB dumps) to an attacker-controlled S3 endpoint.
   // Favicons
-  'site_favicon', 'admin_favicon',
+  'site_favicon', 'admin_favicon', 'admin_logo_icon',
   // Events carousel — managed via the gear icon on the Events admin page
   'event_carousel_autoplay', 'event_carousel_interval', 'event_carousel_pause_on_hover',
   'event_carousel_loop', 'event_carousel_show_arrows', 'event_carousel_show_dots',
   'event_carousel_count', 'event_carousel_transition',
   // Google Analytics (public site)
   'ga_measurement_id', 'ga_consent', 'ga_exclude_staff',
+  // Telegram channel (Settings → Telegram)
+  'telegram_enabled', 'telegram_bot_token', 'telegram_chat_id',
+  'telegram_post_article', 'telegram_post_news', 'telegram_post_review', 'telegram_post_qna',
+  'telegram_post_live', 'telegram_post_event', 'telegram_post_poll',
+  'telegram_live_updates', 'telegram_include_image', 'telegram_category_tags', 'telegram_silent',
 ]);
 
 // The measurement ID ends up in a script URL on every public page, so only a
@@ -40,12 +45,27 @@ const VALUE_RULES: Record<string, { test: (v: string) => boolean; message: strin
   },
   ga_consent: { test: (v) => v === 'banner' || v === 'none', message: 'Consent must be "banner" or "none"' },
   ga_exclude_staff: { test: (v) => v === 'yes' || v === 'no', message: 'Exclude staff must be "yes" or "no"' },
+  telegram_bot_token: {
+    normalize: (v) => v.trim(),
+    test: (v) => v === '' || /^\d{5,15}:[A-Za-z0-9_-]{30,50}$/.test(v),
+    message: 'A bot token looks like 123456789:AAE… (from @BotFather).',
+  },
+  telegram_chat_id: {
+    normalize: (v) => v.trim(),
+    test: (v) => v === '' || /^@[A-Za-z][A-Za-z0-9_]{3,31}$/.test(v) || /^-?\d{5,20}$/.test(v),
+    message: 'The channel is its @username or its numeric ID (e.g. -1001234567890).',
+  },
+  ...Object.fromEntries([
+    'telegram_enabled', 'telegram_post_article', 'telegram_post_news', 'telegram_post_review', 'telegram_post_qna',
+    'telegram_post_live', 'telegram_post_event', 'telegram_post_poll',
+    'telegram_live_updates', 'telegram_include_image', 'telegram_category_tags', 'telegram_silent',
+  ].map((key) => [key, { test: (v: string) => v === 'yes' || v === 'no', message: `${key} must be "yes" or "no"` }])),
 };
 
 // Secrets are never sent back to the browser; the UI echoes this placeholder
 // back when the field is left untouched, and it is then ignored on save.
 export const SECRET_MASK = '••••••••';
-const SECRET_KEYS = new Set(['smtp_pass']);
+const SECRET_KEYS = new Set(['smtp_pass', 'telegram_bot_token']);
 
 // Whoever controls the SMTP server receives every password-reset email, so
 // changing it is reserved for super-admins.
@@ -90,6 +110,17 @@ export async function seedSmtpFromEnv(): Promise<void> {
   if (count > 0) {
     console.log(`✓ Seeded ${count} SMTP setting(s) from environment into the database`);
   }
+}
+
+/** TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID in .env fill the settings once; the UI wins after that. */
+export async function seedTelegramFromEnv(): Promise<void> {
+  const data = [
+    { key: 'telegram_bot_token', value: process.env.TELEGRAM_BOT_TOKEN?.trim() },
+    { key: 'telegram_chat_id', value: process.env.TELEGRAM_CHAT_ID?.trim() },
+  ].filter((r): r is { key: string; value: string } => Boolean(r.value)).map((r) => ({ ...r, type: 'string' }));
+  if (!data.length) return;
+  const { count } = await prisma.setting.createMany({ data, skipDuplicates: true });
+  if (count > 0) console.log(`✓ Seeded ${count} Telegram setting(s) from environment into the database`);
 }
 
 export async function updateSettings(input: Record<string, unknown>, requestingUserId: string) {

@@ -13,16 +13,22 @@ import { buildPostPath, getPermalinkStructure, matchPostPath } from '../utils/pe
 import { getCalendarMonth } from '../services/calendar.service';
 import { getTodaysCelebrations } from '../services/celebrations.service';
 import { getPublicPoll, submitVote, listPublicPolls } from '../services/polls.service';
-import { listPublicEvents, getPublicEvent, registerForEvent, verifyPayment, cancelRegistration, generateIcal } from '../services/events.service';
+import {
+  listPublicEvents, getPublicEvent, registerForEvent, verifyPayment, cancelRegistration, generateIcal,
+  verifyRazorpayWebhook, handleRazorpayWebhook, confirmRegistrationEmail,
+} from '../services/events.service';
 import { searchAll, searchType } from '../services/search.service';
 import { log } from '../services/logger.service';
 import rateLimit from 'express-rate-limit';
 import { publicReadLimiter } from '../middleware/rateLimit';
 import { ApiError, ValidationError } from '../utils/errors';
 import { clientIp } from '../utils/clientIp';
+import { turnstileSiteKey, verifyTurnstile } from '../utils/turnstile';
+import type { Prisma } from '@prisma/client';
 import { postPublicSelect } from '../services/publicSelect';
 import { getPublicFrontPage } from '../services/frontPage.service';
 import { buildFeed } from '../services/feed.service';
+import { liveUpdatePublicSelect, publicFeed } from '../services/liveUpdates.service';
 
 // Throttle comment/reaction writes per IP
 const commentLimiter = rateLimit({
@@ -79,6 +85,7 @@ const postPublicFullSelect = {
     },
   },
   qna: { select: { subject: true, subjectType: true, sessionDate: true, host: true, items: true } },
+  liveUpdates: { select: liveUpdatePublicSelect, orderBy: { createdAt: 'desc' as const } },
   showToc: true,
   metaTitle: true,
   metaDescription: true,
@@ -93,7 +100,7 @@ const postPublicFullSelect = {
 router.get('/site-settings', publicReadLimiter, asyncHandler(async (_req: Request, res: Response) => {
   const SAFE_KEYS = [
     'site_title', 'site_tagline', 'show_tagline', 'site_logo', 'site_logo_dark', 'site_logo_height', 'admin_logo_height', 'site_description',
-    'site_favicon', 'admin_favicon',
+    'site_favicon', 'admin_favicon', 'admin_logo_icon',
     'timezone', 'date_format', 'time_format',
     'posts_per_page', 'front_page_display', 'front_page_id', 'posts_page_id',
     'contact_page_id', 'about_page_id', 'privacy_policy_page_id', 'terms_page_id',
@@ -124,6 +131,10 @@ router.get('/site-settings', publicReadLimiter, asyncHandler(async (_req: Reques
       }
     });
   }
+
+  // The bot check on the ticket form, when it's set up (TURNSTILE_* env vars).
+  const turnstile = turnstileSiteKey();
+  if (turnstile) settings.turnstile_site_key = turnstile;
 
   sendSuccess(res, settings);
 }));
@@ -190,6 +201,15 @@ router.get('/posts/:slug', publicReadLimiter, asyncHandler(async (req: Request, 
   if (!post) { sendError(res, 'NOT_FOUND', 'Post not found', 404); return; }
   // `cardImage` (not featuredImage) so the article doesn't print a banner it never had.
   sendSuccess(res, { ...post, cardImage: post.featuredImage ?? imageFromContent(post.content, post.videoUrl) });
+}));
+
+// GET /public/posts/:slug/live — a live blog's updates, polled by open pages.
+// Small and ETag'd, so an unchanged feed answers 304.
+router.get('/posts/:slug/live', publicReadLimiter, asyncHandler(async (req: Request, res: Response) => {
+  const feed = await publicFeed(req.params.slug);
+  if (!feed) { sendError(res, 'NOT_FOUND', 'Live blog not found', 404); return; }
+  res.set('Cache-Control', 'no-cache');
+  sendSuccess(res, feed);
 }));
 
 // GET /public/pages/:slug
@@ -921,6 +941,10 @@ const registerLimiter = rateLimit({
 });
 router.post('/events/:slug/register', registerLimiter, asyncHandler(async (req: Request, res: Response) => {
   try {
+    if (!(await verifyTurnstile(req.body?.turnstileToken, clientIp(req)))) {
+      sendError(res, 'BOT_CHECK_FAILED', 'We couldn’t check you’re not a bot. Please try again.', 400);
+      return;
+    }
     const result = await registerForEvent(req.params.slug, req.body);
     sendSuccess(res, result, 201);
   } catch (e) {
@@ -940,22 +964,72 @@ router.post('/events/:slug/register/verify', publicWriteLimiter(), asyncHandler(
   }
 }));
 
+// POST /public/payments/razorpay/webhook — payments completed, refunded or disputed outside checkout.
+// Set the webhook URL and secret (RAZORPAY_WEBHOOK_SECRET) in the Razorpay dashboard, with the
+// payment.authorized, payment.captured, refund.* and payment.dispute.* events.
+router.post('/payments/razorpay/webhook', asyncHandler(async (req: Request, res: Response) => {
+  const raw = (req as Request & { rawBody?: Buffer }).rawBody;
+  if (!verifyRazorpayWebhook(raw, req.get('X-Razorpay-Signature'))) {
+    sendError(res, 'UNAUTHORIZED', 'Bad webhook signature', 401);
+    return;
+  }
+  try {
+    const outcome = await handleRazorpayWebhook(req.body);
+    console.log('[razorpay] webhook', req.body?.event, '→', outcome);
+    sendSuccess(res, { outcome });
+  } catch (e) {
+    // A 5xx makes Razorpay retry later, which is what we want if their API or our DB blipped.
+    console.error('[razorpay] webhook failed', req.body?.event, e);
+    sendError(res, 'INTERNAL_ERROR', 'Webhook not processed', 500);
+  }
+}));
+
+// POST /public/events/confirm-email — the link in the "confirm your email" message.
+router.post('/events/confirm-email', publicWriteLimiter(), asyncHandler(async (req: Request, res: Response) => {
+  try {
+    sendSuccess(res, await confirmRegistrationEmail(String(req.body?.token ?? '')));
+  } catch (e) {
+    if (e instanceof ApiError) sendError(res, e.code, e.message, e.statusCode);
+    else sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+  }
+}));
+
+const BOOKING_SELECT = {
+  id: true, ticketCode: true, name: true, quantity: true, status: true, paymentStatus: true, checkedInCount: true,
+  ticketTier: { select: { name: true } },
+  event: { select: { slug: true, title: true, startAt: true, endAt: true, timezone: true, venueName: true, venueCity: true, liveTicketQr: true } },
+} as const;
+
 // What a ticket holder sees about their own booking (from the link in their email).
-function bookingView(reg: { ticketCode: string; name: string; quantity: number; status: string; event: { slug: string; title: string; startAt: Date } }) {
+// The ticket code is the secret here: whoever holds it can see and cancel the booking.
+function bookingView(reg: Prisma.EventRegistrationGetPayload<{ select: typeof BOOKING_SELECT }>) {
+  const { event } = reg;
   return {
+    id: reg.id,
     ticketCode: reg.ticketCode, name: reg.name, quantity: reg.quantity, status: reg.status,
-    event: { slug: reg.event.slug, title: reg.event.title, startAt: reg.event.startAt },
-    canCancel: reg.status !== 'cancelled' && reg.event.startAt > new Date(),
+    tier: reg.ticketTier?.name ?? null,
+    checkedInCount: reg.checkedInCount,
+    paymentStatus: reg.paymentStatus,
+    event: {
+      slug: event.slug, title: event.title, startAt: event.startAt, endAt: event.endAt, timezone: event.timezone,
+      venueName: event.venueName, venueCity: event.venueCity,
+    },
+    canCancel: reg.status !== 'cancelled' && event.startAt > new Date(),
+    // The QR is only worth showing for a ticket that gets you in.
+    ticket: reg.status === 'confirmed' && ['free', 'paid'].includes(reg.paymentStatus)
+      ? { live: event.liveTicketQr }
+      : null,
   };
 }
 
 // GET /public/events/ticket/:code — look up your booking by ticket code
 router.get('/events/ticket/:code', publicReadLimiter, asyncHandler(async (req: Request, res: Response) => {
   const reg = await prisma.eventRegistration.findUnique({
-    where: { ticketCode: req.params.code },
-    select: { ticketCode: true, name: true, quantity: true, status: true, event: { select: { slug: true, title: true, startAt: true } } },
+    where: { ticketCode: req.params.code.trim().toLowerCase() },
+    select: BOOKING_SELECT,
   });
-  if (!reg) { sendError(res, 'NOT_FOUND', 'We couldn’t find that booking', 404); return; }
+  if (!reg || reg.status === 'unconfirmed') { sendError(res, 'NOT_FOUND', 'We couldn’t find that booking', 404); return; }
+  res.setHeader('Cache-Control', 'no-store');
   sendSuccess(res, bookingView(reg));
 }));
 
@@ -963,7 +1037,8 @@ router.get('/events/ticket/:code', publicReadLimiter, asyncHandler(async (req: R
 router.post('/events/cancel/:code', publicWriteLimiter(), asyncHandler(async (req: Request, res: Response) => {
   try {
     const reg = await cancelRegistration(req.params.code);
-    sendSuccess(res, bookingView({ ...reg, status: 'cancelled' }));
+    const fresh = await prisma.eventRegistration.findUniqueOrThrow({ where: { id: reg.id }, select: BOOKING_SELECT });
+    sendSuccess(res, bookingView(fresh));
   } catch (e) {
     if (e instanceof ApiError) sendError(res, e.code, e.message, e.statusCode);
     else sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);

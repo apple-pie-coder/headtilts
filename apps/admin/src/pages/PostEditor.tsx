@@ -16,17 +16,19 @@ import { useToast } from '../components/ToastContext';
 import { ImageToolbar } from '../components/ImageToolbar';
 import { MediaLibraryModal } from '../components/MediaLibraryModal';
 import { useAuth } from '../hooks/useAuth';
-import { ArticleType, Category, Post, QnaSession, Review } from '../types';
+import { ArticleType, Category, LiveUpdate, Post, QnaSession, Review } from '../types';
 import { PostTypeSwitch } from '../components/editor/PostTypeSwitch';
 import { EMPTY_REVIEW, ReviewPanel } from '../components/editor/ReviewPanel';
 import { EMPTY_QNA, QnaPanel } from '../components/editor/QnaPanel';
+import { LivePanel, liveUpdatesToHtml } from '../components/editor/LivePanel';
 import { suggestSeo } from '../utils/seoSuggest';
 import { qnaToHtml } from '../utils/qnaParse';
 import { VideoField } from '../components/editor/VideoField';
 import { FocusPicker } from '../components/FocusPicker';
+import { TelegramPanel, TelegramChoice, fromTelegramChoice, toTelegramChoice } from '../components/TelegramPanel';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { SeoFields, SeoPanel } from '../components/editor/SeoPanel';
-import { analyzeSeo } from '../utils/seoAnalysis';
+import { analyzeSeo, scoreLabel } from '../utils/seoAnalysis';
 import type { CheckTarget } from '../utils/seoAnalysis';
 import { fetchPublicSettings } from '../services/settings';
 import { fetchCategories, createCategory } from '../services/categories';
@@ -259,6 +261,16 @@ function errorMessage(err: unknown, fallback: string): string {
   );
 }
 
+type MobileTab = 'write' | 'settings' | 'seo';
+
+const MOBILE_TABS: { id: MobileTab; label: string }[] = [
+  { id: 'write', label: 'Write' },
+  { id: 'settings', label: 'Settings' },
+  { id: 'seo', label: 'SEO' },
+];
+
+const STATUS_WORDS: Record<string, string> = { draft: 'Draft', published: 'Published', scheduled: 'Scheduled', pending: 'Pending review' };
+
 interface PostEditorPageProps {
   contentType?: 'post' | 'page';
 }
@@ -324,6 +336,8 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   const [showSidebar, setShowSidebar] = useState(false);
   const [commentStatus, setCommentStatus] = useState<'default' | 'open' | 'closed'>('default');
   const [showToc, setShowToc] = useState<'default' | 'yes' | 'no'>('default');
+  const [telegramPost, setTelegramPost] = useState<TelegramChoice>('default');
+  const [telegramLiveUpdates, setTelegramLiveUpdates] = useState(true);
   const [parentId, setParentId] = useState<number | null>(null);
   const [parentPages, setParentPages] = useState<Post[]>([]);
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
@@ -363,6 +377,10 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
 
   const [saving, setSaving] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  // Phones and tablets show one group of panels at a time (desktop shows all).
+  const [mobileTab, setMobileTab] = useState<MobileTab>('write');
+  const tabBarRef = useRef<HTMLDivElement>(null);
+  const layoutRef = useRef<HTMLDivElement>(null);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const buildInputRef = useRef<((s: string) => PostInput) | null>(null);
 
@@ -370,6 +388,8 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   const [videoUrl, setVideoUrl] = useState('');
   const [review, setReview] = useState<Review>(EMPTY_REVIEW);
   const [qna, setQna] = useState<QnaSession>(EMPTY_QNA);
+  // Reported by the live desk, which saves updates on its own; read here for the SEO checks.
+  const [liveUpdates, setLiveUpdates] = useState<LiveUpdate[]>([]);
   const [focusKeyword, setFocusKeyword] = useState('');
   const [site, setSite] = useState<{ title: string; favicon: string | null }>({ title: '', favicon: null });
 
@@ -384,8 +404,13 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   const effectiveType: ArticleType = isPage ? 'article' : articleType;
   const activeReview = effectiveType === 'review' ? review : null;
   const activeQna = effectiveType === 'qna' ? qna : null;
-  // A Q&A's questions and answers are page content too: analyse them with the text.
-  const analysedHtml = useMemo(() => deferredContent + (activeQna ? qnaToHtml(activeQna.items) : ''), [deferredContent, activeQna]);
+  // A Q&A's questions and answers, and a live blog's updates, are page content
+  // too: analyse them with the text.
+  const activeLive = effectiveType === 'live' ? liveUpdates : null;
+  const analysedHtml = useMemo(
+    () => deferredContent + (activeQna ? qnaToHtml(activeQna.items) : '') + (activeLive ? liveUpdatesToHtml(activeLive) : ''),
+    [deferredContent, activeQna, activeLive],
+  );
   const seoInputFor = (o: { metaTitle: string; metaDescription: string; focusKeyword: string; excerpt: string }) => ({
     title, slug: slug || slugify(title), contentHtml: analysedHtml, ...o,
     featuredImage, articleType: effectiveType, review: activeReview, qna: activeQna,
@@ -584,6 +609,8 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
     setShowSidebar(loaded.showSidebar ?? false);
     setCommentStatus(loaded.commentStatus === 'open' || loaded.commentStatus === 'closed' ? loaded.commentStatus : 'default');
     setShowToc(loaded.showToc === 'yes' || loaded.showToc === 'no' ? loaded.showToc : 'default');
+    setTelegramPost(toTelegramChoice(loaded.telegramPost));
+    setTelegramLiveUpdates(loaded.telegramLiveUpdates ?? true);
     setParentId(loaded.parentId ?? null);
     setTagsInput(loaded.tags.map(({ tag }) => tag.name).join(', '));
     setCategoryIds(loaded.categories.map(({ category }) => category.id));
@@ -764,6 +791,8 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
       showSidebar,
       commentStatus: isPage ? undefined : (commentStatus === 'default' ? null : commentStatus),
       showToc: showToc === 'default' ? null : showToc,
+      telegramPost: isPage ? undefined : fromTelegramChoice(telegramPost),
+      telegramLiveUpdates: isPage ? undefined : telegramLiveUpdates,
       categoryIds: isPage ? [] : categoryIds,
       tagNames: isPage ? [] : tagNames,
       authorId: selectedAuthorId || null,
@@ -813,8 +842,30 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
     setTagsInput(next.join(', '));
   }
 
+  /** Switch the phone tab and bring the start of its panels up under the tab bar. */
+  function showMobileTab(tab: MobileTab) {
+    setMobileTab(tab);
+    requestAnimationFrame(() => {
+      const bar = tabBarRef.current?.getBoundingClientRect();
+      const top = layoutRef.current?.getBoundingClientRect().top;
+      if (!bar || top === undefined || top >= bar.bottom) return;
+      document.getElementById('main-content')?.scrollBy({ top: top - bar.bottom - 8 });
+    });
+  }
+
   /** "Fix" buttons in the SEO panel scroll to and focus the field that resolves the check. */
   function jumpTo(target: CheckTarget) {
+    // On phones the field may sit on another tab: open it first, then scroll once it shows.
+    const tab: MobileTab = target === 'featuredImage' || target === 'categories' ? 'settings' : 'write';
+    if (tab !== mobileTab) {
+      setMobileTab(tab);
+      window.setTimeout(() => scrollToTarget(target), 50);
+    } else {
+      scrollToTarget(target);
+    }
+  }
+
+  function scrollToTarget(target: CheckTarget) {
     const el: HTMLElement | null =
       target === 'content' ? (document.querySelector<HTMLElement>('.ql-editor') ?? markdownTextareaRef.current)
       : target === 'slug' ? document.getElementById('post-slug-input')
@@ -1020,7 +1071,25 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
       </div>
 
 
-      <div className={styles.layout}>
+      <div className={styles.mobileTabs} ref={tabBarRef} role="tablist" aria-label="Editor sections">
+        {MOBILE_TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={mobileTab === t.id}
+            className={`${styles.mobileTab} ${mobileTab === t.id ? styles.mobileTabOn : ''}`}
+            onClick={() => showMobileTab(t.id)}
+          >
+            {t.label}
+            {t.id === 'seo' && (
+              <span className={`${styles.mobileTabScore} ${styles[`mobileTabScore_${scoreLabel(seoResult.score).tone}`]}`}>{seoResult.score}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      <div className={styles.layout} data-mtab={mobileTab} ref={layoutRef}>
         <div className={styles.contentColumn}>
           {!isPage && <PostTypeSwitch value={articleType} onChange={setArticleType} disabled={saving} />}
           <input
@@ -1058,6 +1127,12 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
           {!isPage && articleType === 'qna' && (
             <div className={styles.panel} id="qna-panel">
               <QnaPanel value={qna} onChange={setQna} contentHtml={content} disabled={saving} />
+            </div>
+          )}
+
+          {!isPage && articleType === 'live' && (
+            <div className={styles.panel} id="live-panel">
+              <LivePanel postId={post?.id} isPublished={post?.status === 'published'} onUpdatesChange={setLiveUpdates} />
             </div>
           )}
 
@@ -1111,7 +1186,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
             />
           </div>
 
-          <div className={styles.panel} id="seo-panel">
+          <div className={styles.panel} id="seo-panel" data-group="seo">
             <SeoPanel
               result={seoResult}
               fields={seoFields}
@@ -1142,7 +1217,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
           </div>
 
           {isEditing && canViewRevisions && (
-            <div className={styles.panel}>
+            <div className={styles.panel} data-group="settings">
               <div className={styles.revLogHeader}>
                 <h3 className={styles.revLogTitle}>
                   <FontAwesomeIcon icon={faHistory} style={{ marginRight: '0.4em', opacity: 0.7 }} /> Revision Log
@@ -1455,6 +1530,21 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
             </div>
           </div>
 
+          {!isPage && (
+            <div className={styles.panel} id="telegram-panel">
+              <h3>Telegram</h3>
+              <TelegramPanel
+                kind="post"
+                id={post?.id}
+                value={telegramPost}
+                onChange={setTelegramPost}
+                liveUpdates={articleType === 'live' ? { value: telegramLiveUpdates, onChange: setTelegramLiveUpdates } : undefined}
+                refreshKey={post?.updatedAt}
+                disabled={saving}
+              />
+            </div>
+          )}
+
           {isPage && (
             <div className={styles.panel}>
               <h3>Page Attributes</h3>
@@ -1701,6 +1791,36 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
             )}
           </div>
 
+        </div>
+      </div>
+
+      {/* Phones and tablets: save and preview stay in reach wherever you are. */}
+      <div className={styles.mobileBar}>
+        <span className={styles.mobileBarStatus}>
+          <span className={`${styles.mobileBarDot} ${post?.status === 'published' ? styles.mobileBarDotLive : ''}`} aria-hidden="true" />
+          {post ? STATUS_WORDS[post.status] ?? post.status : 'Not saved yet'}
+          {status !== (post?.status ?? 'draft') && status !== 'draft' && <> · {STATUS_WORDS[status] ?? status} on save</>}
+          {autosaveStatus === 'saving' && <> · Saving…</>}
+          {autosaveStatus === 'saved' && <> · Autosaved</>}
+        </span>
+        <div className={styles.mobileBarActions}>
+          {post?.status === 'published' && post.publicUrl ? (
+            <a className={styles.mobileBarGhost} href={post.publicUrl} target="_blank" rel="noreferrer">
+              View <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
+            </a>
+          ) : (
+            <button type="button" className={styles.mobileBarGhost} onClick={handlePreview} disabled={saving}>
+              Preview <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
+            </button>
+          )}
+          <button type="button" className={styles.draftButton} onClick={handleSaveDraft} disabled={saving}>
+            {saving && !(canPublish && status !== 'draft') ? 'Saving…' : 'Save Draft'}
+          </button>
+          {canPublish && status !== 'draft' && (
+            <button type="button" className={styles.primaryButton} onClick={handlePrimaryAction} disabled={saving}>
+              {saving ? 'Saving…' : primaryActionLabel()}
+            </button>
+          )}
         </div>
       </div>
 

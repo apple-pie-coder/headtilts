@@ -1,0 +1,118 @@
+.panel { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.select {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--input-border, var(--border));
+  border-radius: var(--r-sm);
+  background: var(--input-bg);
+  color: var(--t1);
+  font: inherit;
+  font-size: 0.875rem;
+}
+.select:focus { outline: none; box-shadow: 0 0 0 3px var(--input-ring, var(--accent-bg)); border-color: var(--accent); }
+
+.hint, .muted { margin: 0; font-size: 0.8125rem; line-height: 1.4; color: var(--t3); }
+.notice {
+  margin: 0;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--r-sm);
+  background: var(--warning-bg);
+  color: var(--warning-t);
+  font-size: 0.8125rem;
+}
+.notice a { color: inherit; font-weight: 600; }
+
+.check { display: flex; gap: 0.5rem; align-items: flex-start; font-size: 0.875rem; color: var(--t1); cursor: pointer; }
+.check input { margin-top: 0.2rem; }
+
+.sent, .failed { margin: 0; font-size: 0.8125rem; line-height: 1.4; overflow-wrap: anywhere; }
+.sent { color: var(--success-t); }
+.sent a { color: inherit; font-weight: 600; }
+.failed { color: var(--danger-t); }
+
+.actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface-raised);
+  color: var(--t1);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.button:hover:not(:disabled) { background: var(--ghost); }
+.button:disabled { opacity: 0.55; cursor: default; }
+.linkButton {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent-text);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.button:focus-visible, .linkButton:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* A Telegram channel post, roughly: a bubble with the inline buttons under it. */
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  border-radius: var(--r-md, var(--r-sm));
+  background: #d5e3ec;
+}
+.bubble {
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: #fff;
+  color: #000;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
+}
+.image { display: block; width: 100%; max-height: 14rem; object-fit: cover; }
+.text {
+  padding: 0.5rem 0.65rem 0.6rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.text a { color: #168acd; }
+.text blockquote {
+  margin: 0.15rem 0;
+  padding: 0.2rem 0.5rem;
+  border-left: 3px solid #168acd;
+  border-radius: 0.25rem;
+  background: rgba(22, 138, 205, 0.08);
+}
+.text pre, .text code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; }
+.text pre { margin: 0.15rem 0; white-space: pre-wrap; }
+.buttonRow { display: flex; gap: 0.25rem; }
+.tgButton {
+  flex: 1;
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.22);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.preview .muted { color: #4a5a66; margin-top: 0.25rem; }
+
+[data-theme='dark'] .preview { background: #0e1621; }
+[data-theme='dark'] .bubble { background: #182533; color: #f5f5f5; }
+[data-theme='dark'] .text a { color: #6ab3f3; }
+[data-theme='dark'] .text blockquote { border-left-color: #6ab3f3; background: rgba(106, 179, 243, 0.1); }
+[data-theme='dark'] .tgButton { background: rgba(255, 255, 255, 0.12); }
+[data-theme='dark'] .preview .muted { color: #8b9aa7; }

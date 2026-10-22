@@ -214,6 +214,38 @@
 }
 .seeAll a:hover { text-decoration: underline; }
 
+/* ── Phones ─────────────────────────────────────────────────────────────── */
+
+/* No room beside the logo and menu: the open field covers the header row,
+   and its results drop down the full width beneath it. The search page has
+   its own field, so the header one stays out of the way there. */
+@media (max-width: 600px) {
+  .wrap.open {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 1.25rem;
+    right: 1.25rem;
+    z-index: 2;
+  }
+  :global(.site-header):has(.wrap.open) :global(.site-brand-wrap) { visibility: hidden; }
+  .wrap.open .inputWrap {
+    flex: 1;
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+  }
+  .input { font-size: 16px; }
+  .closeBtn { padding: 0.4rem; margin-right: -0.25rem; }
+  .dropdown {
+    left: 0;
+    right: 0;
+    width: auto;
+    max-height: calc(100dvh - 5rem);
+    overflow-y: auto;
+  }
+  .wrap.onSearchPage { display: none; }
+}
+
 /* ── Dark mode ──────────────────────────────────────────────────────────── */
 
 :global(.dark) .dropdown,

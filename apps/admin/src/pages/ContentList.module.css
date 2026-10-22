@@ -86,6 +86,7 @@
 .kind_news { background: var(--danger-bg); color: var(--danger-t); }
 .kind_review { background: var(--accent-bg); color: var(--accent-text); }
 .kind_qna { background: var(--purple-bg); color: var(--purple-t); }
+.kind_live { background: var(--danger-t); color: #fff; }
 .seo_good { background: var(--success-bg); color: var(--success-t); }
 .seo_improve { background: var(--warning-bg); color: var(--warning-t); }
 .seo_problem { background: var(--danger-bg); color: var(--danger-t); }

@@ -45,8 +45,10 @@ export interface PostSummary {
   coAuthors: { user: Author }[];
   categories: { category: Category }[];
   tags: { tag: Tag }[];
-  articleType?: 'article' | 'news' | 'review' | 'qna';
+  articleType?: 'article' | 'news' | 'review' | 'qna' | 'live';
   review?: ReviewSummary | null;
+  /** Live blogs: when coverage closed; null while still live. */
+  liveEndedAt?: string | null;
 }
 
 export interface ReviewSummary {
@@ -75,11 +77,25 @@ export interface QnaSession {
   items: { question: string; askedBy?: string | null; answer: string; answeredBy?: string | null }[];
 }
 
+export interface LiveUpdate {
+  id: number;
+  headline: string | null;
+  /** 'html' from the live desk editor; 'text' = plain text with blank-line paragraphs. */
+  format: 'html' | 'text';
+  body: string;
+  image: string | null;
+  pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+  author: Pick<Author, 'username' | 'firstName' | 'lastName' | 'avatar'> | null;
+}
+
 export interface PostFull extends PostSummary {
   content: string;
   videoUrl?: string | null;
   review?: ReviewFull | null;
   qna?: QnaSession | null;
+  liveUpdates?: LiveUpdate[];
   showToc?: string | null;
   metaTitle: string | null;
   metaDescription: string | null;
@@ -149,6 +165,8 @@ export interface SiteSettings {
   event_carousel_count?: string;
   event_carousel_transition?: string;
   ga_measurement_id?: string;
+  /** Cloudflare Turnstile on the ticket form, when the API has it set up. */
+  turnstile_site_key?: string;
   ga_consent?: string;
   ga_exclude_staff?: string;
   front_page_id: string;
@@ -211,6 +229,8 @@ export interface Celebration {
   photo: string | null;
   photoCredit?: string | null;
   photoCreditUrl?: string | null;
+  photoFocus?: string | null;
+  photoZoom?: number | null;
   message: string | null;
 }
 
@@ -336,10 +356,15 @@ export interface EventFull extends EventSummary {
   venueMapEmbed: string | null;
   showAttendeesNames: boolean;
   requireApproval: boolean;
+  /** Tickets are a QR that changes every 15 seconds on the booking page. */
+  liveTicketQr: boolean;
+  /** Free tickets arrive only after the person confirms their email. */
+  requireEmailConfirmation: boolean;
+  maxTicketsPerPerson: number | null;
   metaTitle: string | null;
   metaDescription: string | null;
   ogImage: string | null;
-  attendees: { name: string; email: string }[] | null;
+  attendees: { name: string }[] | null;
 }
 
 export interface EventListResult {
@@ -348,8 +373,10 @@ export interface EventListResult {
 }
 
 export interface EventRegistrationResult {
-  registration: { id: number; ticketCode: string; status: string; quantity: number };
+  /** No ticketCode while the email address is unconfirmed. */
+  registration: { id: number; ticketCode?: string; status: string; quantity?: number; email?: string };
   requiresPayment: boolean;
+  needsEmailConfirmation?: boolean;
   orderId?: string;
   amount?: number;
   currency?: string;

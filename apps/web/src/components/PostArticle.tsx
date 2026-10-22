@@ -26,6 +26,7 @@ import { YouTubePlayer } from './MediaPlayers';
 import { focusStyle } from '../utils/focus';
 import { Tape } from './Tape';
 import { QnaSection } from './QnaSection';
+import { LiveBlog, useLiveFeed } from './LiveBlog';
 
 function displayName(author: Author): string {
   const name = [author.firstName, author.lastName].filter(Boolean).join(' ');
@@ -83,6 +84,9 @@ export function PostArticle({ post }: { post: PostFull }) {
     return () => resetSeo(site_title);
   }, [post, site_title]);
 
+  const isLive = post.articleType === 'live';
+  const liveFeed = useLiveFeed(post);
+
   const primaryCategory = post.categories[0]?.category ?? null;
   const review = post.articleType === 'review' ? post.review ?? null : null;
   const videoId = post.videoUrl ? youtubeId(post.videoUrl) : null;
@@ -91,7 +95,7 @@ export function PostArticle({ post }: { post: PostFull }) {
   // The review card already shows the cover; don't repeat it as a banner.
   const showBanner = post.featuredImage && !(review && (!review.coverImage || review.coverImage === post.featuredImage));
 
-  useJsonLd('post-jsonld', postJsonLd(post, {
+  useJsonLd('post-jsonld', postJsonLd(isLive ? { ...post, liveEndedAt: liveFeed.liveEndedAt, liveUpdates: liveFeed.updates } : post, {
     siteTitle: site_title,
     siteLogo: site_logo,
     origin: window.location.origin,
@@ -118,6 +122,7 @@ export function PostArticle({ post }: { post: PostFull }) {
           {post.articleType === 'news' && !tapeSays('news') && <span className="type-badge type-badge--news">News</span>}
           {review && !tapeSays('review') && <span className="type-badge type-badge--review">Review</span>}
           {post.articleType === 'qna' && <span className="type-badge type-badge--qna">Q&amp;A</span>}
+          {isLive && !liveFeed.liveEndedAt && <span className="type-badge type-badge--live">Live</span>}
           {post.categories.map(({ category }) => <Tape key={category.id} category={category} />)}
         </div>
         <h1 className="post-title">{post.title}</h1>
@@ -147,8 +152,12 @@ export function PostArticle({ post }: { post: PostFull }) {
               {formatDate(post.publishedAt, date_format, timezone)}
             </span>
           )}
-          <span className="post-byline-sep">·</span>
-          <span className="post-reading-time">{readMins} min read</span>
+          {!isLive && (
+            <>
+              <span className="post-byline-sep">·</span>
+              <span className="post-reading-time">{readMins} min read</span>
+            </>
+          )}
         </div>
       </header>
 
@@ -168,6 +177,7 @@ export function PostArticle({ post }: { post: PostFull }) {
       })()}
       <RichContent html={resolvedContent} className="post-content" />
       {post.articleType === 'qna' && post.qna && <QnaSection qna={post.qna} />}
+      {isLive && <LiveBlog key={post.id} feed={liveFeed} postTitle={post.title} />}
 
       {post.tags.length > 0 && (
         <footer className="post-tags">

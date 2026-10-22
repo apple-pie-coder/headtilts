@@ -7,6 +7,7 @@ import { assertCanAssignRoles, assertCanManageUser } from './authz.service';
 import { accountChanged } from './security.service';
 
 const userInclude = {
+  _count: { select: { passkeys: true } },
   userRoles: {
     include: {
       role: {
@@ -35,6 +36,8 @@ function toUserDTO(user: {
   githubUrl: string | null;
   instagramUrl: string | null;
   isActive: boolean;
+  mfaEnabled: boolean;
+  _count: { passkeys: number };
   userRoles: {
     role: {
       id: number;
@@ -58,6 +61,8 @@ function toUserDTO(user: {
     githubUrl: user.githubUrl,
     instagramUrl: user.instagramUrl,
     isActive: user.isActive,
+    mfaEnabled: user.mfaEnabled,
+    passkeyCount: user._count.passkeys,
     roles: user.userRoles.map((ur) => ({
       id: ur.role.id,
       name: ur.role.name,
@@ -233,6 +238,28 @@ export async function updateUser(id: string, input: UpdateUserInput, requestingU
       .catch((error) => console.error('Deactivation notification failed:', error));
   }
   return toUserDTO(user);
+}
+
+/**
+ * For a user locked out of two-step sign-in: removes their authenticator app,
+ * backup codes and passkeys so they can sign in with the password and set it
+ * up again (enrolment is forced at sign-in if their role requires it).
+ */
+export async function resetUserMfa(id: string, requestingUserId: string) {
+  // Your own second step is removed from your profile, which asks for a code.
+  if (id === requestingUserId) throw new ValidationError('Turn off your own two-step sign-in from your profile');
+  const existing = await prisma.user.findUnique({ where: { id }, select: { id: true } });
+  if (!existing) throw new NotFoundError('User not found');
+  await assertCanManageUser(requestingUserId, id);
+
+  await prisma.$transaction([
+    prisma.passkey.deleteMany({ where: { userId: id } }),
+    prisma.user.update({
+      where: { id },
+      data: { mfaEnabled: false, mfaSecret: null, mfaBackupCodes: null, mfaLastUsedStep: null },
+    }),
+  ]);
+  await accountChanged(id, 'mfa_reset');
 }
 
 interface UpdateMeInput {

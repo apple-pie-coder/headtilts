@@ -69,7 +69,7 @@ export function normalizeFocus(value: unknown): string | null | undefined {
   if (value === undefined) return undefined;
   if (value === null || value === '') return null;
   const m = typeof value === 'string' ? value.trim().match(/^(\d{1,3}(?:\.\d+)?)%\s+(\d{1,3}(?:\.\d+)?)%$/) : null;
-  if (!m) throw new ValidationError('Featured image focus must look like "50% 30%"');
+  if (!m) throw new ValidationError('Image focus must look like "50% 30%"');
   const clamp = (n: string) => Math.round(Math.min(100, Math.max(0, Number(n))));
   const focus = `${clamp(m[1])}% ${clamp(m[2])}%`;
   return focus === '50% 50%' ? null : focus;

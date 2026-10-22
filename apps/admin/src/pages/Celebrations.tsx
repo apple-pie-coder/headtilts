@@ -18,6 +18,7 @@ import { useUrlState } from '../hooks/useUrlState';
 import { Celebration } from '../types';
 import { deleteCelebration, fetchCelebrations, updateCelebration } from '../services/celebrations';
 import { resolveMediaUrl } from '../services/media';
+import { framingStyle } from '../components/FocusPicker';
 import styles from './Celebrations.module.css';
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -188,7 +189,7 @@ export default function CelebrationsPage() {
                           <div className={t.primaryWrap}>
                             <span className={styles.photo}>
                               {c.photo
-                                ? <img src={resolveMediaUrl(c.photo)} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
+                                ? <img src={resolveMediaUrl(c.photo)} alt="" loading="lazy" style={framingStyle(c.photoFocus, c.photoZoom)} onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
                                 : <span aria-hidden="true">{c.type === 'birthday' ? '🎂' : '🕯️'}</span>}
                             </span>
                             <div className={t.stack}>

@@ -95,3 +95,13 @@ export async function remove(req: Request, res: Response): Promise<void> {
     handleError(res, error);
   }
 }
+
+export async function resetMfa(req: Request, res: Response): Promise<void> {
+  try {
+    if (!req.user) { sendError(res, 'UNAUTHORIZED', 'Unauthorized', 401); return; }
+    await usersService.resetUserMfa(req.params.id, req.user.sub);
+    sendSuccess(res, { message: 'Two-step sign-in reset' });
+  } catch (error) {
+    handleError(res, error);
+  }
+}

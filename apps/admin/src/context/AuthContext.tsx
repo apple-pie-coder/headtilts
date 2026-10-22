@@ -1,6 +1,6 @@
 import { createContext, useState, useEffect, ReactNode } from 'react';
 import { AxiosError } from 'axios';
-import { AuthContextType, SetupInput, User } from '../types';
+import { AuthContextType, MfaChallenge, MfaMethod, SetupInput, User } from '../types';
 import { apiClient, refreshSession, setAccessToken } from '../services/api';
 import { setupAdmin } from '../services/auth';
 
@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function login(identifier: string, password: string): Promise<{ mfaRequired: true; mfaToken: string } | void> {
+  async function login(identifier: string, password: string): Promise<MfaChallenge | void> {
     setLoading(true);
     setError(null);
     try {
@@ -54,7 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = response.data.data;
 
       if (data.mfaRequired) {
-        return { mfaRequired: true as const, mfaToken: data.mfaToken as string };
+        return {
+          mfaRequired: true as const,
+          mfaToken: data.mfaToken as string,
+          setupRequired: !!data.mfaSetupRequired,
+          methods: (data.methods as MfaMethod[] | undefined) ?? ['totp', 'backup'],
+        };
       }
 
       setAccessToken(data.accessToken);
@@ -102,6 +107,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  function startSession(session: { accessToken: string; user: User }) {
+    setAccessToken(session.accessToken);
+    setUser(session.user);
+    setError(null);
+  }
+
   async function setup(input: SetupInput) {
     setLoading(true);
     setError(null);
@@ -145,6 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     completeMfaLogin,
     completeMfaBackupLogin,
+    startSession,
     setup,
     logout,
     isAuthenticated: !!user,

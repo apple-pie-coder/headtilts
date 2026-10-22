@@ -1,6 +1,8 @@
 .page {
   padding: 1.5rem 2rem;
 }
+/* The layout already pads the page on phones; don't add a second gutter. */
+@media (max-width: 768px) { .page { padding: 0 0 2rem; } }
 
 /* Header */
 .header {
@@ -173,7 +175,7 @@
 }
 
 @media (max-width: 900px) {
-  .chartsRow { grid-template-columns: 1fr; }
+  .chartsRow { grid-template-columns: minmax(0, 1fr); }
 }
 
 .chartCard {

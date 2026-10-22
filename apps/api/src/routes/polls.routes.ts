@@ -6,6 +6,7 @@ import { sendSuccess, sendError, sendPaginatedSuccess } from '../utils/response'
 import { ApiError } from '../utils/errors';
 import { prisma } from '../config/database';
 import * as pollsService from '../services/polls.service';
+import * as telegramController from '../controllers/telegram.controller';
 import { POLL_IMAGE_FORMATS, PollImageFormat, renderPollResultsImage } from '../services/pollImage.service';
 
 const router: IRouter = Router();
@@ -20,6 +21,10 @@ router.get('/', requirePermission(PERMISSIONS.POLL_READ), asyncHandler(async (re
   const { items, total } = await pollsService.listPolls(page, limit, search, status);
   sendPaginatedSuccess(res, items, total, page, limit);
 }));
+
+// Telegram channel: what was sent, a preview, and Post now.
+router.get('/:id/telegram', requirePermission(PERMISSIONS.POLL_READ), asyncHandler(telegramController.itemStatus('poll')));
+router.post('/:id/telegram', requirePermission(PERMISSIONS.POLL_EDIT), asyncHandler(telegramController.itemSend('poll')));
 
 // Analytics overview — must be before /:id
 router.get('/analytics', requirePermission(PERMISSIONS.POLL_READ), asyncHandler(async (_req: Request, res: Response) => {

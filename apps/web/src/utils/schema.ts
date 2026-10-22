@@ -6,7 +6,8 @@ import type { Author, PostFull } from '../types';
 /**
  * schema.org JSON-LD for a post, chosen by its editorial type:
  *   article → Article, news → NewsArticle, review → Review (of a MusicAlbum or
- *   MusicRecording). Every post also gets a BreadcrumbList, and a VideoObject
+ *   MusicRecording), qna → Article with Questions, live → LiveBlogPosting.
+ *   Every post also gets a BreadcrumbList, and a VideoObject
  *   when it has a featured YouTube video.
  */
 
@@ -28,6 +29,7 @@ const abs = (origin: string, path: string | null | undefined) => {
 
 const personName = (a: Author) => [a.firstName, a.lastName].filter(Boolean).join(' ') || a.username;
 const textOnly = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+const bodyText = (u: { format: string; body: string }) => (u.format === 'html' ? textOnly(u.body) : u.body.replace(/\s+/g, ' ').trim());
 
 export function postJsonLd(post: PostFull, ctx: Context): Json[] {
   const description = post.metaDescription || post.excerpt || textOnly(post.content).slice(0, 200) || undefined;
@@ -121,6 +123,30 @@ export function postJsonLd(post: PostFull, ctx: Context): Json[] {
             author: i.answeredBy ? { '@type': 'Person', name: i.answeredBy } : who,
           },
         })),
+    };
+  } else if (post.articleType === 'live') {
+    const updates = post.liveUpdates ?? [];
+    const latest = updates.reduce<string | null>((max, u) => (!max || u.updatedAt > max ? u.updatedAt : max), null);
+    main = {
+      ...common,
+      '@type': 'LiveBlogPosting',
+      headline: post.title.slice(0, 110),
+      ...(latest && latest > post.updatedAt ? { dateModified: latest } : {}),
+      ...(post.publishedAt ? { coverageStartTime: post.publishedAt } : {}),
+      ...(post.liveEndedAt ? { coverageEndTime: post.liveEndedAt } : {}),
+      ...(category ? { articleSection: category.name } : {}),
+      // The newest updates are what search engines surface; cap the payload.
+      liveBlogUpdate: updates.slice(0, 50).map((u) => ({
+        '@type': 'BlogPosting',
+        '@id': `${ctx.url}#update-${u.id}`,
+        url: `${ctx.url}#update-${u.id}`,
+        headline: (u.headline || bodyText(u)).slice(0, 110) || post.title.slice(0, 110),
+        datePublished: u.createdAt,
+        dateModified: u.updatedAt,
+        ...(bodyText(u) ? { articleBody: bodyText(u) } : {}),
+        ...(u.image ? { image: abs(ctx.origin, u.image) } : {}),
+        ...(u.author ? { author: { '@type': 'Person', name: personName(u.author as Author), url: `${ctx.origin}/authors/${u.author.username}` } } : {}),
+      })),
     };
   } else {
     main = {

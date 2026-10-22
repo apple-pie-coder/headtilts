@@ -1,6 +1,6 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import { faComments, faCompactDisc, faFileLines, faNewspaper } from '@fortawesome/free-solid-svg-icons';
+import { faComments, faCompactDisc, faFileLines, faNewspaper, faTowerBroadcast } from '@fortawesome/free-solid-svg-icons';
 import type { ArticleType } from '../../types';
 import styles from './editorExtras.module.css';
 
@@ -9,6 +9,7 @@ const OPTIONS: { value: ArticleType; label: string; icon: IconDefinition; schema
   { value: 'news', label: 'News', icon: faNewspaper, schema: 'NewsArticle', hint: 'Time-sensitive announcements — eligible for Google News surfaces.' },
   { value: 'review', label: 'Review', icon: faCompactDisc, schema: 'Review', hint: 'Album, EP or single reviews with a rating and streaming links.' },
   { value: 'qna', label: 'Q&A', icon: faComments, schema: 'Article with Questions & Answers', hint: 'An artist or band answering questions — fan AMAs and press Q&As.' },
+  { value: 'live', label: 'Live', icon: faTowerBroadcast, schema: 'LiveBlogPosting', hint: 'Running coverage of a gig, festival or announcement, with timestamped updates.' },
 ];
 
 export function PostTypeSwitch({ value, onChange, disabled }: { value: ArticleType; onChange: (v: ArticleType) => void; disabled?: boolean }) {

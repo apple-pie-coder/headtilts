@@ -7,6 +7,7 @@ import {
 import { AdminLayout } from '../components/AdminLayout';
 import { MediaPickerInput } from '../components/MediaPickerInput';
 import { useToast } from '../components/ToastContext';
+import { TelegramPanel, TelegramChoice, fromTelegramChoice, toTelegramChoice } from '../components/TelegramPanel';
 import { fetchPoll, createPoll, updatePoll, resetPollVotes, downloadPollCsv, pollHasEnded, PollInput, PollOption } from '../services/polls';
 import { PollResultsImage } from '../components/polls/PollResultsImage';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -48,6 +49,8 @@ export default function PollEditorPage() {
   const [endsAt, setEndsAt] = useState('');
   const [showImage, setShowImage] = useState(false);
   const [featuredImage, setFeaturedImage] = useState('');
+  const [telegramPost, setTelegramPost] = useState<TelegramChoice>('default');
+  const [savedAt, setSavedAt] = useState(0);
   const [options, setOptions] = useState<PollOption[]>([
     { text: '', order: 0 },
     { text: '', order: 1 },
@@ -77,6 +80,7 @@ export default function PollEditorPage() {
         setVoterRestriction(poll.voterRestriction);
         setAllowVoteChange(poll.allowVoteChange);
         setShowSidebar(poll.showSidebar ?? false);
+        setTelegramPost(toTelegramChoice(poll.telegramPost));
         setStartsAt(poll.startsAt ? new Date(poll.startsAt).toISOString().slice(0, 16) : '');
         setEndsAt(poll.endsAt ? new Date(poll.endsAt).toISOString().slice(0, 16) : '');
         setFeaturedImage(poll.featuredImage || '');
@@ -178,6 +182,7 @@ export default function PollEditorPage() {
       startsAt: startsAt || null,
       endsAt: endsAt || null,
       featuredImage: featuredImage || null,
+      telegramPost: fromTelegramChoice(telegramPost),
       options: validOpts,
     };
 
@@ -186,6 +191,7 @@ export default function PollEditorPage() {
       if (isEdit) {
         await updatePoll(Number(id), input);
         toast.success('Poll updated');
+        setSavedAt(Date.now());
       } else {
         await createPoll(input);
         toast.success('Poll created');
@@ -420,6 +426,18 @@ export default function PollEditorPage() {
                 {saving ? 'Saving…' : isEdit ? 'Update' : 'Publish'}
               </button>
             </div>
+          </div>
+
+          <div className={styles.panel}>
+            <h3>Telegram</h3>
+            <TelegramPanel
+              kind="poll"
+              id={isEdit ? Number(id) : undefined}
+              value={telegramPost}
+              onChange={setTelegramPost}
+              refreshKey={savedAt}
+              disabled={saving}
+            />
           </div>
 
           <div className={styles.panel}>

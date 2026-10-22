@@ -69,6 +69,13 @@ services:
       SITE_URL: ${SITE_URL:-http://localhost}
       WEB_URL: ${WEB_URL:-http://localhost}
       ADMIN_URL: ${ADMIN_URL:-http://localhost/admin}
+      # Passkeys: default to ADMIN_URL's host and origin. Override when the admin
+      # is reached through another hostname (RP ID = registrable domain, origins = full URLs).
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-}
+      WEBAUTHN_ORIGINS: ${WEBAUTHN_ORIGINS:-}
+      # Extra origins allowed to call the API, e.g. the plain-HTTP LAN address when
+      # ADMIN_URL points at an HTTPS gateway in front of it.
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
       UPLOAD_DIR: /app/apps/api/uploads
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -76,6 +83,16 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      # Paid tickets. The webhook secret is the one set on the webhook in the Razorpay
+      # dashboard (URL: <SITE_URL>/api/public/payments/razorpay/webhook).
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      # Bot check on the public ticket form (Cloudflare Turnstile); off unless both are set.
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
       # Admin feedback → GitHub issues. Fine-grained token with "Issues: read & write"
       # on the repo below; leave empty to keep feedback in the admin only.
       GITHUB_FEEDBACK_TOKEN: ${GITHUB_FEEDBACK_TOKEN:-}
@@ -83,8 +100,11 @@ services:
     volumes:
       - uploads_data:/app/apps/api/uploads
       - backups_data:/app/apps/api/backups
+    # nginx joins the shared proxy network too, where other projects have their own
+    # "api" / "web"; it looks these services up by their headtilts-* names only.
     networks:
-      - internal
+      internal:
+        aliases: [headtilts-api]
 
   # ── Admin panel (React SPA → nginx) ─────────────────────────────────────────
   admin:
@@ -98,7 +118,8 @@ services:
     depends_on:
       - api
     networks:
-      - internal
+      internal:
+        aliases: [headtilts-admin]
 
   # ── Public website (React SPA → nginx) ──────────────────────────────────────
   web:
@@ -112,17 +133,21 @@ services:
     depends_on:
       - api
     networks:
-      - internal
+      internal:
+        aliases: [headtilts-web]
 
   # ── nginx reverse proxy ──────────────────────────────────────────────────────
-  # This is the ONLY service with a host-port binding.
-  # Set HTTP_PORT in .env to expose on any port you want (e.g. 8080).
+  # This is the ONLY service with a host-port binding, and only on the Pi's loopback
+  # (HTTP_PORT in .env; scripts on the Pi use http://localhost:HTTP_PORT). Other
+  # devices come in through the shared Caddy (~/dockers/proxy), which reaches this
+  # container as "headtilts" on the proxy network: https://pandorasbox.local:5444,
+  # or plain http on the LAN address and HTTP_PORT.
   nginx:
     image: nginx:stable-alpine
     restart: unless-stopped
     logging: *rotated-logs
     ports:
-      - "${HTTP_PORT:-80}:80"
+      - "127.0.0.1:${HTTP_PORT:-80}:80"
     volumes:
       - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -130,7 +155,9 @@ services:
       - admin
       - web
     networks:
-      - internal
+      internal:
+      proxy:
+        aliases: [headtilts]
 
 volumes:
   mysql_data:
@@ -140,3 +167,6 @@ volumes:
 networks:
   internal:
     driver: bridge
+  # Shared with the proxy (made once: see ~/dockers/proxy).
+  proxy:
+    external: true

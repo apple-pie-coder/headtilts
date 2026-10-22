@@ -8,6 +8,7 @@ import { useLayout } from '../context/LayoutContext';
 import { applySeo, resetSeo } from '../utils/seo';
 import { formatDate, timeAgo } from '../utils/date';
 import { postPath } from '../utils/permalink';
+import { framingStyle } from '../utils/focus';
 import { PostSummary } from '../types';
 import { authorName, plain, PostCard, StoryImage } from './PostCard';
 import { Tape } from './Tape';
@@ -400,7 +401,7 @@ function Events({ title, events }: { title?: string; events: EventItem[] }) {
   );
 }
 
-interface CelebrationItem { id: number; name: string; type: 'birthday' | 'remembrance'; year: number | null; photo: string | null; message: string | null }
+interface CelebrationItem { id: number; name: string; type: 'birthday' | 'remembrance'; year: number | null; photo: string | null; photoFocus?: string | null; photoZoom?: number | null; message: string | null }
 
 function OnThisDay({ title, items }: { title?: string; items: CelebrationItem[] }) {
   if (!items.length) return null;
@@ -410,7 +411,7 @@ function OnThisDay({ title, items }: { title?: string; items: CelebrationItem[] 
       <ul className="fp-otd">
         {items.map((c) => (
           <li key={c.id} className="fp-otd-item">
-            {c.photo ? <img src={resolveMediaUrl(c.photo)} alt="" loading="lazy" /> : <span className="fp-otd-ph" aria-hidden="true">{c.type === 'birthday' ? '🎂' : '🕯️'}</span>}
+            {c.photo ? <span className="fp-otd-photo"><img src={resolveMediaUrl(c.photo)} alt="" loading="lazy" style={framingStyle(c.photoFocus, c.photoZoom)} /></span> : <span className="fp-otd-ph" aria-hidden="true">{c.type === 'birthday' ? '🎂' : '🕯️'}</span>}
             <span>
               <strong>{c.name}</strong>
               <span>{c.type === 'birthday' ? (c.year ? `Born ${c.year} · would be ${year - c.year}` : 'Birthday') : (c.year ? `Died ${c.year} · ${year - c.year} years on` : 'Remembered today')}</span>

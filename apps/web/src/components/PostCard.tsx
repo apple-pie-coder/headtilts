@@ -16,7 +16,10 @@ export function authorName(post: PostSummary): string {
   return name || post.author.username;
 }
 
-const KIND: Record<string, string> = { news: 'News', review: 'Review', qna: 'Q&A' };
+const KIND: Record<string, string> = { news: 'News', review: 'Review', qna: 'Q&A', live: 'Live' };
+
+/** Card label for a post's type; a live blog only says "Live" while coverage is open. */
+const kindOf = (post: PostSummary) => (post.articleType === 'live' && post.liveEndedAt ? null : post.articleType && KIND[post.articleType]);
 
 /** Imported excerpts often join words with non-breaking spaces, which stops them wrapping. */
 export const plain = (s: string) => s.replace(/\u00a0/g, ' ');
@@ -74,7 +77,7 @@ export function PostCard({ post }: { post: PostSummary }) {
       <div className="story-card-body">
         <div className="story-labels">
           {cat && <Tape category={cat} />}
-          {post.articleType && KIND[post.articleType] && <span className={`story-kind story-kind--${post.articleType}`}>{KIND[post.articleType]}</span>}
+          {kindOf(post) && <span className={`story-kind story-kind--${post.articleType}`}>{kindOf(post)}</span>}
         </div>
         <h2 className="story-title"><Link to={href}>{post.title}</Link></h2>
         {review?.artist && <p className="story-review">{review.artist} — <em>{review.subjectTitle}</em></p>}
@@ -98,7 +101,7 @@ export function StoryRow({ post }: { post: PostSummary }) {
       <div className="story-row-body">
         <div className="story-labels">
           {cat && <Tape category={cat} />}
-          {post.articleType && KIND[post.articleType] && <span className={`story-kind story-kind--${post.articleType}`}>{KIND[post.articleType]}</span>}
+          {kindOf(post) && <span className={`story-kind story-kind--${post.articleType}`}>{kindOf(post)}</span>}
         </div>
         <h3 className="story-title"><Link to={href}>{post.title}</Link></h3>
         {review?.artist && <p className="story-review">{review.artist} — <em>{review.subjectTitle}</em></p>}

@@ -52,11 +52,11 @@
 .typeOption:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .typeHint { font-size: 0.8125rem; color: var(--t2); }
 .typeHint code { font-size: 0.75rem; padding: 0.0625rem 0.3rem; border-radius: 4px; background: var(--ghost); color: var(--t1); }
-/* Phones: the four types as an even row that always fits, icon over label. */
+/* Phones: every type in one even row that always fits, icon over label. */
 @media (max-width: 600px) {
   .typeSwitch { gap: 0.5rem; }
-  .typeOptions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; box-sizing: border-box; }
-  .typeOption { flex-direction: column; justify-content: center; gap: 0.2rem; min-height: 3rem; padding: 0.4rem 0.25rem; font-size: 0.75rem; }
+  .typeOptions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); width: 100%; box-sizing: border-box; }
+  .typeOption { flex-direction: column; justify-content: center; gap: 0.2rem; min-height: 3rem; padding: 0.4rem 0.125rem; font-size: 0.75rem; white-space: nowrap; }
   .typeOption svg { font-size: 0.9375rem; }
 }
 
@@ -302,3 +302,42 @@
 .autofillText strong { font-size: 0.875rem; color: var(--t1); }
 .autofillText span { font-size: 0.8125rem; color: var(--t2); }
 .suggestLine { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
+
+/* ── Live desk ── */
+.liveForm { display: flex; flex-direction: column; gap: 0.5rem; }
+.liveCheck { display: inline-flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem; color: var(--t1); cursor: pointer; }
+.liveState {
+  display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.25rem 0.625rem; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 700; background: var(--ghost); color: var(--t2);
+}
+.liveStateOn { background: var(--danger-bg); color: var(--danger-t); }
+.liveStateOn::before {
+  content: ''; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: currentColor;
+  animation: livePulse 1.6s ease-in-out infinite;
+}
+@keyframes livePulse { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .liveStateOn::before { animation: none; } }
+.livePinned { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.liveMeta { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.liveTag { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; font-weight: 700; color: var(--accent-text); }
+.liveBody { display: flex; gap: 0.75rem; align-items: flex-start; font-size: 0.875rem; color: var(--t1); }
+.liveText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+/* Three lines is enough to recognise an update; Edit shows the rest. */
+.liveText p {
+  margin: 0; white-space: pre-line; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+}
+.liveThumb { flex-shrink: 0; width: 4rem; height: 4rem; border-radius: var(--r-sm); object-fit: cover; }
+.liveToggle {
+  display: inline-flex; align-items: center; gap: 0.5rem; padding: 0; border: none; background: none;
+  font: inherit; color: inherit; cursor: pointer; text-align: left;
+}
+.liveToggle svg:first-child { color: var(--accent-text); }
+.liveToggle .help { font-weight: 400; }
+.reviewPanel .reviewTitle .liveChevron { font-size: 0.75rem; color: var(--t2); transform: rotate(-90deg); transition: transform var(--ease); }
+.reviewPanel .reviewTitle .liveChevronOpen { transform: none; }
+.liveEditor :global(.ql-toolbar) { border-radius: var(--r-sm) var(--r-sm) 0 0; border-color: var(--border); }
+.liveEditor :global(.ql-container) { border-radius: 0 0 var(--r-sm) var(--r-sm); border-color: var(--border); font-size: 0.9375rem; }
+.liveEditor :global(.ql-editor) { min-height: 7rem; max-height: 24rem; overflow-y: auto; color: var(--t1); }
+.liveEditor :global(.ql-editor.ql-blank::before) { color: var(--t2); font-style: normal; }
+.liveEditor :global(.ql-editor img) { max-width: 100%; max-height: 16rem; }

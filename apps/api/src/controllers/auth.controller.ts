@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as authService from '../services/auth.service';
 import * as mfaService from '../services/mfa.service';
+import * as passkeyService from '../services/passkey.service';
 import { sendSuccess, sendError } from '../utils/response';
 import { ApiError } from '../utils/errors';
 import { log } from '../services/logger.service';
@@ -43,7 +44,22 @@ function deliverSession<T extends object>(req: Request, res: Response, result: T
   return rest;
 }
 import { clientIp } from '../utils/clientIp';
-import { clearFailedLogins, recordFailedLogin, recordSignIn } from '../services/security.service';
+import { clearFailedLogins, describeDevice, recordFailedLogin, recordSignIn } from '../services/security.service';
+
+function handleError(res: Response, error: unknown): void {
+  if (error instanceof ApiError) {
+    sendError(res, error.code, error.message, error.statusCode, error.details);
+  } else {
+    sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+  }
+}
+
+/** The user behind the short-lived token issued after a correct password; sends the 401 itself. */
+function mfaTokenUser(req: Request, res: Response): string | null {
+  const payload = typeof req.body?.mfaToken === 'string' ? verifyMfaToken(req.body.mfaToken) : null;
+  if (!payload) sendError(res, 'UNAUTHORIZED', 'Invalid or expired MFA token', 401);
+  return payload?.sub ?? null;
+}
 
 export async function register(req: Request, res: Response): Promise<void> {
   try {
@@ -386,5 +402,162 @@ export async function mfaEnrollComplete(req: Request, res: Response): Promise<vo
     } else {
       sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
     }
+  }
+}
+
+export async function mfaRegenerateBackupCodes(req: Request, res: Response): Promise<void> {
+  try {
+    const { password, code } = req.body;
+    if (!password || !code) {
+      sendError(res, 'VALIDATION_ERROR', 'Password and an authentication (or backup) code are required', 400);
+      return;
+    }
+    sendSuccess(res, await authService.regenerateBackupCodes(req.user!.sub, password, String(code)));
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+// ── Passkeys: sign-in ────────────────────────────────────────────────────────
+
+export async function passkeyLoginOptions(_req: Request, res: Response): Promise<void> {
+  try {
+    sendSuccess(res, await passkeyService.loginOptions());
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function passkeyLoginVerify(req: Request, res: Response): Promise<void> {
+  try {
+    // A passkey that verified the user is two factors in one, so this
+    // satisfies roles that require two-step sign-in.
+    const userId = await passkeyService.verifyLogin(req.body?.challengeId, req.body?.response);
+    const result = await authService.completeMfaLogin(userId);
+    await recordSignIn(userId, clientIp(req), req.get('user-agent'));
+    log({
+      site: 'admin', level: 'info', category: 'auth', action: 'auth.login',
+      actorId: userId, actorEmail: result.user.email,
+      ip: clientIp(req), userAgent: req.get('user-agent'),
+      path: req.path, method: req.method, statusCode: 200,
+      meta: { method: 'passkey' },
+    });
+    sendSuccess(res, deliverSession(req, res, result), 200, 'Logged in successfully');
+  } catch (error) {
+    if (error instanceof ApiError) {
+      log({
+        site: 'admin', level: 'warn', category: 'auth', action: 'auth.login_failed',
+        ip: clientIp(req), userAgent: req.get('user-agent'),
+        path: req.path, method: req.method, statusCode: error.statusCode,
+        meta: { method: 'passkey', reason: error.message },
+      });
+    }
+    handleError(res, error);
+  }
+}
+
+/** Second step after the password, with one of the user's passkeys. */
+export async function mfaPasskeyOptions(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = mfaTokenUser(req, res);
+    if (!userId) return;
+    sendSuccess(res, await passkeyService.secondFactorOptions(userId));
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function mfaPasskeyVerify(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = mfaTokenUser(req, res);
+    if (!userId) return;
+    await passkeyService.verifySecondFactor(userId, req.body?.challengeId, req.body?.response);
+    const result = await authService.completeMfaLogin(userId);
+    await recordSignIn(userId, clientIp(req), req.get('user-agent'));
+    sendSuccess(res, deliverSession(req, res, result));
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+/** Login-time enrolment with a passkey (role requires MFA, nothing set up yet). */
+export async function mfaEnrollPasskeyOptions(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = mfaTokenUser(req, res);
+    if (!userId) return;
+    sendSuccess(res, await authService.startPasskeyEnrollment(userId));
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function mfaEnrollPasskeyComplete(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = mfaTokenUser(req, res);
+    if (!userId) return;
+    const name = typeof req.body?.name === 'string' && req.body.name.trim() ? req.body.name : describeDevice(req.get('user-agent'));
+    const result = await authService.completePasskeyEnrollment(userId, req.body?.challengeId, req.body?.response, name);
+    await recordSignIn(userId, clientIp(req), req.get('user-agent'));
+    sendSuccess(res, deliverSession(req, res, result));
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+// ── Passkeys: management (signed in) ─────────────────────────────────────────
+
+function passkeyId(req: Request, res: Response): number | null {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    sendError(res, 'VALIDATION_ERROR', 'Invalid passkey id', 400);
+    return null;
+  }
+  return id;
+}
+
+export async function passkeysList(req: Request, res: Response): Promise<void> {
+  try {
+    sendSuccess(res, await passkeyService.listPasskeys(req.user!.sub));
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function passkeyRegisterOptions(req: Request, res: Response): Promise<void> {
+  try {
+    sendSuccess(res, await authService.passkeyRegistrationOptions(req.user!.sub, req.body?.password));
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function passkeyRegister(req: Request, res: Response): Promise<void> {
+  try {
+    const name = typeof req.body?.name === 'string' && req.body.name.trim() ? req.body.name : describeDevice(req.get('user-agent'));
+    const passkey = await authService.addPasskey(req.user!.sub, req.body?.challengeId, req.body?.response, name);
+    sendSuccess(res, passkey, 201, 'Passkey added');
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function passkeyRename(req: Request, res: Response): Promise<void> {
+  try {
+    const id = passkeyId(req, res);
+    if (id === null) return;
+    sendSuccess(res, await passkeyService.renamePasskey(req.user!.sub, id, req.body?.name));
+  } catch (error) {
+    handleError(res, error);
+  }
+}
+
+export async function passkeyDelete(req: Request, res: Response): Promise<void> {
+  try {
+    const id = passkeyId(req, res);
+    if (id === null) return;
+    await authService.removePasskey(req.user!.sub, id);
+    sendSuccess(res, { message: 'Passkey removed' });
+  } catch (error) {
+    handleError(res, error);
   }
 }

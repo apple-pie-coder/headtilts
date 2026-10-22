@@ -43,11 +43,11 @@ export const MODULES: Record<string, ModuleInfo> = {
 };
 
 /** Display order of actions within a module; anything else follows, alphabetically. */
-const ACTION_ORDER = ['read', 'view', 'create', 'update', 'publish', 'edit_others', 'moderate', 'manage', 'manage_registrations', 'manage_roles', 'reset', 'archive', 'backup', 'delete'];
+const ACTION_ORDER = ['read', 'view', 'create', 'update', 'publish', 'edit_others', 'moderate', 'manage', 'manage_registrations', 'check_in', 'manage_roles', 'reset', 'archive', 'backup', 'delete'];
 
 const ACTION_LABELS: Record<string, string> = {
   read: 'View', view: 'View', create: 'Create', update: 'Edit', delete: 'Delete', publish: 'Publish',
-  edit_others: 'Anyone’s', moderate: 'Moderate', manage: 'Manage', manage_registrations: 'Bookings',
+  edit_others: 'Anyone’s', moderate: 'Moderate', manage: 'Manage', manage_registrations: 'Bookings', check_in: 'Door scanner',
   manage_roles: 'Assign roles', reset: 'Reset votes', archive: 'Archive', backup: 'Backups',
 };
 
@@ -70,6 +70,7 @@ const PERMISSION_HINTS: Record<string, string> = {
   contact_manage: 'Mark, reply to and delete messages',
   polls_reset: 'Clear all votes on a poll',
   events_manage_registrations: 'See, export and update ticket bookings',
+  events_check_in: 'Scan tickets at the door. On its own, only from 12 hours before an event to 12 hours after it',
   widgets_update: 'Change widgets and the front page layout',
   seo_manage: 'Add and change sitemap entries',
   redirects_manage: 'Add, change and delete redirects',

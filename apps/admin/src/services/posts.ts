@@ -20,6 +20,9 @@ export interface PostInput {
   showSidebar?: boolean;
   commentStatus?: string | null;
   showToc?: string | null;
+  /** 'yes' / 'no' overrides the Telegram setting for the post's type; null follows it. */
+  telegramPost?: string | null;
+  telegramLiveUpdates?: boolean;
   categoryIds?: number[];
   tagNames?: string[];
   authorId?: string | null;

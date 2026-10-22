@@ -20,6 +20,7 @@
 
 .searchInput {
   flex: 1;
+  min-width: 0;
   padding: 0.625rem 1rem;
   border: 1px solid var(--border, #d1d1d6);
   border-radius: 0.5rem;

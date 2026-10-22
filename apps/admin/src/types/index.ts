@@ -14,6 +14,7 @@ export interface User {
   instagramUrl?: string | null;
   isActive: boolean;
   mfaEnabled?: boolean;
+  passkeyCount?: number;
   roles: Role[];
 }
 
@@ -68,6 +69,8 @@ export interface Celebration {
   photo: string | null;
   photoCredit?: string | null;
   photoCreditUrl?: string | null;
+  photoFocus?: string | null;
+  photoZoom?: number | null;
   message: string | null;
   isActive: boolean;
   createdAt?: string;
@@ -102,6 +105,8 @@ export interface Post {
   showSidebar?: boolean;
   commentStatus?: string | null;
   showToc?: string | null;
+  telegramPost?: string | null;
+  telegramLiveUpdates?: boolean;
   publicUrl?: string;
   authorId?: string | null;
   author?: PostAuthor | null;
@@ -119,12 +124,28 @@ export interface Post {
   videoUrl?: string | null;
   review?: Review | null;
   qna?: QnaSession | null;
+  /** Live blogs: when coverage was closed; null while still live. */
+  liveEndedAt?: string | null;
   seoMetadata?: { focusKeyword: string | null; seoScore: number | null; readabilityScore: number | null } | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export type ArticleType = 'article' | 'news' | 'review' | 'qna';
+export type ArticleType = 'article' | 'news' | 'review' | 'qna' | 'live';
+
+/** One entry on a live blog (posts with articleType = 'live'). */
+export interface LiveUpdate {
+  id: number;
+  headline: string | null;
+  /** 'html' from the live desk editor; 'text' = plain text (API clients). */
+  format: 'html' | 'text';
+  body: string;
+  image: string | null;
+  pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+  author: PostAuthor | null;
+}
 
 export interface QnaItem {
   question: string;
@@ -403,13 +424,25 @@ export interface PostRevision {
   };
 }
 
+export type MfaMethod = 'totp' | 'passkey' | 'backup';
+
+/** The password was right; a second step is needed (or, with setupRequired, must be set up first). */
+export interface MfaChallenge {
+  mfaRequired: true;
+  mfaToken: string;
+  setupRequired: boolean;
+  methods: MfaMethod[];
+}
+
 export interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
-  login: (identifier: string, password: string) => Promise<{ mfaRequired: true; mfaToken: string } | void>;
+  login: (identifier: string, password: string) => Promise<MfaChallenge | void>;
   completeMfaLogin: (mfaToken: string, code: string) => Promise<void>;
   completeMfaBackupLogin: (mfaToken: string, backupCode: string) => Promise<void>;
+  /** Signs in with a session obtained elsewhere (passkey, login-time enrolment). */
+  startSession: (session: { accessToken: string; user: User }) => void;
   setup: (input: SetupInput) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;

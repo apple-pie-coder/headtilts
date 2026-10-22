@@ -94,12 +94,14 @@ export function commentOnYourPost(c: CommentFacts): BuiltEmail {
 
 // ── Event registrations ─────────────────────────────────────────────────────
 
-export type RegistrationEmailKind = 'confirmed' | 'pending' | 'waitlisted' | 'cancelled';
+export type RegistrationEmailKind = 'confirm-email' | 'confirmed' | 'pending' | 'waitlisted' | 'cancelled';
 
 export interface EmailEvent {
   title: string; slug: string; startAt: Date; endAt: Date; timezone: string; type: string;
   venueName?: string | null; venueAddress?: string | null; venueCity?: string | null; venueCountry?: string | null;
   onlineUrl?: string | null;
+  /** Tickets are a QR that changes every few seconds on the booking page, not a code in the email. */
+  liveTicketQr?: boolean;
 }
 
 export interface EmailRegistration { name: string; ticketCode: string; quantity: number; paymentStatus?: string }
@@ -133,7 +135,7 @@ export async function registrationEmail(
   kind: RegistrationEmailKind,
   reg: EmailRegistration,
   event: EmailEvent,
-  opts: { cancelledBy?: 'you' | 'organisers'; replyTo?: string } = {},
+  opts: { cancelledBy?: 'you' | 'organisers'; replyTo?: string; confirmUrl?: string } = {},
 ): Promise<BuiltEmail> {
   const base = siteUrl();
   const pageUrl = `${base}/events/${event.slug}`;
@@ -152,6 +154,54 @@ export async function registrationEmail(
     { label: reg.quantity === 1 ? 'Ticket' : 'Tickets', value: `${reg.quantity} × ${reg.name}` },
   ] };
 
+  // Fake sellers on social media are the most common ticket scam; say where real tickets come from.
+  const officialSales: EmailBlock = {
+    type: 'notice', tone: 'info',
+    text: `Tickets are only sold at ${new URL(base).host}. Tickets bought anywhere else may be refused at the door.`,
+  };
+
+  if (kind === 'confirm-email') {
+    return {
+      replyTo: opts.replyTo,
+      subject: `Confirm your email to get your ticket: ${event.title}`,
+      content: {
+        audience: 'reader', tag: 'Confirm',
+        preheader: 'One click and your ticket is on its way.',
+        heading: 'Confirm your email address',
+        intro: `Hi ${first}, thanks for signing up for ${event.title}. Confirm this is your email address and we'll send your ticket straight away.`,
+        blocks: [facts],
+        button: { label: 'Confirm and get my ticket', url: opts.confirmUrl ?? pageUrl },
+        footnote: 'The link works for 24 hours. Your place isn’t held until you confirm. If you didn’t sign up, ignore this email.',
+      },
+    };
+  }
+
+  if (kind === 'confirmed' && event.liveTicketQr) {
+    return {
+      replyTo: opts.replyTo,
+      subject: `Your ticket: ${event.title}`,
+      content: {
+        audience: 'reader', tag: 'Ticket',
+        preheader: `${when.replace('\n', ', ')} · ${where}`,
+        heading: `You're in: ${event.title}`,
+        intro: `Hi ${first}, your place is confirmed. This event uses live tickets: at the door, open your ticket from the button below and show the QR code on your screen.`,
+        blocks: [
+          facts,
+          { type: 'notice', tone: 'warning', text: 'The QR code changes every few seconds, so screenshots and printouts won’t work. Open the ticket page before you join the queue.' },
+          { type: 'code', label: 'Ticket code', code: reg.ticketCode },
+          officialSales,
+          { type: 'links', links: [
+            { label: 'Add to Google Calendar', url: googleCalendarLink(event, online ? 'Online' : address || where, pageUrl) },
+            { label: 'Calendar file (.ics)', url: `${base}/api/public/events/${event.slug}/calendar.ics` },
+            ...(address && !online ? [{ label: 'Directions', url: mapUrl }] : []),
+          ] },
+        ],
+        button: { label: 'Open my live ticket', url: manageUrl },
+        secondary: [{ label: 'View the event', url: pageUrl }],
+      },
+    };
+  }
+
   if (kind === 'confirmed') {
     const qr = await qrcode.toBuffer(reg.ticketCode, { width: 360, margin: 1 });
     return {
@@ -167,6 +217,7 @@ export async function registrationEmail(
           facts,
           { type: 'image', cid: 'ticket-qr', alt: `QR code for ticket ${reg.ticketCode}`, width: 180, caption: 'Scan at the entrance' },
           { type: 'code', label: 'Ticket code', code: reg.ticketCode },
+          officialSales,
           { type: 'links', links: [
             { label: 'Add to Google Calendar', url: googleCalendarLink(event, online ? 'Online' : address || where, pageUrl) },
             { label: 'Calendar file (.ics)', url: `${base}/api/public/events/${event.slug}/calendar.ics` },

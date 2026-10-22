@@ -3,6 +3,8 @@ import { AxiosError } from 'axios';
 import { Celebration } from '../types';
 import { createCelebration, updateCelebration, CelebrationInput } from '../services/celebrations';
 import { MediaPickerInput } from './MediaPickerInput';
+import { CropPreview, FocusPicker } from './FocusPicker';
+import { resolveMediaUrl } from '../services/media';
 import { useToast } from './ToastContext';
 import styles from './CelebrationForm.module.css';
 
@@ -10,6 +12,13 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
 
 const now = new Date();
+
+// The crop shapes the public site uses for celebration photos.
+const PHOTO_PREVIEWS: CropPreview[] = [
+  { label: 'Popup', ratio: '4 / 5', size: 1 },
+  { label: 'Short screens', ratio: '1 / 1', size: 1.25 },
+  { label: 'On This Day', ratio: '1 / 1', size: 0.6, round: true },
+];
 
 interface CelebrationFormProps {
   celebration: Celebration | null;
@@ -29,6 +38,8 @@ export function CelebrationForm({ celebration, onSaved, onCancel }: CelebrationF
   const [photo, setPhoto] = useState(celebration?.photo || '');
   const [photoCredit, setPhotoCredit] = useState(celebration?.photoCredit || '');
   const [photoCreditUrl, setPhotoCreditUrl] = useState(celebration?.photoCreditUrl || '');
+  const [photoFocus, setPhotoFocus] = useState<string | null>(celebration?.photoFocus ?? null);
+  const [photoZoom, setPhotoZoom] = useState<number | null>(celebration?.photoZoom ?? null);
   const [message, setMessage] = useState(celebration?.message || '');
   const [isActive, setIsActive] = useState(celebration?.isActive ?? true);
   const [saving, setSaving] = useState(false);
@@ -50,6 +61,8 @@ export function CelebrationForm({ celebration, onSaved, onCancel }: CelebrationF
       photo: photo || null,
       photoCredit: photoCredit.trim() || null,
       photoCreditUrl: photoCreditUrl.trim() || null,
+      photoFocus: photo ? photoFocus : null,
+      photoZoom: photo ? photoZoom : null,
       message: message || null,
       isActive,
     };
@@ -146,7 +159,29 @@ export function CelebrationForm({ celebration, onSaved, onCancel }: CelebrationF
 
         <div className={styles.formGroup}>
           <label>Photo</label>
-          <MediaPickerInput value={photo} onChange={setPhoto} disabled={saving} />
+          <MediaPickerInput
+            value={photo}
+            onChange={(url) => {
+              // A different photo needs framing from scratch.
+              if (url !== photo) { setPhotoFocus(null); setPhotoZoom(null); }
+              setPhoto(url);
+            }}
+            disabled={saving}
+          />
+          {photo && (
+            <div className={styles.stacked}>
+              <FocusPicker
+                src={resolveMediaUrl(photo)}
+                value={photoFocus}
+                onChange={setPhotoFocus}
+                zoom={photoZoom}
+                onZoomChange={setPhotoZoom}
+                previews={PHOTO_PREVIEWS}
+                alt={name ? `Photo of ${name}` : 'Celebration photo'}
+                disabled={saving}
+              />
+            </div>
+          )}
         </div>
 
         <div className={styles.formGroup}>

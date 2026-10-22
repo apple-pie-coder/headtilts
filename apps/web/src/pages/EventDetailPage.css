@@ -3,6 +3,10 @@
   margin: 0 auto;
   padding: 0 1.5rem 4rem;
 }
+/* Phones: the site container already has side padding; don't double it. */
+@media (max-width: 600px) {
+  .event-detail-page { padding: 0 0 3rem; }
+}
 
 /* ── Banner ── */
 
@@ -575,3 +579,34 @@
 [data-theme='dark'] .booking-panel__status--confirmed { background: #12301d; color: #8fdca8; }
 [data-theme='dark'] .booking-panel__status--pending, [data-theme='dark'] .booking-panel__status--waitlisted { background: #3a2e0a; color: #f2cf73; }
 [data-theme='dark'] .booking-panel__status--cancelled { background: #3a1410; color: #f3a198; }
+
+/* ── Tickets: email confirmation, "show my ticket", bot check, official sales ── */
+.event-detail-confirm {
+  margin: 0 0 1.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: var(--n-tile, #f2f2f4);
+  font-size: 0.9375rem;
+  color: var(--n-ink, #1d1d1f);
+}
+.event-detail-confirm--error { background: #fdecea; color: #8a1f13; }
+[data-theme='dark'] .event-detail-confirm--error { background: #3a1410; color: #f3a198; }
+
+.event-reg__show-ticket {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  margin-top: 0.75rem;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  background: var(--n-ink, #1d1d1f);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+.event-reg__show-ticket:focus-visible { outline: 3px solid var(--n-accent, #0071e3); outline-offset: 2px; }
+[data-theme='dark'] .event-reg__show-ticket { background: #f5f5f7; color: #111; }
+
+.event-reg__turnstile { min-height: 65px; margin: 0.25rem 0 0.75rem; }
+.event-reg__official { font-size: 0.8125rem; }

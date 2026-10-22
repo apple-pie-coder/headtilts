@@ -1022,3 +1022,130 @@
 
 .viewLink:hover { text-decoration: underline; }
 .viewLink:disabled { opacity: 0.5; cursor: default; }
+
+/* ── Phones and tablets: tabs + action bar ──
+   Below 1000px the two columns stack into one very long page, with Save at the
+   bottom. Instead show one group at a time (Write / Settings / SEO) and keep
+   Preview and Save in a bar fixed to the bottom. Panels stay mounted, so
+   switching tabs never loses editor state. */
+
+.mobileTabs,
+.mobileBar { display: none; }
+
+@media (max-width: 1000px) {
+  .mobileTabs {
+    position: sticky;
+    top: 3.5rem; /* under the admin header */
+    z-index: 40;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 3px;
+    margin: 0 -2rem 1rem;
+    padding: 0.5rem 2rem;
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--sep);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+  }
+  .mobileTab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    min-height: 2.5rem;
+    padding: 0 0.5rem;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    background: var(--ghost);
+    color: var(--t2);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .mobileTabOn { background: var(--surface-overlay, var(--surface)); color: var(--accent-text); border-color: var(--border); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+  .mobileTab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .mobileTabScore {
+    min-width: 1.5rem;
+    padding: 0.0625rem 0.375rem;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .mobileTabScore_good { background: var(--success-bg); color: var(--success-t); }
+  .mobileTabScore_improve { background: var(--warning-bg); color: var(--warning-t); }
+  .mobileTabScore_problem { background: var(--danger-bg); color: var(--danger-t); }
+
+  /* Write: the content column minus SEO and the revision log. */
+  .layout[data-mtab='write'] .sidebar,
+  .layout[data-mtab='write'] .contentColumn > [data-group] { display: none; }
+  /* Settings: the sidebar panels plus the revision log. */
+  .layout[data-mtab='settings'] .contentColumn > :not([data-group='settings']) { display: none; }
+  .layout[data-mtab='settings'] .contentColumn { order: 1; } /* revision log after the settings */
+  /* SEO: just the SEO panel. */
+  .layout[data-mtab='seo'] .sidebar,
+  .layout[data-mtab='seo'] .contentColumn > :not([data-group='seo']) { display: none; }
+
+  /* The bar below carries these. */
+  .publishActions,
+  .viewActions { display: none; }
+
+  /* Room for the bar at the end of every tab. */
+  .layout { padding-bottom: 6.5rem; }
+
+  .mobileBar {
+    position: fixed;
+    left: var(--sidebar-w, 0);
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.625rem 1rem calc(0.625rem + env(safe-area-inset-bottom));
+    background: var(--header-bg);
+    border-top: 1px solid var(--sep);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+  }
+  .mobileBarStatus {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-width: 0;
+    font-size: 0.8125rem;
+    color: var(--t2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mobileBarDot { flex-shrink: 0; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--t3, var(--t2)); }
+  .mobileBarDotLive { background: var(--success-t); }
+  .mobileBarActions { display: flex; gap: 0.5rem; }
+  .mobileBarActions > * {
+    flex: 1 1 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    min-height: 2.75rem; /* comfortable tap target */
+    padding: 0 0.75rem;
+    border: none;
+    border-radius: var(--r-sm);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .mobileBarActions > :disabled { opacity: 0.5; cursor: not-allowed; }
+  .mobileBarGhost { background: transparent; color: var(--accent-text); border: 1px solid var(--border) !important; }
+  .mobileBarGhost svg { font-size: 0.75em; }
+}
+
+@media (max-width: 768px) {
+  .mobileTabs { margin: 0 -1rem 1rem; padding: 0.5rem 1rem; }
+  /* The admin nav is a drawer here, so the bar spans the screen. */
+  .mobileBar { left: 0; }
+}

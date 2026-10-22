@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Booking, cancelRegistration, fetchBooking } from '../services/events';
+import { TicketQr } from './TicketQr';
 
 const STATUS: Record<Booking['status'], string> = {
   confirmed: 'Confirmed',
@@ -8,9 +9,27 @@ const STATUS: Record<Booking['status'], string> = {
   cancelled: 'Cancelled',
 };
 
+// The last copy of each ticket opened on this phone, for when the signal
+// drops in the queue: the QR (live ones included) still works offline.
+const savedKey = (code: string) => `ht-ticket:${code.toLowerCase()}`;
+
+function savedBooking(code: string): { booking: Booking; clockOffset: number } | null {
+  try {
+    const raw = localStorage.getItem(savedKey(code));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveBooking(code: string, value: { booking: Booking; clockOffset: number }) {
+  try { localStorage.setItem(savedKey(code), JSON.stringify(value)); } catch { /* not saved: fine online */ }
+}
+
 /**
  * "Your booking", opened from the link in a registration email
- * (/events/<slug>?ticket=<code>): shows the booking and lets the person cancel.
+ * (/events/<slug>?ticket=<code>): the ticket QR for the door, the booking,
+ * and cancelling.
  */
 export function BookingPanel({ ticketCode, eventSlug }: { ticketCode: string; eventSlug: string }) {
   const [booking, setBooking] = useState<Booking | null>(null);
@@ -18,18 +37,38 @@ export function BookingPanel({ ticketCode, eventSlug }: { ticketCode: string; ev
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [justCancelled, setJustCancelled] = useState(false);
+  const [clockOffset, setClockOffset] = useState(0);
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => {
     fetchBooking(ticketCode)
-      .then((b) => (b.event.slug === eventSlug ? setBooking(b) : setError('That booking is for a different event.')))
-      .catch(() => setError('We couldn’t find that booking. Check the link in your email.'));
+      .then((res) => {
+        if (res.booking.event.slug !== eventSlug) { setError('That booking is for a different event.'); return; }
+        setBooking(res.booking);
+        setClockOffset(res.clockOffset);
+        setOffline(false);
+        saveBooking(ticketCode, res);
+      })
+      .catch((e: Error) => {
+        const saved = savedBooking(ticketCode);
+        // Offline (fetch threw a TypeError): fall back to the copy on this phone.
+        if (saved && saved.booking.event.slug === eventSlug && e instanceof TypeError) {
+          setBooking(saved.booking);
+          setClockOffset(saved.clockOffset);
+          setOffline(true);
+        } else {
+          setError('We couldn’t find that booking. Check the link in your email.');
+        }
+      });
   }, [ticketCode, eventSlug]);
 
   async function cancel() {
     setBusy(true);
     setError('');
     try {
-      setBooking(await cancelRegistration(ticketCode));
+      const cancelled = await cancelRegistration(ticketCode);
+      setBooking(cancelled);
+      saveBooking(ticketCode, { booking: cancelled, clockOffset });
       setJustCancelled(true);
       setConfirming(false);
     } catch (e) {
@@ -46,10 +85,13 @@ export function BookingPanel({ ticketCode, eventSlug }: { ticketCode: string; ev
       <h2 id="booking-title" className="booking-panel__title">Your booking</h2>
       {booking && (
         <>
+          {booking.ticket && <TicketQr booking={booking} clockOffset={clockOffset} />}
+          {offline && <p className="booking-panel__note" role="status">No connection: this is the copy of your ticket saved on this phone.</p>}
           <dl className="booking-panel__facts">
             <div><dt>Name</dt><dd>{booking.name}</dd></div>
             <div><dt>{booking.quantity === 1 ? 'Ticket' : 'Tickets'}</dt><dd>{booking.quantity}</dd></div>
             <div><dt>Status</dt><dd><span className={`booking-panel__status booking-panel__status--${booking.status}`}>{STATUS[booking.status]}</span></dd></div>
+            {booking.tier && <div><dt>Ticket type</dt><dd>{booking.tier}</dd></div>}
             <div><dt>Ticket code</dt><dd><code>{booking.ticketCode}</code></dd></div>
           </dl>
           {justCancelled && (

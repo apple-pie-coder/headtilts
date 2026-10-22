@@ -1,13 +1,19 @@
 import { Router, IRouter, Request, Response } from 'express';
-import { authenticate, requirePermission } from '../middleware/auth';
+import { authenticate, loadPermissions, requirePermission } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import { PERMISSIONS } from '@headtilts/shared';
 import { sendSuccess, sendError, sendPaginatedSuccess } from '../utils/response';
 import { ApiError } from '../utils/errors';
 import * as eventsService from '../services/events.service';
+import * as checkIn from '../services/checkIn.service';
+import * as telegramController from '../controllers/telegram.controller';
 
 const router: IRouter = Router();
 router.use(authenticate);
+
+// Telegram channel: what was sent, a preview, and Post now.
+router.get('/:id/telegram', requirePermission(PERMISSIONS.EVENT_READ), asyncHandler(telegramController.itemStatus('event')));
+router.post('/:id/telegram', requirePermission(PERMISSIONS.EVENT_EDIT), asyncHandler(telegramController.itemSend('event')));
 
 // ─── Events CRUD ──────────────────────────────────────────────────────────────
 
@@ -97,6 +103,14 @@ router.patch(
   asyncHandler(async (req: Request, res: Response) => {
     try {
       const { action } = req.body as { action: 'approve' | 'cancel' | 'check-in' };
+      if (action === 'check-in') {
+        // Same rules and log as the door scanner.
+        await checkIn.checkInFromAdmin(Number(req.params.eventId), Number(req.params.regId), {
+          userId: req.user!.sub, permissions: await loadPermissions(req), device: 'Registrations page',
+        });
+        sendSuccess(res, await eventsService.getRegistration(Number(req.params.regId)));
+        return;
+      }
       const reg = await eventsService.updateRegistration(Number(req.params.regId), action);
       sendSuccess(res, reg);
     } catch (e) {

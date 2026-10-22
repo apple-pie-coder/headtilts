@@ -89,12 +89,18 @@ export async function recordSignIn(userId: string, ip: string | null, userAgent?
 }
 
 /** Password changed, two-step sign-in switched on or off: tell the account owner. */
-export async function accountChanged(userId: string, what: 'password_reset' | 'password_changed' | 'mfa_on' | 'mfa_off'): Promise<void> {
+export async function accountChanged(
+  userId: string,
+  what: 'password_reset' | 'password_changed' | 'mfa_on' | 'mfa_off' | 'mfa_reset' | 'passkey_added' | 'passkey_removed',
+): Promise<void> {
   const copy = {
     password_reset: { title: 'Your password was reset', body: 'Your password was changed using a reset link, and you were signed out everywhere else. If you didn\'t do this, reset it again now and tell an administrator.' },
     password_changed: { title: 'Your password was changed', body: 'The password for your account was just changed from your profile. If you didn\'t do this, reset it now and tell an administrator.' },
     mfa_on: { title: 'Two-step sign-in is on', body: 'From now on, signing in also needs a code from your authenticator app. Keep your backup codes somewhere safe.' },
     mfa_off: { title: 'Two-step sign-in was turned off', body: 'Your account no longer asks for an authenticator code when signing in. If you didn\'t do this, change your password and turn it back on.' },
+    mfa_reset: { title: 'Your two-step sign-in was reset', body: 'An administrator removed your authenticator app, backup codes and passkeys, usually because you were locked out. Set two-step sign-in up again from your profile. If you didn\'t ask for this, tell an administrator.' },
+    passkey_added: { title: 'A passkey was added to your account', body: 'A new passkey can now be used to sign in to your account. If you didn\'t add it, remove it from your profile, change your password and tell an administrator.' },
+    passkey_removed: { title: 'A passkey was removed from your account', body: 'One of your passkeys can no longer be used to sign in. If you didn\'t do this, change your password and tell an administrator.' },
   }[what];
   await notifySecurityAlert({ userId, ...copy, details: [{ label: 'When', value: await formatNow() }] })
     .catch((error) => console.error('Security alert failed:', error));

@@ -14,6 +14,20 @@ export const authLimiter = rateLimit({
   },
 });
 
+// Passkey challenges are cheap to hand out but each is a row, and the sign-in
+// page asks for one on every visit (for passkey autofill), so this is looser
+// than authLimiter. The verify calls still go through authLimiter.
+export const passkeyOptionsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMITED', message: 'Too many attempts. Please try again later.' },
+  },
+});
+
 // General API limiter — generous; protects against runaway clients, not users.
 export const apiLimiter = rateLimit({
   windowMs: 60 * 1000,

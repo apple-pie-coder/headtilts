@@ -43,6 +43,8 @@ model User {
   revisions                   PostRevision[]
   pollVotes                   PollVote[]
   apiKeys                     ApiKey[]
+  passkeys                    Passkey[]
+  liveUpdates                 LiveUpdate[]
 
   @@index([email])
   @@index([username])
@@ -88,6 +90,36 @@ model Session {
   createdAt     DateTime  @default(now())
 
   @@index([userId])
+}
+
+// A WebAuthn credential (passkey or security key). Signs the user in on its
+// own, or serves as the second step after a password.
+model Passkey {
+  id           Int       @id @default(autoincrement())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId String    @unique @db.VarChar(512) // base64url
+  publicKey    Bytes     @db.Blob
+  counter      Int       @default(0) @db.UnsignedInt
+  transports   String?   @db.VarChar(255)        // comma-separated
+  deviceType   String    @db.VarChar(16)         // singleDevice | multiDevice
+  backedUp     Boolean   @default(false)
+  name         String    @db.VarChar(100)
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  @@index([userId])
+}
+
+// One-time WebAuthn challenge, consumed by the matching verify call.
+model WebAuthnChallenge {
+  id        String   @id @default(cuid())
+  challenge String   @db.VarChar(128)
+  purpose   String   @db.VarChar(16)  // register | login | mfa
+  userId    String?                   // null for passwordless sign-in
+  expiresAt DateTime
+
+  @@index([expiresAt])
 }
 
 model PasswordResetToken {
@@ -187,6 +219,12 @@ model Post {
   // schema.org markup (Article / NewsArticle / Review) and the type's extra fields.
   articleType     String    @default("article") @db.VarChar(20)
   videoUrl        String?   @db.VarChar(500) // featured YouTube video
+  // Live blogs (articleType = "live"): set when coverage is closed; null = still live.
+  liveEndedAt     DateTime?
+  // Telegram channel: null = follow the site setting for this type, "yes" / "no" = per-post override.
+  telegramPost    String?   @db.VarChar(10)
+  // Live blogs on Telegram: also send each new update as a reply in the thread.
+  telegramLiveUpdates Boolean @default(true)
 
   metaTitle       String?
   metaDescription String?
@@ -207,6 +245,7 @@ model Post {
   polls           Poll[]
   reactions       PostReaction[]
   seriesPosts     SeriesPost[]
+  liveUpdates     LiveUpdate[]
 
   @@index([slug])
   @@index([status])
@@ -260,6 +299,58 @@ model QnaSession {
   items       Json                                       // { question, askedBy?, answer, answeredBy? }[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+// ===================== Live Blogs =====================
+
+// One timestamped entry on a live blog. Saved on its own (not with the post
+// form) so several editors can post while the story is running.
+model LiveUpdate {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  headline  String?  @db.VarChar(200)
+  // "html" from the live desk's editor (sanitised when shown); "text" = plain
+  // text where blank lines split paragraphs.
+  format    String   @default("html") @db.VarChar(10)
+  body      String   @db.MediumText
+  image     String?  @db.VarChar(500)            // lead image; newer updates put images inline
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([postId, createdAt])
+  @@index([authorId])
+}
+
+// ===================== Telegram =====================
+
+// One message sent (or being sent) to the Telegram channel. "kind" is post,
+// event, poll, live_update or live_end; refId is that row's id (the post's id
+// for live_end). At most one per item, so nothing is announced twice.
+model TelegramDelivery {
+  id        Int       @id @default(autoincrement())
+  kind      String    @db.VarChar(20)
+  refId     Int
+  postId    Int?      // live_update / live_end: the live blog, whose message they reply to
+  title     String    @db.VarChar(255) // what was announced, kept for the log after deletes
+  chatId    String    @db.VarChar(100)
+  messageId Int?
+  hasMedia  Boolean   @default(false) // photo with caption (edited as a caption) or a text message
+  status    String    @default("pending") @db.VarChar(10) // pending | sent | failed
+  error     String?   @db.Text
+  attempts  Int       @default(0)
+  retryAt   DateTime? // when a failed send is tried again on its own; null = only by hand
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([kind, refId])
+  @@index([status, retryAt])
+  @@index([postId])
+  @@index([createdAt])
 }
 
 // ===================== Admin Feedback =====================
@@ -613,6 +704,10 @@ model Celebration {
   // Attribution for the photo (e.g. photographer and licence), shown under it.
   photoCredit    String? @db.VarChar(300)
   photoCreditUrl String? @db.VarChar(500)
+  // Framing for the photo: crop focus as a CSS object-position ("50% 30%") and
+  // a zoom factor around that point (null = centre / 1x).
+  photoFocus     String? @db.VarChar(20)
+  photoZoom      Float?
   message   String?  @db.Text
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -638,6 +733,7 @@ model Poll {
   startsAt          DateTime?
   endsAt            DateTime?
   featuredImage     String?
+  telegramPost      String?              @db.VarChar(10) // null = site setting, "yes" / "no" = override
   postId            Int?
   post              Post?                @relation(fields: [postId], references: [id], onDelete: SetNull)
   options           PollOption[]
@@ -895,11 +991,19 @@ model Event {
   metaTitle              String?
   metaDescription        String?   @db.Text
   ogImage                String?
+  telegramPost           String?   @db.VarChar(10) // null = site setting, "yes" / "no" = override
+  // Door: tickets show a QR that changes every 15 seconds, so screenshots stop working
+  liveTicketQr             Boolean @default(false)
+  // Free tickets only arrive after the person clicks a link sent to their email
+  requireEmailConfirmation Boolean @default(false)
+  // Most tickets one email address or phone number can hold for this event
+  maxTicketsPerPerson      Int?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
   ticketTiers   EventTicketTier[]
   registrations EventRegistration[]
+  checkIns      EventCheckIn[]
   speakers      EventSpeaker[]
   agendaItems   EventAgendaItem[]
   customFields  EventCustomField[]
@@ -943,25 +1047,53 @@ model EventRegistration {
   email           String
   phone           String?
   quantity        Int       @default(1)
-  status          String    @default("pending") // pending | confirmed | waitlisted | cancelled
+  status          String    @default("pending") // unconfirmed | pending | confirmed | waitlisted | cancelled
   ticketCode      String    @unique @default(uuid())
-  paymentStatus   String    @default("free") // free | pending | paid | refunded
+  paymentStatus   String    @default("free") // free | pending | paid | refunded | partially_refunded | disputed
   paymentProvider String?
   paymentId       String?
   paymentOrderId  String?
   paymentAmount   Int?
   customData      Json?
-  checkInAt       DateTime?
+  checkInAt       DateTime? // first person on the ticket in
+  checkedInCount  Int       @default(0) // people in so far, up to quantity
+  emailTokenHash  String?   @unique // sha256 of the email confirmation link's token
+  emailConfirmedAt DateTime?
   registeredAt    DateTime  @default(now())
   cancelledAt     DateTime?
 
   event      Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
   ticketTier EventTicketTier? @relation(fields: [ticketTierId], references: [id], onDelete: SetNull)
+  checkIns   EventCheckIn[]
 
   @@index([eventId])
   @@index([email])
   @@index([ticketCode])
   @@index([status])
+}
+
+/// Every scan and manual check-in at the door, admitted or not, and every undo.
+model EventCheckIn {
+  id             Int      @id @default(autoincrement())
+  eventId        Int
+  registrationId Int?
+  userId         String?
+  staffName      String?  @db.VarChar(120) // who was signed in on the door phone
+  device         String?  @db.VarChar(60)  // the door phone's label, e.g. "Main gate"
+  action         String   @db.VarChar(20)  // admit | undo | denied
+  count          Int      @default(0)      // people admitted, or taken back by an undo
+  verdict        String?  @db.VarChar(30)  // why a scan was denied (see TicketVerdict)
+  source         String   @db.VarChar(20)  // scan | manual | offline
+  override       Boolean  @default(false)  // admitted although the ticket wasn't valid
+  reason         String?  @db.Text
+  scannedAt      DateTime
+  createdAt      DateTime @default(now())
+
+  event        Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registration EventRegistration? @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, createdAt])
+  @@index([registrationId])
 }
 
 model EventSpeaker {

@@ -74,9 +74,11 @@ const MIN_WORDS: Record<ArticleType, [number, number]> = {
   review: [250, 400],
   article: [300, 600],
   qna: [200, 400],
+  // Counts the intro and every update on the live desk.
+  live: [300, 600],
 };
 const TYPE_NOUN: Record<ArticleType, [string, string]> = {
-  news: ['news', 'News'], review: ['a review', 'Reviews'], article: ['an article', 'Articles'], qna: ['a Q&A', 'Q&As'],
+  news: ['news', 'News'], review: ['a review', 'Reviews'], article: ['an article', 'Articles'], qna: ['a Q&A', 'Q&As'], live: ['a live blog', 'Live blogs'],
 };
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

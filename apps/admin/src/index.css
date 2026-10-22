@@ -402,6 +402,29 @@ select {
   textarea { font-size: 16px !important; }
 }
 
+/* iOS draws date and time fields its own way: centred text, a width that can
+   push past the column, and no height at all while empty. Line them up with
+   the text fields around them. */
+@supports (-webkit-touch-callout: none) {
+  input[type="datetime-local"],
+  input[type="date"],
+  input[type="time"] {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    text-align: left;
+  }
+  input[type="datetime-local"]::-webkit-date-and-time-value,
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value {
+    min-height: 1.25em;
+    margin: 0;
+    text-align: left;
+  }
+}
+
 /* Touch screens: small icon buttons get a finger-sized hit area. */
 @media (pointer: coarse) {
   table[data-cards] td[data-cell="actions"] button,

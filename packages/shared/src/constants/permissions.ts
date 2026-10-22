@@ -118,6 +118,7 @@ export const PERMISSIONS = {
   EVENT_EDIT:   'events_update',
   EVENT_DELETE: 'events_delete',
   EVENT_MANAGE_REGISTRATIONS: 'events_manage_registrations',
+  EVENT_CHECK_IN: 'events_check_in', // the door scanner
 } as const;
 
 export type ContentAction = 'create' | 'read' | 'update' | 'delete' | 'publish' | 'edit_others';
@@ -134,6 +135,7 @@ export function contentPermission(type: string | null | undefined, action: Conte
 //   author       their own posts (not pages): write, publish, delete, upload media
 //   contributor  their own drafts only: an editor reviews and publishes; no uploads
 //   subscriber   their own profile and notification preferences
+//   door-staff   the ticket scanner, around event time, and nothing else
 // "Own" vs "anyone's" is POST_EDIT_OTHERS; publishing and live posts need POST_PUBLISH.
 const ADMIN_EXCLUDED: string[] = [PERMISSIONS.SYSTEM_BACKUP];
 
@@ -200,6 +202,7 @@ export const DEFAULT_ROLES = {
       PERMISSIONS.EVENT_EDIT,
       PERMISSIONS.EVENT_DELETE,
       PERMISSIONS.EVENT_MANAGE_REGISTRATIONS,
+      PERMISSIONS.EVENT_CHECK_IN,
     ],
   },
   AUTHOR: {
@@ -246,5 +249,10 @@ export const DEFAULT_ROLES = {
     description: 'Manages their own profile and notifications',
     // Nothing on the admin API: even "read" there includes drafts and unpublished items.
     permissions: [PERMISSIONS.NOTIFICATION_MANAGE],
+  },
+  DOOR_STAFF: {
+    name: 'door-staff',
+    description: 'Scans tickets at the door around event time, and nothing else',
+    permissions: [PERMISSIONS.EVENT_CHECK_IN],
   },
 } as const;

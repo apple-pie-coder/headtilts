@@ -97,6 +97,8 @@ function postInputFromBody(req: Request) {
     qna,
     seo,
     featuredImageFocus,
+    telegramPost,
+    telegramLiveUpdates,
   } = req.body;
 
   return {
@@ -140,6 +142,12 @@ function postInputFromBody(req: Request) {
     qna,
     seo,
     featuredImageFocus,
+    // 'yes' / 'no' override; null = follow the Telegram setting for the post's type
+    telegramPost:
+      telegramPost !== undefined
+        ? (telegramPost === 'yes' || telegramPost === 'no' ? telegramPost : null)
+        : undefined,
+    telegramLiveUpdates: telegramLiveUpdates !== undefined ? Boolean(telegramLiveUpdates) : undefined,
   };
 }
 

@@ -80,7 +80,7 @@ function dateInfo(post: Post): { label: string; value?: string | null } {
   return { label: 'Modified', value: post.updatedAt };
 }
 
-const KIND_LABELS: Record<string, string> = { article: 'Article', news: 'News', review: 'Review', qna: 'Q&A' };
+const KIND_LABELS: Record<string, string> = { article: 'Article', news: 'News', review: 'Review', qna: 'Q&A', live: 'Live' };
 
 export default function ContentList({ type }: { type: ContentType }) {
   const isPost = type === 'post';
@@ -465,6 +465,7 @@ export default function ContentList({ type }: { type: ContentType }) {
                 <option value="news">News</option>
                 <option value="review">Reviews</option>
                 <option value="qna">Q&amp;As</option>
+                <option value="live">Live blogs</option>
               </select>
             </Field>
           )}

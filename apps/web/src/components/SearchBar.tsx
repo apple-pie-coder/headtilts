@@ -94,7 +94,10 @@ export function SearchBar() {
   const showDropdown = open && !onSearchPage && (loading || hasResults || (debouncedQuery.length >= 2 && result !== null));
 
   return (
-    <div className={styles.wrap} ref={wrapRef}>
+    <div
+      className={`${styles.wrap}${open ? ` ${styles.open}` : ''}${onSearchPage ? ` ${styles.onSearchPage}` : ''}`}
+      ref={wrapRef}
+    >
       {!open && (
         <button
           type="button"

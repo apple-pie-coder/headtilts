@@ -217,6 +217,9 @@
 
 .imagePreview {
   display: grid;
+  /* Fixed tracks give the image a definite box, so max-height can cap it;
+     in an auto-sized row a square icon grew past the bottom of the frame. */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: center;
   flex-shrink: 0;
   width: 6.5rem;
@@ -919,6 +922,33 @@
   font-size: 0.875rem;
   color: var(--t3);
   line-height: 1.5;
+}
+
+/* Phones: keep the switch beside its text rather than wrapping under it. */
+@media (max-width: 640px) {
+  .emailToggleRow { flex-wrap: nowrap; gap: 1rem; }
+  .emailToggleInfo { min-width: 0; }
+  .emailToggleLabel { min-width: 0; }
+}
+
+/* ── Telegram tab ── */
+
+.setupSteps { margin: 0 0 1.25rem; padding-left: 1.25rem; }
+.setupSteps li + li { margin-top: 0.25rem; }
+
+.testRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.875rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--sep);
+}
+.testRow .fieldHint { margin: 0; flex: 1 1 14rem; }
+
+@media (max-width: 640px) {
+  .testRow .secondaryButton { width: 100%; min-height: 2.5rem; }
 }
 
 .emailToggleSwitch {

@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { BookingPanel } from '../components/BookingPanel';
+import { Turnstile } from '../components/Turnstile';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { useLayout } from '../context/LayoutContext';
 import { useSiteSettings } from '../context/SiteSettingsContext';
 import { applySeo, resetSeo } from '../utils/seo';
 import { resolveMediaUrl } from '../services/api';
 import { sanitizeHtml, sanitizeMapEmbed } from '../utils/sanitize';
-import { fetchEvent, registerForEvent, verifyEventPayment, eventIcalUrl, googleCalendarUrl } from '../services/events';
+import {
+  fetchEvent, registerForEvent, verifyEventPayment, eventIcalUrl, googleCalendarUrl, confirmRegistrationEmail,
+} from '../services/events';
 import { EventFull, EventCustomField, EventRegistrationResult } from '../types';
 import './EventDetailPage.css';
 import { trackEvent } from '../utils/analytics';
@@ -53,13 +56,19 @@ function loadRazorpay(): Promise<void> {
   });
 }
 
-type RegStep = 'form' | 'paying' | 'done';
+type RegStep = 'form' | 'paying' | 'done' | 'check-email';
 
 export default function EventDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const { setShowSidebar } = useLayout();
   const [event, setEvent]   = useState<EventFull | null>(null);
-  const ticketParam = useSearchParams()[0].get('ticket');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const ticketParam = searchParams.get('ticket');
+  const confirmParam = searchParams.get('confirm');
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [botToken, setBotToken] = useState('');
+  const [botKey, setBotKey] = useState(0);
   const [error, setError]   = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -80,7 +89,18 @@ export default function EventDetailPage() {
     if (slug) load(slug);
   }, [slug]);
 
-  const { site_title } = useSiteSettings();
+  const { site_title, turnstile_site_key } = useSiteSettings();
+
+  // The link in the "confirm your email" message: confirm, then show the ticket.
+  useEffect(() => {
+    if (!confirmParam) return;
+    setConfirming(true);
+    setConfirmError(null);
+    confirmRegistrationEmail(confirmParam)
+      .then(({ ticketCode: code }) => setSearchParams({ ticket: code }, { replace: true }))
+      .catch((e: Error) => setConfirmError(e.message || 'That confirmation link didn’t work.'))
+      .finally(() => setConfirming(false));
+  }, [confirmParam, setSearchParams]);
   useEffect(() => {
     if (!event) return;
     applySeo({
@@ -106,6 +126,7 @@ export default function EventDetailPage() {
   async function handleRegister() {
     if (!event) return;
     if (!name.trim() || !email.trim()) { setRegError('Name and email are required'); return; }
+    if (turnstile_site_key && !botToken) { setRegError('Please wait for the check above to finish, then try again.'); return; }
     setRegError(null);
     setSubmitting(true);
 
@@ -116,11 +137,18 @@ export default function EventDetailPage() {
         ticketTierId: tierId ?? undefined,
         quantity: qty,
         customData: Object.keys(customData).length ? customData : undefined,
+        turnstileToken: botToken || undefined,
       });
+
+      if (result.needsEmailConfirmation) {
+        trackEvent('event_registration', { event: event.slug, tickets: qty, paid: false, confirm_email: true });
+        setRegStep('check-email');
+        return;
+      }
 
       if (!result.requiresPayment) {
         trackEvent('event_registration', { event: event.slug, tickets: qty, paid: false });
-        setTicketCode(result.registration.ticketCode);
+        setTicketCode(result.registration.ticketCode ?? null);
         setRegStep('done');
         return;
       }
@@ -146,7 +174,7 @@ export default function EventDetailPage() {
               razorpay_signature: response.razorpay_signature,
             });
             trackEvent('event_registration', { event: event.slug, tickets: qty, paid: true });
-            setTicketCode(result.registration.ticketCode);
+            setTicketCode(result.registration.ticketCode ?? null);
             setRegStep('done');
           } catch {
             setRegError('Payment verified but confirmation failed. Please contact support with your ticket code.');
@@ -163,6 +191,8 @@ export default function EventDetailPage() {
       setRegStep('form');
     } finally {
       setSubmitting(false);
+      // A bot-check token works once: get a fresh one for the next try.
+      if (turnstile_site_key) { setBotToken(''); setBotKey((k) => k + 1); }
     }
   }
 
@@ -222,6 +252,8 @@ export default function EventDetailPage() {
   const canRegister = event.isRegistrationRequired && !isClosed && !isDeadlinePassed && !isSoldOut;
 
   const selectedTier = event.ticketTiers.find((t) => t.id === tierId) ?? null;
+  // The tier's per-order limit, and no more than one person may hold in total.
+  const maxQty = selectedTier ? Math.min(selectedTier.perOrderMax, event.maxTicketsPerPerson ?? Infinity) : 1;
   const isFree = !selectedTier || selectedTier.price === 0;
 
   const location = event.type === 'online'
@@ -242,7 +274,9 @@ export default function EventDetailPage() {
         <div className="event-detail-body">
           <div className="event-detail-main">
 
-            {ticketParam && <BookingPanel ticketCode={ticketParam} eventSlug={event.slug} />}
+            {confirming && <p className="event-detail-confirm" role="status">Confirming your email…</p>}
+            {confirmError && <p className="event-detail-confirm event-detail-confirm--error" role="alert">{confirmError}</p>}
+            {ticketParam && <BookingPanel key={ticketParam} ticketCode={ticketParam} eventSlug={event.slug} />}
 
             <div className="event-detail-quickinfo">
               <span className={`event-detail-type event-detail-type--${event.type}`}>
@@ -378,17 +412,37 @@ export default function EventDetailPage() {
 
           {event.isRegistrationRequired && (
             <aside className="event-reg" ref={formRef}>
-              {regStep === 'done' ? (
+              {regStep === 'check-email' ? (
+                <div className="event-reg__success">
+                  <div className="event-reg__success-icon">✉️</div>
+                  <h3 className="event-reg__success-title">Check your email</h3>
+                  <p className="event-reg__success-body">
+                    We’ve sent a link to <strong>{email.trim()}</strong>. Click it to confirm your address and your ticket
+                    arrives straight away. The link works for 24 hours, and your place isn’t held until you confirm.
+                  </p>
+                </div>
+              ) : regStep === 'done' ? (
                 <div className="event-reg__success">
                   <div className="event-reg__success-icon">🎉</div>
                   <h3 className="event-reg__success-title">You're registered!</h3>
                   <p className="event-reg__success-body">
-                    A confirmation email with your ticket has been sent.
+                    {event.liveTicketQr
+                      ? 'We’ve emailed you a link to your live ticket. Open it at the door: the QR code changes every few seconds, so screenshots won’t work.'
+                      : 'A confirmation email with your ticket has been sent.'}
                   </p>
                   {ticketCode && (
-                    <p className="event-reg__ticket-code">
-                      Ticket: <code>{ticketCode}</code>
-                    </p>
+                    <>
+                      <p className="event-reg__ticket-code">
+                        Ticket: <code>{ticketCode}</code>
+                      </p>
+                      <Link
+                        to={`/events/${event.slug}?ticket=${encodeURIComponent(ticketCode)}`}
+                        className="event-reg__show-ticket"
+                        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                      >
+                        Show my ticket
+                      </Link>
+                    </>
                   )}
                   <div className="event-detail-calendar-links" style={{ justifyContent: 'center', marginTop: '1rem' }}>
                     <a href={googleCalendarUrl(event)} target="_blank" rel="noreferrer" className="event-detail-cal-btn">
@@ -444,12 +498,12 @@ export default function EventDetailPage() {
                         </div>
                       )}
 
-                      {selectedTier && selectedTier.perOrderMax > 1 && (
+                      {selectedTier && maxQty > 1 && (
                         <div className="event-reg__field">
                           <label className="event-reg__label">Quantity</label>
                           <select className="event-reg__input" value={qty} onChange={(e) => setQty(Number(e.target.value))}>
                             {Array.from(
-                              { length: selectedTier.perOrderMax - selectedTier.perOrderMin + 1 },
+                              { length: Math.max(1, maxQty - selectedTier.perOrderMin + 1) },
                               (_, i) => i + selectedTier.perOrderMin,
                             ).map((n) => <option key={n} value={n}>{n}</option>)}
                           </select>
@@ -471,6 +525,10 @@ export default function EventDetailPage() {
 
                       {event.customFields.map(renderCustomField)}
 
+                      {turnstile_site_key && (
+                        <Turnstile key={botKey} siteKey={turnstile_site_key} onToken={setBotToken} />
+                      )}
+
                       {regError && <p className="event-reg__error">{regError}</p>}
 
                       <button
@@ -486,6 +544,15 @@ export default function EventDetailPage() {
                       {event.requireApproval && (
                         <p className="event-reg__note">Registration is subject to approval by the organiser.</p>
                       )}
+                      {isFree && event.requireEmailConfirmation && (
+                        <p className="event-reg__note">We’ll email you a link to confirm your address. Your ticket arrives once you click it.</p>
+                      )}
+                      {event.maxTicketsPerPerson && (
+                        <p className="event-reg__note">Up to {event.maxTicketsPerPerson} ticket{event.maxTicketsPerPerson === 1 ? '' : 's'} per person.</p>
+                      )}
+                      <p className="event-reg__note event-reg__official">
+                        Tickets are only sold here, on {site_title || 'this site'}. Tickets bought from anyone else may be refused at the door.
+                      </p>
                     </>
                   )}
                 </>

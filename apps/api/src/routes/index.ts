@@ -25,7 +25,9 @@ import logsRoutes from './logs.routes';
 import healthRoutes from './health.routes';
 import feedbackRoutes from './feedback.routes';
 import issueRoutes from './issues.routes';
+import checkInRoutes from './checkIn.routes';
 import frontPageRoutes from './frontPage.routes';
+import telegramRoutes from './telegram.routes';
 import publicRoutes from './public.routes';
 
 const router: IRouter = Router();
@@ -47,6 +49,7 @@ router.use('/comments', commentRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/celebrations', celebrationRoutes);
 router.use('/polls', pollRoutes);
+router.use('/events', checkInRoutes); // before eventRoutes: /events/check-in/events isn't an event id
 router.use('/events', eventRoutes);
 router.use('/api-keys', apiKeyRoutes);
 router.use('/api-analytics', apiAnalyticsRoutes);
@@ -57,6 +60,7 @@ router.use('/health', healthRoutes);
 router.use('/feedback', feedbackRoutes);
 router.use('/issues', issueRoutes);
 router.use('/front-page', frontPageRoutes);
+router.use('/telegram', telegramRoutes);
 router.use('/public', publicRoutes);
 
 export default router;

@@ -1,5 +1,6 @@
 import { prisma } from '../config/database';
 import { ValidationError, NotFoundError } from '../utils/errors';
+import { normalizeFocus } from './postExtras';
 
 export const CELEBRATION_TYPES = ['birthday', 'remembrance'] as const;
 export type CelebrationType = (typeof CELEBRATION_TYPES)[number];
@@ -13,8 +14,22 @@ interface CelebrationInput {
   photo?: string | null;
   photoCredit?: string | null;
   photoCreditUrl?: string | null;
+  photoFocus?: string | null;
+  photoZoom?: number | null;
   message?: string | null;
   isActive?: boolean;
+}
+
+const MAX_ZOOM = 4;
+
+/** Zoom factor rounded to 2 decimals and clamped to 1–MAX_ZOOM; null (or 1) = no zoom. */
+function normalizeZoom(value: unknown): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) throw new ValidationError('Photo zoom must be a number');
+  const zoom = Math.round(Math.min(MAX_ZOOM, Math.max(1, n)) * 100) / 100;
+  return zoom === 1 ? null : zoom;
 }
 
 // Days per month (max), used to validate the day for the chosen month. Uses 29
@@ -25,7 +40,7 @@ function validate(input: CelebrationInput, partial = false) {
   const data: {
     name?: string; type?: string; month?: number; day?: number;
     year?: number | null; photo?: string | null; photoCredit?: string | null; photoCreditUrl?: string | null;
-    message?: string | null; isActive?: boolean;
+    photoFocus?: string | null; photoZoom?: number | null; message?: string | null; isActive?: boolean;
   } = {};
 
   if (input.name !== undefined || !partial) {
@@ -83,6 +98,8 @@ function validate(input: CelebrationInput, partial = false) {
     if (url && (!/^https?:\/\//i.test(url) || url.length > 500)) throw new ValidationError('Photo credit link must be an http(s) URL');
     data.photoCreditUrl = url;
   }
+  if (input.photoFocus !== undefined) data.photoFocus = normalizeFocus(input.photoFocus) ?? null;
+  if (input.photoZoom !== undefined) data.photoZoom = normalizeZoom(input.photoZoom) ?? null;
   if (input.message !== undefined) data.message = input.message?.trim() || null;
   if (input.isActive !== undefined) data.isActive = Boolean(input.isActive);
 
@@ -126,6 +143,8 @@ export async function createCelebration(input: CelebrationInput) {
       photo: data.photo ?? null,
       photoCredit: data.photoCredit ?? null,
       photoCreditUrl: data.photoCreditUrl ?? null,
+      photoFocus: data.photoFocus ?? null,
+      photoZoom: data.photoZoom ?? null,
       message: data.message ?? null,
       isActive: data.isActive ?? true,
     },
@@ -171,7 +190,7 @@ export async function getTodaysCelebrations() {
   const items = await prisma.celebration.findMany({
     where: { isActive: true, month: today.month, day: today.day },
     orderBy: [{ type: 'asc' }, { name: 'asc' }],
-    select: { id: true, name: true, type: true, month: true, day: true, year: true, photo: true, photoCredit: true, photoCreditUrl: true, message: true },
+    select: { id: true, name: true, type: true, month: true, day: true, year: true, photo: true, photoCredit: true, photoCreditUrl: true, photoFocus: true, photoZoom: true, message: true },
   });
   return { date: today.date, items };
 }

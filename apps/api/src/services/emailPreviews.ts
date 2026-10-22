@@ -48,6 +48,15 @@ const PREVIEWS: PreviewDef[] = [
   { id: 'ticket', group: 'Readers', name: 'Ticket confirmed', to: 'The person who registered',
     when: 'A free registration is confirmed, a payment goes through, or you approve a registration.',
     build: async () => { const s = await samples(); return emails.registrationEmail('confirmed', s.reg, s.event); } },
+  { id: 'ticket-live', group: 'Readers', name: 'Ticket confirmed (live ticket)', to: 'The person who registered',
+    when: 'As above, for an event with live tickets turned on: no QR code in the email, a button to the live ticket instead.',
+    build: async () => { const s = await samples(); return emails.registrationEmail('confirmed', s.reg, { ...s.event, liveTicketQr: true }); } },
+  { id: 'registration-confirm-email', group: 'Readers', name: 'Confirm your email', to: 'The person who registered',
+    when: 'Someone books a free ticket for an event that asks people to confirm their email first.',
+    build: async () => {
+      const s = await samples();
+      return emails.registrationEmail('confirm-email', s.reg, s.event, { confirmUrl: `${siteUrl()}/events/${s.event.slug}?confirm=sample` });
+    } },
   { id: 'registration-pending', group: 'Readers', name: 'Registration received', to: 'The person who registered',
     when: 'Someone registers for an event that needs approval.',
     build: async () => { const s = await samples(); return emails.registrationEmail('pending', s.reg, s.event); } },

@@ -5,6 +5,7 @@ import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
   faSliders, faBookOpen, faComments, faImage, faLink, faChartLine, faEnvelope, faBell,
 } from '@fortawesome/free-solid-svg-icons';
+import { faTelegram } from '@fortawesome/free-brands-svg-icons';
 import { AxiosError } from 'axios';
 import { AdminLayout } from '../components/AdminLayout';
 import { MediaLibraryModal } from '../components/MediaLibraryModal';
@@ -19,6 +20,8 @@ import {
 import { Post, Setting } from '../types';
 import { PageHeader } from '../components/ui';
 import { EmailPreviews } from '../components/EmailPreviews';
+import { TelegramDeliveries } from '../components/TelegramDeliveries';
+import { sendTelegramTest } from '../services/telegram';
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 import { SettingsSearch, revealSetting } from './SettingsSearch';
 import styles from './Settings.module.css';
@@ -273,7 +276,7 @@ function CheckField({
 // Main component
 // ---------------------------------------------------------------------------
 
-const TABS = ['General', 'Reading', 'Discussion', 'Media', 'Permalinks', 'Analytics', 'Email', 'Notifications'] as const;
+const TABS = ['General', 'Reading', 'Discussion', 'Media', 'Permalinks', 'Analytics', 'Email', 'Telegram', 'Notifications'] as const;
 type Tab = (typeof TABS)[number];
 
 const TAB_META: Record<Tab, { icon: IconDefinition; desc: string; group: string }> = {
@@ -284,9 +287,27 @@ const TAB_META: Record<Tab, { icon: IconDefinition; desc: string; group: string 
   Media:         { icon: faImage,     group: 'Content',      desc: 'Image sizes, uploads and formats' },
   Analytics:     { icon: faChartLine, group: 'Integrations', desc: 'Google Analytics and visitor consent' },
   Email:         { icon: faEnvelope,  group: 'Integrations', desc: 'Outgoing mail server (SMTP)' },
+  Telegram:      { icon: faTelegram,  group: 'Integrations', desc: 'Announce new posts in a channel' },
   Notifications: { icon: faBell,      group: 'You',          desc: 'What you’re alerted about, and how' },
 };
 const TAB_GROUPS = ['Site', 'Content', 'Integrations', 'You'];
+
+/** Settings → Telegram: one switch per kind of content, in the order they're listed. */
+const TELEGRAM_TYPES: { key: string; label: string; hint: string }[] = [
+  { key: 'telegram_post_article', label: 'Articles', hint: '✍️ ARTICLE' },
+  { key: 'telegram_post_news',    label: 'News', hint: '🗞 NEWS' },
+  { key: 'telegram_post_review',  label: 'Reviews', hint: '💿 REVIEW, with the rating, verdict and streaming links' },
+  { key: 'telegram_post_qna',     label: 'Interviews', hint: '🎙 INTERVIEW, with one question and answer' },
+  { key: 'telegram_post_live',    label: 'Live blogs', hint: '🔴 LIVE NOW' },
+  { key: 'telegram_post_event',   label: 'Events', hint: '📅 EVENT, with the date, venue and tickets' },
+  { key: 'telegram_post_poll',    label: 'Polls', hint: '📊 POLL, listing the answers, with a Vote now button' },
+];
+const TELEGRAM_KEYS = ['telegram_enabled', 'telegram_bot_token', 'telegram_chat_id', ...TELEGRAM_TYPES.map((t) => t.key),
+  'telegram_live_updates', 'telegram_include_image', 'telegram_category_tags', 'telegram_silent'];
+const TELEGRAM_DEFAULTS: Record<string, string> = {
+  ...Object.fromEntries(TELEGRAM_KEYS.map((k) => [k, 'yes'])),
+  telegram_enabled: 'no', telegram_bot_token: '', telegram_chat_id: '', telegram_silent: 'no',
+};
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
 export default function SettingsPage() {
@@ -313,6 +334,7 @@ export default function SettingsPage() {
   const [adminLogoHeight, setAdminLogoHeight] = useState('');
   const [siteFavicon,     setSiteFavicon]     = useState('');
   const [adminFavicon,    setAdminFavicon]    = useState('');
+  const [adminLogoIcon,   setAdminLogoIcon]   = useState('');
   const [siteDescription, setSiteDescription] = useState('');
   const [adminEmail,      setAdminEmail]      = useState('');
   const [timezone,        setTimezone]        = useState('UTC');
@@ -388,6 +410,13 @@ export default function SettingsPage() {
   const [gaExcludeStaff, setGaExcludeStaff] = useState('yes');
   const [savedAnalytics, setSavedAnalytics] = useState<Record<string, string>>({});
 
+  // ── Telegram ──
+  const [telegram, setTelegram] = useState<Record<string, string>>(TELEGRAM_DEFAULTS);
+  const [savedTelegram, setSavedTelegram] = useState<Record<string, string>>(TELEGRAM_DEFAULTS);
+  const [testingTelegram, setTestingTelegram] = useState(false);
+  const setTg = (key: string, value: string) => setTelegram((prev) => ({ ...prev, [key]: value }));
+  const tgOn = (key: string) => telegram[key] === 'yes';
+
   // ── Notification preferences ──
   const [notifPrefs, setNotifPrefs] = useState<NotificationPreference[]>([]);
   const [notifLoadError, setNotifLoadError] = useState<string | null>(null);
@@ -439,6 +468,7 @@ export default function SettingsPage() {
       const algh = g(all, 'admin_logo_height');
       const sfav = g(all, 'site_favicon');
       const afav = g(all, 'admin_favicon');
+      const alic = g(all, 'admin_logo_icon');
       const sd   = g(all, 'site_description');
       const em   = g(all, 'admin_email');
       const tz   = g(all, 'timezone', 'UTC');
@@ -448,14 +478,14 @@ export default function SettingsPage() {
       const sb   = g(all, 'show_breadcrumbs', 'yes');
       const be   = g(all, 'background_effect', 'none');
       setSiteTitle(st); setSiteTagline(stag); setShowTagline(stg); setSiteLogo(slg); setSiteLogoDark(slgd);
-      setSiteLogoHeight(slgh); setAdminLogoHeight(algh); setSiteFavicon(sfav); setAdminFavicon(afav);
+      setSiteLogoHeight(slgh); setAdminLogoHeight(algh); setSiteFavicon(sfav); setAdminFavicon(afav); setAdminLogoIcon(alic);
       setSiteDescription(sd);
       setAdminEmail(em); setTimezone(tz); setDateFormat(df); setTimeFormat(tf);
       setWeekStartsOn(wso); setShowBreadcrumbs(sb); setBackgroundEffect(be);
       if (!DATE_FORMAT_PRESETS.includes(df)) setCustomDate(df);
       if (!TIME_FORMAT_PRESETS.includes(tf)) setCustomTime(tf);
       setSavedGeneral({ site_title: st, site_tagline: stag, show_tagline: stg, site_logo: slg, site_logo_dark: slgd,
-        site_logo_height: slgh, admin_logo_height: algh, site_favicon: sfav, admin_favicon: afav,
+        site_logo_height: slgh, admin_logo_height: algh, site_favicon: sfav, admin_favicon: afav, admin_logo_icon: alic,
         site_description: sd, admin_email: em, timezone: tz, date_format: df, time_format: tf,
         week_starts_on: wso, show_breadcrumbs: sb, background_effect: be });
 
@@ -487,6 +517,10 @@ export default function SettingsPage() {
       const gex = g(all, 'ga_exclude_staff', 'yes');
       setGaId(gid); setGaConsent(gcs); setGaExcludeStaff(gex);
       setSavedAnalytics({ ga_measurement_id: gid, ga_consent: gcs, ga_exclude_staff: gex });
+
+      // Telegram
+      const tg = Object.fromEntries(TELEGRAM_KEYS.map((k) => [k, g(all, k, TELEGRAM_DEFAULTS[k])]));
+      setTelegram(tg); setSavedTelegram(tg);
 
       // Discussion
       const cs  = g(all, 'default_comment_status', 'open');
@@ -610,7 +644,7 @@ export default function SettingsPage() {
   const curGeneral: Record<string, string> = { site_title: siteTitle, site_tagline: siteTagline,
     show_tagline: showTagline, site_logo: siteLogo, site_logo_dark: siteLogoDark,
     site_logo_height: siteLogoHeight, admin_logo_height: adminLogoHeight,
-    site_favicon: siteFavicon, admin_favicon: adminFavicon,
+    site_favicon: siteFavicon, admin_favicon: adminFavicon, admin_logo_icon: adminLogoIcon,
     site_description: siteDescription, admin_email: adminEmail, timezone, date_format: dateFormat,
     time_format: timeFormat, week_starts_on: weekStartsOn, show_breadcrumbs: showBreadcrumbs,
     background_effect: backgroundEffect };
@@ -650,6 +684,11 @@ export default function SettingsPage() {
     ga_consent: gaConsent, ga_exclude_staff: gaExcludeStaff };
   const gaIdValid = curAnalytics.ga_measurement_id === '' || /^G-[A-Z0-9]{4,20}$/.test(curAnalytics.ga_measurement_id);
 
+  const tgToken = telegram.telegram_bot_token.trim();
+  const tgTokenValid = tgToken === '' || tgToken === '••••••••' || /^\d{5,15}:[A-Za-z0-9_-]{30,50}$/.test(tgToken);
+  const tgChat = telegram.telegram_chat_id.trim();
+  const tgChatValid = tgChat === '' || /^@[A-Za-z][A-Za-z0-9_]{3,31}$/.test(tgChat) || /^-?\d{5,20}$/.test(tgChat);
+
   const isDirty = (cur: Record<string, string>, saved: Record<string, string>) =>
     Object.entries(cur).some(([k, v]) => saved[k] !== v);
 
@@ -661,6 +700,7 @@ export default function SettingsPage() {
     Media: isDirty(curMedia, savedMedia),
     Email: isDirty(curEmail, savedEmail),
     Analytics: isDirty(curAnalytics, savedAnalytics),
+    Telegram: isDirty(telegram, savedTelegram),
     Permalinks: structure !== savedStructure,
   };
   useUnsavedChanges(() => Object.values(tabDirty).some(Boolean),
@@ -771,6 +811,8 @@ export default function SettingsPage() {
                 hint="The public site's browser tab icon. A square image, 32 × 32 px or larger." />
               <ImageTile label="Admin favicon" value={adminFavicon} onChange={setAdminFavicon} disabled={saving}
                 hint="The admin panel's tab icon. Without one, the site favicon is used." />
+              <ImageTile label="Collapsed sidebar icon" value={adminLogoIcon} onChange={setAdminLogoIcon} disabled={saving}
+                hint="Shown in place of the logo when the admin sidebar is collapsed. A square image works best. Without one, the admin favicon is used." />
             </div>
             <div className={styles.sizeRow}>
               <span className={styles.sizeRowLabel}>Logo height</span>
@@ -1633,6 +1675,136 @@ export default function SettingsPage() {
           <EmailPreviews />
         </div>
         </>
+      ) : tab === 'Telegram' ? (
+        /* ═══════════════ TELEGRAM ═══════════════ */
+        <form onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          if (!tgTokenValid || !tgChatValid) return;
+          const next = { ...telegram, telegram_chat_id: telegram.telegram_chat_id.trim(), telegram_bot_token: telegram.telegram_bot_token.trim() };
+          save(next, () => { setTelegram(next); setSavedTelegram(next); });
+        }}>
+
+          <div className={styles.panel}>
+            <h3 className={styles.sectionTitle}>Posting</h3>
+            <div className={styles.emailToggleRow}>
+              <div className={styles.emailToggleInfo}>
+                <p className={styles.emailToggleDesc}>
+                  Announces posts, events and polls in your Telegram channel the first time they go live.
+                  Each post’s Telegram box can override this.
+                </p>
+              </div>
+              <label className={styles.emailToggleSwitch}>
+                <input
+                  type="checkbox"
+                  checked={tgOn('telegram_enabled')}
+                  onChange={(e) => setTg('telegram_enabled', e.target.checked ? 'yes' : 'no')}
+                  disabled={saving}
+                />
+                <span className={styles.emailToggleTrack} />
+                <span className={styles.emailToggleLabel}>{tgOn('telegram_enabled') ? 'On' : 'Off'}</span>
+              </label>
+            </div>
+          </div>
+
+          <div className={styles.panel}>
+            <h3 className={styles.sectionTitle}>Bot and channel</h3>
+            <ol className={`${styles.fieldHint} ${styles.setupSteps}`}>
+              <li>In Telegram, message <a href="https://t.me/BotFather" target="_blank" rel="noreferrer">@BotFather</a>, send <code>/newbot</code> and copy the token it gives you.</li>
+              <li>Add the bot to your channel as an admin with “Post messages”, “Edit messages” and “Delete messages” on.</li>
+              <li>Paste both below, save, then send a test message.</li>
+            </ol>
+            <div className={styles.formTable}>
+              <label className={styles.formLabel} htmlFor="telegram_bot_token">Bot token</label>
+              <div className={styles.formField}>
+                <input id="telegram_bot_token" type="password" className={styles.regularText} autoComplete="new-password"
+                  spellCheck={false} placeholder="123456789:AAE…" value={telegram.telegram_bot_token}
+                  aria-invalid={!tgTokenValid} aria-describedby="telegram_bot_token_hint"
+                  onChange={(e) => setTg('telegram_bot_token', e.target.value)} disabled={saving} />
+                <p id="telegram_bot_token_hint" className={styles.fieldHint}>
+                  {tgTokenValid
+                    ? 'Kept on the server and never shown again. Anyone with it can post as your bot.'
+                    : <strong>That doesn’t look like a bot token. It’s a number, a colon, then a long code.</strong>}
+                </p>
+              </div>
+
+              <label className={styles.formLabel} htmlFor="telegram_chat_id">Channel</label>
+              <div className={styles.formField}>
+                <input id="telegram_chat_id" type="text" className={styles.regularText} autoComplete="off"
+                  spellCheck={false} placeholder="@yourchannel" value={telegram.telegram_chat_id}
+                  aria-invalid={!tgChatValid} aria-describedby="telegram_chat_id_hint"
+                  onChange={(e) => setTg('telegram_chat_id', e.target.value)} disabled={saving} />
+                <p id="telegram_chat_id_hint" className={styles.fieldHint}>
+                  {tgChatValid
+                    ? <>A public channel’s <code>@username</code>, or a private channel’s ID such as <code>-1001234567890</code>.</>
+                    : <strong>Use the channel’s @username or its numeric ID.</strong>}
+                </p>
+              </div>
+            </div>
+            <div className={styles.testRow}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                disabled={testingTelegram || saving || !telegram.telegram_bot_token || !telegram.telegram_chat_id || !tgTokenValid || !tgChatValid}
+                onClick={async () => {
+                  setTestingTelegram(true);
+                  try {
+                    const result = await sendTelegramTest({ token: telegram.telegram_bot_token, chatId: telegram.telegram_chat_id.trim() });
+                    toast.success(`@${result.bot} posted a test message in ${result.chat}`);
+                  } catch (err) {
+                    toast.error(errMsg(err, 'The test message couldn’t be sent'));
+                  } finally {
+                    setTestingTelegram(false);
+                  }
+                }}
+              >
+                {testingTelegram ? 'Sending…' : 'Send test message'}
+              </button>
+              <span className={styles.fieldHint}>Checks the bot can post there and sends a short message. Works before saving.</span>
+            </div>
+          </div>
+
+          <div className={styles.panel}>
+            <h3 className={styles.sectionTitle}>What gets posted</h3>
+            <p className={styles.sectionDesc}>Each type has its own look in the channel, so readers can tell them apart at a glance.</p>
+            <div className={styles.formTable}>
+              <span className={styles.formLabel}>Content</span>
+              <div className={`${styles.formField} ${styles.checkStack}`}>
+                {TELEGRAM_TYPES.map((t) => (
+                  <CheckField key={t.key} id={t.key} label={t.label} hint={t.hint}
+                    checked={tgOn(t.key)} onChange={(v) => setTg(t.key, v ? 'yes' : 'no')} disabled={saving} />
+                ))}
+              </div>
+
+              <span className={styles.formLabel}>Live blogs</span>
+              <div className={styles.formField}>
+                <CheckField id="telegram_live_updates" label="Post each new update as a reply to the live blog’s message"
+                  hint="Edits and deletions show up in the channel too, and closing coverage posts a final message."
+                  checked={tgOn('telegram_live_updates')} onChange={(v) => setTg('telegram_live_updates', v ? 'yes' : 'no')} disabled={saving} />
+              </div>
+
+              <span className={styles.formLabel}>Messages</span>
+              <div className={`${styles.formField} ${styles.checkStack}`}>
+                <CheckField id="telegram_include_image" label="Include the featured image"
+                  checked={tgOn('telegram_include_image')} onChange={(v) => setTg('telegram_include_image', v ? 'yes' : 'no')} disabled={saving} />
+                <CheckField id="telegram_category_tags" label="Add the post’s categories as hashtags"
+                  checked={tgOn('telegram_category_tags')} onChange={(v) => setTg('telegram_category_tags', v ? 'yes' : 'no')} disabled={saving} />
+                <CheckField id="telegram_silent" label="Send silently"
+                  hint="Subscribers get the message without a notification sound."
+                  checked={tgOn('telegram_silent')} onChange={(v) => setTg('telegram_silent', v ? 'yes' : 'no')} disabled={saving} />
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.panel}>
+            <h3 className={styles.sectionTitle}>Recent messages</h3>
+            <p className={styles.sectionDesc}>
+              Everything sent to the channel. Failed sends are tried again on their own a few times; Retry sends one now.
+            </p>
+            <TelegramDeliveries />
+          </div>
+
+          <SaveBar dirty={tabDirty.Telegram} saving={saving} disabled={saving || !tgTokenValid || !tgChatValid || !isDirty(telegram, savedTelegram)} />
+        </form>
       ) : tab === 'Notifications' ? (
         /* ═══════════════ NOTIFICATIONS ═══════════════ */
         <div>

@@ -88,6 +88,9 @@ export interface EventFull extends EventSummary {
   registrationDeadline: string | null;
   requireApproval: boolean;
   showAttendeesNames: boolean;
+  liveTicketQr: boolean;
+  requireEmailConfirmation: boolean;
+  maxTicketsPerPerson: number | null;
   recurrenceType: string | null;
   recurrenceInterval: number | null;
   recurrenceDays: string | null;
@@ -95,6 +98,7 @@ export interface EventFull extends EventSummary {
   metaTitle: string | null;
   metaDescription: string | null;
   ogImage: string | null;
+  telegramPost?: string | null;
   ticketTiers: TicketTier[];
   speakers: Speaker[];
   agendaItems: AgendaItem[];
@@ -137,6 +141,10 @@ export interface EventInput {
   metaTitle?: string;
   metaDescription?: string;
   ogImage?: string;
+  telegramPost?: string | null;
+  liveTicketQr?: boolean;
+  requireEmailConfirmation?: boolean;
+  maxTicketsPerPerson?: number | null;
   ticketTiers?: TicketTier[];
   speakers?: Speaker[];
   agendaItems?: AgendaItem[];
@@ -159,6 +167,7 @@ export interface Registration {
   paymentAmount: number | null;
   customData: Record<string, unknown> | null;
   checkInAt: string | null;
+  checkedInCount: number;
   registeredAt: string;
   cancelledAt: string | null;
   ticketTier: { id: number; name: string; price: number } | null;

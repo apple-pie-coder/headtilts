@@ -55,9 +55,19 @@
 }
 
 .brandIcon {
+  display: inline-flex;
+  align-items: center;
   font-size: 1.25rem;
   color: var(--accent-text);
   flex-shrink: 0;
+}
+
+.brandMark {
+  display: block;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--r-xs);
+  object-fit: contain;
 }
 
 .brandName {
@@ -84,7 +94,23 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding: 0.6rem 0 1rem;
+  /* A slim themed scrollbar that stays faint until the nav is hovered. */
   scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s ease;
+}
+.nav:hover,
+.nav:focus-within { scrollbar-color: var(--border-strong) transparent; }
+.nav::-webkit-scrollbar { width: 6px; }
+.nav::-webkit-scrollbar-track { background: transparent; }
+.nav::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
+.nav:hover::-webkit-scrollbar-thumb,
+.nav:focus-within::-webkit-scrollbar-thumb { background: var(--border-strong); }
+.nav::-webkit-scrollbar-thumb:hover { background: var(--t3); }
+/* Touch screens have no hover: keep the thumb visible there. */
+@media (hover: none) {
+  .nav { scrollbar-color: var(--border-strong) transparent; }
+  .nav::-webkit-scrollbar-thumb { background: var(--border-strong); }
 }
 
 .nav ul {

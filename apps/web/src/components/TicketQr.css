@@ -1,0 +1,111 @@
+/* The ticket QR on the booking page. Always black on white, whatever the theme:
+   that's what door cameras read best. */
+
+.ticket-qr {
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 1.25rem;
+  padding: 1rem;
+  border-radius: 12px;
+  background: var(--n-tile, #f2f2f4);
+  text-align: center;
+}
+
+.ticket-qr__frame {
+  position: relative;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 10px;
+  border-radius: 12px;
+  background: #fff;
+  line-height: 0;
+  overflow: hidden;
+}
+.ticket-qr__frame canvas { display: block; max-width: 100%; height: auto; aspect-ratio: 1; image-rendering: pixelated; }
+
+/* A colour edge that keeps moving round the code, so a still picture looks still. */
+.ticket-qr__frame--live {
+  padding: 12px;
+  background:
+    linear-gradient(#fff, #fff) padding-box,
+    conic-gradient(from var(--ticket-spin, 0deg), #c3301f, #f59e0b, #16a34a, #2563eb, #c3301f) border-box;
+  border: 6px solid transparent;
+  animation: ticket-spin 3s linear infinite;
+}
+@property --ticket-spin { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes ticket-spin { to { --ticket-spin: 360deg; } }
+
+.ticket-qr__bar {
+  width: min(248px, 100%);
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+.ticket-qr__bar span {
+  display: block;
+  height: 100%;
+  background: #16a34a;
+  transform-origin: left center;
+  transition: transform 0.2s linear;
+}
+
+.ticket-qr__caption { margin: 0; max-width: 22rem; font-size: 0.875rem; line-height: 1.45; color: var(--n-ink, #1d1d1f); font-variant-numeric: tabular-nums; }
+.ticket-qr__admits { margin: 0; font-size: 0.8125rem; font-weight: 600; color: var(--n-muted, #6e6e73); }
+.ticket-qr__big {
+  min-height: 2.75rem;
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--n-ink, #1d1d1f);
+  border-radius: 8px;
+  background: var(--n-ink, #1d1d1f);
+  color: #fff;
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ticket-qr__big:focus-visible { outline: 3px solid var(--n-accent, #0071e3); outline-offset: 2px; }
+
+/* Full screen: white, huge, nothing else competing for the camera. */
+.ticket-qr-full {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
+  background: #fff;
+  color: #111;
+}
+.ticket-qr-full__inner { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; width: 100%; max-width: 560px; text-align: center; }
+.ticket-qr-full__event { margin: 0; font-size: 0.9375rem; font-weight: 600; color: #555; }
+.ticket-qr-full__name { margin: 0; font-size: 1.5rem; font-weight: 800; overflow-wrap: anywhere; }
+.ticket-qr-full .ticket-qr__bar { width: min(86vw, 520px); height: 8px; }
+.ticket-qr-full__meta { margin: 0; font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ticket-qr-full__clock { font-size: 1.25rem; font-weight: 800; }
+.ticket-qr-full__close {
+  min-height: 3rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem 2rem;
+  border: 2px solid #111;
+  border-radius: 10px;
+  background: #fff;
+  color: #111;
+  font: inherit;
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticket-qr__frame--live { animation-duration: 12s; }
+  .ticket-qr__bar span { transition: none; }
+}
+
+[data-theme='dark'] .ticket-qr { background: rgba(255, 255, 255, 0.06); }
+[data-theme='dark'] .ticket-qr__caption { color: #f5f5f7; }
+[data-theme='dark'] .ticket-qr__bar { background: rgba(255, 255, 255, 0.18); }
+[data-theme='dark'] .ticket-qr__big { background: #f5f5f7; border-color: #f5f5f7; color: #111; }

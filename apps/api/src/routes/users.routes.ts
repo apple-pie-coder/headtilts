@@ -16,6 +16,7 @@ router.get('/', requirePermission(PERMISSIONS.USER_READ), asyncHandler(usersCont
 router.get('/:id', requirePermission(PERMISSIONS.USER_READ), asyncHandler(usersController.getOne));
 router.post('/', requirePermission(PERMISSIONS.USER_CREATE), asyncHandler(usersController.create));
 router.put('/:id', requirePermission(PERMISSIONS.USER_EDIT), asyncHandler(usersController.update));
+router.post('/:id/reset-mfa', requirePermission(PERMISSIONS.USER_EDIT), asyncHandler(usersController.resetMfa));
 router.delete('/:id', requirePermission(PERMISSIONS.USER_DELETE), asyncHandler(usersController.remove));
 
 export default router;

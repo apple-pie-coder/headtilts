@@ -68,7 +68,7 @@ export function refreshSession(): Promise<{ accessToken: string; user: unknown }
 
 // Endpoints whose 401 means "bad credentials", not "session expired".
 const NO_REFRESH_PATHS = ['/auth/login', '/auth/refresh', '/auth/setup', '/auth/logout', '/auth/mfa/verify',
-  '/auth/forgot-password', '/auth/reset-password'];
+  '/auth/mfa/enroll', '/auth/mfa/passkey', '/auth/passkey/', '/auth/forgot-password', '/auth/reset-password'];
 
 function redirectToLogin(): void {
   if (!window.location.pathname.startsWith('/admin/login')) {

@@ -91,7 +91,7 @@ async function getMediaSettings(): Promise<MediaSettings> {
   };
 }
 
-function urlToPath(url: string | null | undefined): string | null {
+export function urlToPath(url: string | null | undefined): string | null {
   if (!url || !url.startsWith('/uploads/')) return null;
   const rel = path.normalize(url.slice('/uploads/'.length));
   if (rel.startsWith('..')) return null;
@@ -474,6 +474,7 @@ export interface MediaUse {
 
 const SETTING_LABELS: Record<string, string> = {
   site_logo: 'Site logo', site_logo_dark: 'Site logo (dark)', site_favicon: 'Site favicon', admin_favicon: 'Admin favicon',
+  admin_logo_icon: 'Admin sidebar icon',
 };
 
 /** Every stored form of a file (delivery, original and resized copies) shares its path stem. */

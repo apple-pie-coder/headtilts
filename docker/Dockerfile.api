@@ -52,6 +52,7 @@ COPY packages/shared/package.json ./packages/shared/
 COPY apps/api/package.json           ./apps/api/
 COPY --from=deps /app/node_modules          ./node_modules
 COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
 
 # Copy compiled output from the build stage
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist

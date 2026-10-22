@@ -3,8 +3,10 @@ import Razorpay from 'razorpay';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { ValidationError, NotFoundError } from '../utils/errors';
+import * as telegram from './telegram.service';
 import { slugify } from '@headtilts/shared';
 import { sendBuilt } from './mail.service';
+import { siteUrl } from './emailLayout';
 import { EmailEvent, EmailRegistration, RegistrationEmailKind, registrationEmail } from './emailContent';
 
 // ─── Select shapes ────────────────────────────────────────────────────────────
@@ -46,7 +48,8 @@ const EVENT_FULL_SELECT = {
   onlineUrl: true, streamUrl: true, streamPlatform: true,
   registrationDeadline: true, requireApproval: true, showAttendeesNames: true,
   recurrenceType: true, recurrenceInterval: true, recurrenceDays: true,
-  recurrenceEndsAt: true, metaTitle: true, metaDescription: true, ogImage: true,
+  recurrenceEndsAt: true, metaTitle: true, metaDescription: true, ogImage: true, telegramPost: true,
+  liveTicketQr: true, requireEmailConfirmation: true, maxTicketsPerPerson: true,
   ticketTiers: { select: TICKET_TIER_SELECT, orderBy: { position: 'asc' as const } },
   speakers: { select: SPEAKER_SELECT, orderBy: { position: 'asc' as const } },
   agendaItems: { select: AGENDA_SELECT, orderBy: { position: 'asc' as const } },
@@ -137,6 +140,11 @@ export interface EventInput {
   metaTitle?: string;
   metaDescription?: string;
   ogImage?: string;
+  /** "yes" / "no" overrides the Telegram setting for events; null follows it. */
+  telegramPost?: string | null;
+  liveTicketQr?: boolean;
+  requireEmailConfirmation?: boolean;
+  maxTicketsPerPerson?: number | null;
   ticketTiers?: TicketTierInput[];
   speakers?: SpeakerInput[];
   agendaItems?: AgendaItemInput[];
@@ -263,6 +271,7 @@ export async function createEvent(input: EventInput) {
     await generateOccurrences(event.id, event.startAt, event.endAt, input);
   }
 
+  if (event.status === 'published') telegram.announce('event', event.id);
   return getEvent(event.id);
 }
 
@@ -308,7 +317,9 @@ export async function updateEvent(
     }
   }
 
-  return getEvent(id);
+  const updated = await getEvent(id);
+  if (existing.status !== 'published' && updated.status === 'published') telegram.announce('event', id);
+  return updated;
 }
 
 export async function deleteEvent(id: number) {
@@ -375,15 +386,17 @@ export async function getPublicEvent(slug: string) {
       description: true, venueAddress: true, venueMapEmbed: true,
       showAttendeesNames: true, requireApproval: true,
       metaTitle: true, metaDescription: true, ogImage: true,
+      liveTicketQr: true, requireEmailConfirmation: true, maxTicketsPerPerson: true,
     },
   });
   if (!event) throw new NotFoundError('Event not found');
 
-  let attendees: { name: string; email: string }[] | null = null;
+  // Names only: a public list of attendees' email addresses is a ready-made phishing list.
+  let attendees: { name: string }[] | null = null;
   if (event.showAttendeesNames) {
     const regs = await prisma.eventRegistration.findMany({
       where: { eventId: event.id, status: 'confirmed' },
-      select: { name: true, email: true },
+      select: { name: true },
       take: 50,
     });
     attendees = regs;
@@ -477,6 +490,12 @@ export async function registerForEvent(
 
   const isFree = !tier || tier.price === 0;
   const status = event.requireApproval ? 'pending' : (isWaitlisted ? 'waitlisted' : 'confirmed');
+  const phone = typeof input.phone === 'string' ? input.phone.trim().slice(0, 40) || undefined : undefined;
+  await assertWithinPersonCap(event, email, phone, qty);
+  // Free tickets can be made to wait for a click on an emailed link, so made-up
+  // addresses can't fill the event. Unconfirmed sign-ups hold no place or stock.
+  const needsEmailConfirmation = isFree && event.requireEmailConfirmation;
+  const emailToken = needsEmailConfirmation ? crypto.randomBytes(24).toString('base64url') : null;
 
   // Fail before creating a pending row if paid checkout isn't possible.
   const razorpay = isFree ? null : getRazorpay();
@@ -484,31 +503,30 @@ export async function registerForEvent(
   // Create registration record. Free tier stock is reserved atomically in the
   // same transaction, so concurrent sign-ups can't oversell the tier.
   const reg = await prisma.$transaction(async (tx) => {
-    if (isFree && tier) {
-      const { count } = await tx.eventTicketTier.updateMany({
-        where: {
-          id: tier.id,
-          ...(tier.quantity !== null ? { soldCount: { lte: tier.quantity - qty } } : {}),
-        },
-        data: { soldCount: { increment: qty } },
-      });
-      if (count === 0) throw new ValidationError('Selected ticket tier is sold out');
-    }
+    if (isFree && tier && !needsEmailConfirmation) await reserveTierStock(tx, tier, qty);
     return tx.eventRegistration.create({
       data: {
         eventId: event.id,
         ticketTierId: tier?.id ?? null,
         name,
         email,
-        phone: input.phone,
+        phone,
         quantity: qty,
-        status: isFree ? status : 'pending',
+        status: needsEmailConfirmation ? 'unconfirmed' : isFree ? status : 'pending',
+        emailTokenHash: emailToken ? hashToken(emailToken) : null,
         paymentStatus: isFree ? 'free' : 'pending',
         paymentProvider: isFree ? null : 'razorpay',
         customData: (input.customData ?? Prisma.DbNull) as Prisma.InputJsonValue,
       },
     });
   });
+
+  if (emailToken) {
+    const confirmUrl = `${siteUrl()}/events/${event.slug}?confirm=${emailToken}`;
+    void sendRegistrationEmail('confirm-email', reg, event, 'organisers', confirmUrl);
+    // No ticket code until the address is confirmed: that's the whole point.
+    return { registration: { id: reg.id, status: reg.status, email: reg.email }, requiresPayment: false, needsEmailConfirmation: true };
+  }
 
   if (isFree) {
     void sendRegistrationEmail(status as RegistrationEmailKind, reg, event);
@@ -576,19 +594,43 @@ export async function verifyPayment(input: {
   if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) throw fail();
 
   // Confirm with Razorpay that this payment belongs to the order and covers the amount.
-  const payment = await getRazorpay().payments.fetch(paymentId);
-  if (
-    payment.order_id !== reg.paymentOrderId ||
-    Number(payment.amount) !== reg.paymentAmount ||
-    (reg.ticketTier && payment.currency !== reg.ticketTier.currency) ||
-    !['authorized', 'captured'].includes(payment.status)
-  ) {
-    throw fail();
-  }
+  const payment = await capturedPayment(paymentId, reg);
+  if (!payment) throw fail();
+  return markPaid(reg, paymentId);
+}
 
-  // Flip to paid atomically so concurrent or replayed calls can't double-count.
+type PaidRegistration = Prisma.EventRegistrationGetPayload<{ include: { event: true; ticketTier: true } }>;
+
+/**
+ * The Razorpay payment for this registration, captured. A payment that is only
+ * "authorized" is captured here first: an authorisation alone can lapse back to
+ * the buyer, so it must never be enough for a ticket. Null if it isn't this
+ * order's payment, the amount is wrong, or it can't be captured.
+ */
+async function capturedPayment(paymentId: string, reg: PaidRegistration) {
+  const razorpay = getRazorpay();
+  let payment = await razorpay.payments.fetch(paymentId);
+  const matches = (p: typeof payment) =>
+    p.order_id === reg.paymentOrderId &&
+    Number(p.amount) === reg.paymentAmount &&
+    (!reg.ticketTier || p.currency === reg.ticketTier.currency);
+  if (!matches(payment)) return null;
+  if (payment.status === 'authorized') {
+    try {
+      payment = await razorpay.payments.capture(paymentId, Number(payment.amount), payment.currency);
+    } catch {
+      // Auto-capture (or the webhook) may have got there first.
+      payment = await razorpay.payments.fetch(paymentId);
+    }
+  }
+  return payment.status === 'captured' && matches(payment) ? payment : null;
+}
+
+/** Turns an unpaid registration into a paid one, exactly once, and sends the ticket. */
+async function markPaid(reg: PaidRegistration, paymentId: string) {
+  // Flip to paid atomically so concurrent or replayed calls (browser and webhook) can't double-count.
   const { count } = await prisma.eventRegistration.updateMany({
-    where: { id: reg.id, paymentStatus: { not: 'paid' }, status: { not: 'cancelled' } },
+    where: { id: reg.id, paymentStatus: 'pending', status: { not: 'cancelled' } },
     data: {
       status: reg.event.requireApproval ? 'pending' : 'confirmed',
       paymentStatus: 'paid',
@@ -612,6 +654,196 @@ export async function verifyPayment(input: {
   return updated;
 }
 
+const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
+
+/** Reserves free tickets in a tier, atomically, so concurrent sign-ups can't oversell it. */
+async function reserveTierStock(tx: Prisma.TransactionClient, tier: { id: number; quantity: number | null }, qty: number) {
+  const { count } = await tx.eventTicketTier.updateMany({
+    where: {
+      id: tier.id,
+      ...(tier.quantity !== null ? { soldCount: { lte: tier.quantity - qty } } : {}),
+    },
+    data: { soldCount: { increment: qty } },
+  });
+  if (count === 0) throw new ValidationError('Selected ticket tier is sold out');
+}
+
+/** Phone numbers compared on their last 10 digits, so "+91 98765 43210" and "9876543210" match. */
+function phoneKey(phone: string | null | undefined): string | null {
+  const digits = (phone ?? '').replace(/\D/g, '');
+  return digits.length >= 6 ? digits.slice(-10) : null;
+}
+
+/**
+ * The per-person limit (Event.maxTicketsPerPerson): tickets already held by
+ * this email address or phone number, plus these, can't go over it. Unpaid
+ * checkouts and unconfirmed sign-ups don't count; they hold nothing.
+ */
+async function assertWithinPersonCap(
+  event: { id: number; maxTicketsPerPerson: number | null },
+  email: string,
+  phone: string | undefined,
+  qty: number,
+  excludeId?: number,
+) {
+  const cap = event.maxTicketsPerPerson;
+  if (!cap) return;
+  if (qty > cap) throw new ValidationError(`You can book up to ${cap} ticket${cap === 1 ? '' : 's'} for this event.`);
+  const key = phoneKey(phone);
+  const held = await prisma.eventRegistration.findMany({
+    where: {
+      eventId: event.id,
+      status: { in: ['confirmed', 'pending', 'waitlisted'] },
+      paymentStatus: { not: 'pending' },
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+      OR: [{ email }, ...(key ? [{ phone: { not: null } }] : [])],
+    },
+    select: { email: true, phone: true, quantity: true },
+  });
+  const already = held
+    .filter((r) => r.email === email || (key !== null && phoneKey(r.phone) === key))
+    .reduce((sum, r) => sum + r.quantity, 0);
+  if (already + qty > cap) {
+    throw new ValidationError(
+      `You can book up to ${cap} ticket${cap === 1 ? '' : 's'} for this event, and you already have ${already}.`,
+    );
+  }
+}
+
+/**
+ * The link in the "confirm your email" message. Confirming does what the
+ * original sign-up would have done: takes a place (or the waitlist), reserves
+ * stock, and sends the ticket. Clicking again just returns the booking.
+ */
+export async function confirmRegistrationEmail(token: string) {
+  const reg = typeof token === 'string' && token.length >= 20
+    ? await prisma.eventRegistration.findUnique({
+      where: { emailTokenHash: hashToken(token) },
+      include: { event: true, ticketTier: true },
+    })
+    : null;
+  if (!reg) throw new NotFoundError('This confirmation link isn’t valid. Check you used the latest email.');
+  const done = { ticketCode: reg.ticketCode, slug: reg.event.slug };
+  if (reg.status !== 'unconfirmed') return done;
+  if (Date.now() - reg.registeredAt.getTime() > 24 * 60 * 60 * 1000) {
+    throw new ValidationError('This confirmation link has expired. Please register again.');
+  }
+  if (reg.event.registrationDeadline && new Date() > reg.event.registrationDeadline) {
+    throw new ValidationError('Registration has closed for this event');
+  }
+  await assertWithinPersonCap(reg.event, reg.email, reg.phone ?? undefined, reg.quantity, reg.id);
+
+  const taken = await prisma.eventRegistration.aggregate({
+    where: { eventId: reg.eventId, status: { in: ['confirmed', 'waitlisted'] } },
+    _sum: { quantity: true },
+  });
+  const full = reg.event.maxAttendees !== null && (taken._sum.quantity ?? 0) + reg.quantity > reg.event.maxAttendees;
+  const status = reg.event.requireApproval ? 'pending' : full ? 'waitlisted' : 'confirmed';
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.eventRegistration.updateMany({
+      where: { id: reg.id, status: 'unconfirmed' },
+      data: { status, emailConfirmedAt: new Date() },
+    });
+    if (count === 0) return false; // a double click got there first
+    if (reg.ticketTier) await reserveTierStock(tx, reg.ticketTier, reg.quantity);
+    return true;
+  });
+  if (updated) void sendRegistrationEmail(status, reg, reg.event);
+  return done;
+}
+
+// ─── Razorpay webhook ─────────────────────────────────────────────────────────
+
+/**
+ * Checks a webhook really came from Razorpay: an HMAC of the exact request
+ * body, keyed with the webhook secret set in the Razorpay dashboard.
+ */
+export function verifyRazorpayWebhook(rawBody: Buffer | undefined, signature: string | undefined): boolean {
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  if (!secret || !rawBody || !signature) return false;
+  const expected = Buffer.from(crypto.createHmac('sha256', secret).update(rawBody).digest('hex'));
+  const given = Buffer.from(signature);
+  return given.length === expected.length && crypto.timingSafeEqual(given, expected);
+}
+
+type DisputeState = 'open' | 'won' | 'lost';
+
+function disputeState(event: string, entityStatus: unknown): DisputeState | undefined {
+  if (event === 'payment.dispute.won') return 'won';
+  if (event === 'payment.dispute.lost') return 'lost';
+  if (event === 'payment.dispute.closed') return entityStatus === 'won' ? 'won' : entityStatus === 'lost' ? 'lost' : undefined;
+  if (event.startsWith('payment.dispute.')) return 'open';
+  return undefined;
+}
+
+/**
+ * Razorpay tells us about payments that happen away from the checkout page:
+ * a payment completing after the buyer closed the tab, refunds made in the
+ * dashboard, and chargebacks. A refunded ticket is cancelled; a disputed or
+ * partly refunded one is flagged amber at the door.
+ */
+export async function handleRazorpayWebhook(body: {
+  event?: string;
+  payload?: Record<string, { entity?: Record<string, unknown> } | undefined>;
+}): Promise<string> {
+  const event = typeof body.event === 'string' ? body.event : '';
+  const payment = body.payload?.payment?.entity;
+  const refund = body.payload?.refund?.entity;
+  const dispute = body.payload?.dispute?.entity;
+  const paymentId = String(payment?.id ?? refund?.payment_id ?? dispute?.payment_id ?? '');
+  const orderId = typeof payment?.order_id === 'string' ? payment.order_id : '';
+  if (!paymentId && !orderId) return 'ignored: no payment';
+
+  const reg = await prisma.eventRegistration.findFirst({
+    where: { OR: [...(paymentId ? [{ paymentId }] : []), ...(orderId ? [{ paymentOrderId: orderId }] : [])] },
+    include: { event: true, ticketTier: true },
+  });
+  if (!reg) return 'ignored: not one of our tickets';
+
+  if (event === 'payment.authorized' || event === 'payment.captured') {
+    if (reg.paymentStatus !== 'pending' || reg.status === 'cancelled') return 'ignored: already settled';
+    const captured = await capturedPayment(paymentId, reg);
+    if (!captured) return 'ignored: payment does not match the order';
+    await markPaid(reg, paymentId);
+    return 'paid';
+  }
+
+  if (event.startsWith('refund.') || event.startsWith('payment.dispute.')) {
+    if (!['paid', 'partially_refunded', 'disputed', 'refunded'].includes(reg.paymentStatus)) return 'ignored: not paid';
+    // Razorpay's own record decides how much has been refunded, not the event's snapshot.
+    const current = await getRazorpay().payments.fetch(paymentId || reg.paymentId!);
+    return settleRefundsAndDisputes(reg, {
+      amount: Number(current.amount),
+      refunded: Number(current.amount_refunded ?? 0),
+      dispute: disputeState(event, dispute?.status),
+    });
+  }
+  return 'ignored: event not handled';
+}
+
+async function settleRefundsAndDisputes(
+  reg: PaidRegistration,
+  money: { amount: number; refunded: number; dispute?: DisputeState },
+): Promise<string> {
+  const fullyRefunded = money.refunded >= money.amount || money.dispute === 'lost';
+  if (fullyRefunded) {
+    if (reg.paymentStatus === 'refunded') return 'unchanged';
+    // Stock is released by the status the ticket had, so cancel before marking refunded.
+    const wasCancelled = reg.status === 'cancelled';
+    await cancelAndReleaseStock(reg);
+    await prisma.eventRegistration.update({ where: { id: reg.id }, data: { paymentStatus: 'refunded' } });
+    if (!wasCancelled) void sendRegistrationEmail('cancelled', reg, reg.event, 'organisers');
+    return 'refunded';
+  }
+  const next = money.dispute === 'open' || (money.dispute === undefined && reg.paymentStatus === 'disputed')
+    ? 'disputed'
+    : money.refunded > 0 ? 'partially_refunded' : 'paid';
+  if (next === reg.paymentStatus) return 'unchanged';
+  await prisma.eventRegistration.update({ where: { id: reg.id }, data: { paymentStatus: next } });
+  return next;
+}
+
 /**
  * Cancel exactly once and release tier stock only if this registration ever
  * took it (free sign-ups reserve at registration, paid ones on payment). An
@@ -624,7 +856,8 @@ async function cancelAndReleaseStock(reg: { id: number; ticketTierId: number | n
       where: { id: reg.id, status: { not: 'cancelled' } },
       data: { status: 'cancelled', cancelledAt: new Date() },
     });
-    if (count === 0 || !reg.ticketTierId || !['free', 'paid'].includes(reg.paymentStatus)) return;
+    // Disputed and partly refunded tickets were paid for, so they hold stock too.
+    if (count === 0 || !reg.ticketTierId || !['free', 'paid', 'disputed', 'partially_refunded'].includes(reg.paymentStatus)) return;
     await tx.eventTicketTier.updateMany({
       where: { id: reg.ticketTierId, soldCount: { gte: reg.quantity } },
       data: { soldCount: { decrement: reg.quantity } },
@@ -680,6 +913,13 @@ export async function listRegistrations(
   return { items, total };
 }
 
+export function getRegistration(id: number) {
+  return prisma.eventRegistration.findUnique({
+    where: { id },
+    include: { ticketTier: { select: { id: true, name: true, price: true } } },
+  });
+}
+
 export async function updateRegistration(
   id: number,
   action: 'approve' | 'cancel' | 'check-in',
@@ -705,9 +945,7 @@ export async function updateRegistration(
       void sendRegistrationEmail('cancelled', reg, reg.event, 'organisers');
     }
   } else if (action === 'check-in') {
-    await prisma.eventRegistration.update({
-      where: { id }, data: { checkInAt: new Date() },
-    });
+    throw new ValidationError('Check-in goes through the door check-in service');
   }
 
   return prisma.eventRegistration.findUnique({ where: { id } });
@@ -720,7 +958,7 @@ export async function exportRegistrationsCsv(eventId: number): Promise<string> {
     orderBy: { registeredAt: 'asc' },
   });
 
-  const headers = ['ID', 'Name', 'Email', 'Phone', 'Ticket', 'Qty', 'Status', 'Payment', 'Checked In', 'Registered At'];
+  const headers = ['ID', 'Name', 'Email', 'Phone', 'Ticket', 'Qty', 'Status', 'Payment', 'Checked In', 'People In', 'Ticket Code', 'Registered At'];
   const rows = regs.map((r) => [
     r.id,
     r.name,
@@ -731,6 +969,8 @@ export async function exportRegistrationsCsv(eventId: number): Promise<string> {
     r.status,
     r.paymentStatus,
     r.checkInAt ? r.checkInAt.toISOString() : '',
+    r.checkedInCount,
+    r.ticketCode, // the paper backup at the door can be searched by code
     r.registeredAt.toISOString(),
   ]);
 
@@ -809,10 +1049,11 @@ async function sendRegistrationEmail(
   reg: EmailRegistration & { id: number; email: string },
   event: EmailEvent,
   cancelledBy: 'you' | 'organisers' = 'organisers',
+  confirmUrl?: string,
 ) {
   try {
     const replyTo = (await prisma.setting.findUnique({ where: { key: 'admin_email' } }))?.value || undefined;
-    await sendBuilt(reg.email, await registrationEmail(kind, reg, event, { cancelledBy, replyTo }));
+    await sendBuilt(reg.email, await registrationEmail(kind, reg, event, { cancelledBy, replyTo, confirmUrl }));
   } catch (error) {
     console.error('[events] Failed to send', kind, 'email for registration', reg.id, error);
   }
@@ -891,7 +1132,22 @@ function buildEventData(slug: string, input: Partial<EventInput>) {
     metaTitle: input.metaTitle,
     metaDescription: input.metaDescription,
     ogImage: input.ogImage,
+    ...(input.telegramPost !== undefined
+      ? { telegramPost: input.telegramPost === 'yes' || input.telegramPost === 'no' ? input.telegramPost : null }
+      : {}),
+    ...(input.liveTicketQr !== undefined ? { liveTicketQr: input.liveTicketQr === true } : {}),
+    ...(input.requireEmailConfirmation !== undefined ? { requireEmailConfirmation: input.requireEmailConfirmation === true } : {}),
+    ...(input.maxTicketsPerPerson !== undefined ? { maxTicketsPerPerson: personCap(input.maxTicketsPerPerson) } : {}),
   };
+}
+
+function personCap(value: unknown): number | null {
+  if (value === null || value === '' || value === undefined) return null;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > MAX_QTY_PER_ORDER * 5) {
+    throw new ValidationError(`Tickets per person must be a whole number from 1 to ${MAX_QTY_PER_ORDER * 5}, or empty for no limit`);
+  }
+  return n;
 }
 
 async function syncChildResources(eventId: number, input: Partial<EventInput>) {

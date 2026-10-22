@@ -39,5 +39,6 @@
 .email { color: inherit; }
 .email:hover { color: var(--accent-text); text-decoration: underline; }
 .paid { color: var(--success-t); font-weight: 600; }
+.payTrouble { color: var(--warning-t); font-weight: 600; }
 
 .checkedIn { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--success-t); font-size: 0.8125rem; font-weight: 600; white-space: nowrap; }
