@@ -47,7 +47,7 @@ cd headtilts
 Copy the template env file and edit it:
 
 ```bash
-cp .env.docker .env
+cp .env.example .env
 ```
 
 All configuration lives in `.env`. `docker-compose.yml` reads everything from there via `${VARIABLE}` substitution — you never need to edit `docker-compose.yml` directly.
@@ -71,7 +71,7 @@ Set these in `.env` to match your production domain:
 
 ### Database credentials
 
-The `.env.docker` template ships with example passwords. **Change `MYSQL_ROOT_PASSWORD` and `MYSQL_PASSWORD` before going live.**
+The `.env.example` template ships with placeholder passwords. **Change `MYSQL_ROOT_PASSWORD` and `MYSQL_PASSWORD` before going live.**
 
 ---
 

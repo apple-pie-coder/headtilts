@@ -3,7 +3,7 @@
 # Change HTTP_PORT in your .env to run on any port you choose (e.g. 8080).
 #
 # Quick start:
-#   cp .env.docker .env        # copy the template
+#   cp .env.example .env       # copy the template
 #   nano .env                  # set your secrets and HTTP_PORT
 #   docker compose up -d --build
 #   docker compose exec api sh -c "cd apps/api && node_modules/.bin/prisma db seed"
