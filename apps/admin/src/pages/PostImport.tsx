@@ -22,6 +22,7 @@ import { DocPost, dataUriToFile, parseDocx } from './import/parseDocx';
 import {
   EXAMPLE_TITLES, FIELDS, ImportStatus, TEMPLATE_FILENAME, parseDate, parseStatus, parseYesNo, splitList,
 } from './import/importFormat';
+import { sanitizeHtml } from '../utils/sanitize';
 import styles from './PostImport.module.css';
 
 /* ── Types ─────────────────────────────────────────────────── */
@@ -783,7 +784,7 @@ export default function PostImportPage() {
                         )}
                         {row.post.fields.excerpt && <p className={styles.previewExcerpt}>{row.post.fields.excerpt}</p>}
                         {/* Sanitised in parseDocx: only basic formatting, safe links and data:/https images remain. */}
-                        <div className={styles.prose} dangerouslySetInnerHTML={{ __html: row.post.html || '<p><em>No body text</em></p>' }} />
+                        <div className={styles.prose} dangerouslySetInnerHTML={{ __html: row.post.html ? sanitizeHtml(row.post.html) : '<p><em>No body text</em></p>' }} />
                       </div>
                     )}
                   </li>

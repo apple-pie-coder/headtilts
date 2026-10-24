@@ -10,13 +10,30 @@ import { notifyFailedLogins, notifySecurityAlert } from './notifications.service
 const WINDOW_MS = 15 * 60 * 1000;
 const NEW_PLACE_DAYS = 90;   // matches how long the logs keep IP addresses
 const failures = new Map<string, number[]>();
+const mfaFailures = new Map<string, number[]>();
+
+// Per-account brakes on top of the per-IP authLimiter: a sign-in name stops
+// accepting passwords after this many failures in WINDOW_MS, and an account
+// stops accepting two-step codes after MFA_LOCK_AFTER wrong ones.
+const LOCK_AFTER = 10;
+const MFA_LOCK_AFTER = 5;
+
+function recentFailures(map: Map<string, number[]>, key: string, now: number): number[] {
+  return (map.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
+}
+
+/** Minutes until the oldest failure that keeps the lock in place ages out, or 0 if not locked. */
+function lockMinutes(times: number[], limit: number, now: number): number {
+  if (times.length < limit) return 0;
+  return Math.max(1, Math.ceil((times[times.length - limit] + WINDOW_MS - now) / 60_000));
+}
 
 /** A wrong password (or unknown name). Alerts as the count reaches each recipient's threshold. */
 export function recordFailedLogin(identifier: unknown, ip: string | null): void {
   if (typeof identifier !== 'string' || !identifier.trim()) return;
   const key = identifier.trim().toLowerCase();
   const now = Date.now();
-  const recent = (failures.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
+  const recent = recentFailures(failures, key, now);
   recent.push(now);
   failures.set(key, recent);
   if (failures.size > 5000) {
@@ -31,6 +48,33 @@ export function recordFailedLogin(identifier: unknown, ip: string | null): void 
 
 export function clearFailedLogins(identifier: unknown): void {
   if (typeof identifier === 'string') failures.delete(identifier.trim().toLowerCase());
+}
+
+/** Minutes this sign-in name stays locked after too many wrong passwords; 0 when it isn't. */
+export function loginLockMinutes(identifier: string): number {
+  const now = Date.now();
+  return lockMinutes(recentFailures(failures, identifier.trim().toLowerCase(), now), LOCK_AFTER, now);
+}
+
+/** A wrong two-step code (authenticator or backup code) for this account. */
+export function recordFailedMfa(userId: string): void {
+  const now = Date.now();
+  const recent = recentFailures(mfaFailures, userId, now);
+  recent.push(now);
+  mfaFailures.set(userId, recent);
+  if (mfaFailures.size > 5000) {
+    for (const [k, times] of mfaFailures) if (now - times[times.length - 1] >= WINDOW_MS) mfaFailures.delete(k);
+  }
+}
+
+export function clearFailedMfa(userId: string): void {
+  mfaFailures.delete(userId);
+}
+
+/** Minutes this account stays locked out of two-step codes; 0 when it isn't. */
+export function mfaLockMinutes(userId: string): number {
+  const now = Date.now();
+  return lockMinutes(recentFailures(mfaFailures, userId, now), MFA_LOCK_AFTER, now);
 }
 
 /** "Chrome on Windows" from a user-agent string; good enough for an alert email. */

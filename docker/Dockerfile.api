@@ -62,11 +62,15 @@ COPY apps/api/prisma                          ./apps/api/prisma
 # Generate the Prisma client for the production runtime
 RUN cd apps/api && npx prisma generate
 
-# Create the uploads directory; docker-compose mounts a named volume here
-RUN mkdir -p /app/apps/api/uploads
+# Create the uploads and backups directories; docker-compose mounts named
+# volumes here, and a new volume takes its owner from the image.
+RUN mkdir -p /app/apps/api/uploads /app/apps/api/backups && chown node:node /app/apps/api/uploads /app/apps/api/backups
 
 EXPOSE 3000
 
-# Run pending migrations then start. DATABASE_URL is injected at runtime
-# by docker-compose, so migrations cannot run during the build stage.
-CMD ["sh", "-c", "cd apps/api && npx prisma migrate deploy && node dist/index.js"]
+# The app runs as `node`, not root. The container starts as root only to hand
+# the volumes to `node` (files written when the API ran as root are still
+# owned by root), then drops privileges for migrations and the server.
+# DATABASE_URL is injected at runtime by docker-compose, so migrations cannot
+# run during the build stage.
+CMD ["sh", "-c", "find apps/api/uploads apps/api/backups ! -user node -exec chown node:node {} + ; cd apps/api && HOME=/home/node exec setpriv --reuid=node --regid=node --init-groups sh -c 'node node_modules/prisma/build/index.js migrate deploy && exec node dist/index.js'"]

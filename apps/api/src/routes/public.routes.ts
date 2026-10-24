@@ -357,9 +357,9 @@ router.get('/preview/:id', asyncHandler(async (req: Request, res: Response) => {
     .createHmac('sha256', process.env.JWT_SECRET || 'dev-secret')
     .update(`preview.${id}.${exp}`)
     .digest('hex');
-  const valid =
-    token.length === expected.length &&
-    crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected));
+  // Compare byte lengths: a multibyte token can match in string length only.
+  const given = Buffer.from(token);
+  const valid = given.length === expected.length && crypto.timingSafeEqual(given, Buffer.from(expected));
   if (!valid) {
     sendError(res, 'UNAUTHORIZED', 'Invalid preview link', 401);
     return;

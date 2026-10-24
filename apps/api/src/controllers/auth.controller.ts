@@ -44,7 +44,7 @@ function deliverSession<T extends object>(req: Request, res: Response, result: T
   return rest;
 }
 import { clientIp } from '../utils/clientIp';
-import { clearFailedLogins, describeDevice, recordFailedLogin, recordSignIn } from '../services/security.service';
+import { clearFailedLogins, clearFailedMfa, describeDevice, loginLockMinutes, mfaLockMinutes, recordFailedLogin, recordFailedMfa, recordSignIn } from '../services/security.service';
 
 function handleError(res: Response, error: unknown): void {
   if (error instanceof ApiError) {
@@ -108,10 +108,18 @@ export async function login(req: Request, res: Response): Promise<void> {
   try {
     // Accept `identifier` (email or username); fall back to `email` for compatibility.
     const { identifier, email, password } = req.body;
-    const loginId: string | undefined = identifier ?? email;
+    const loginId: unknown = identifier ?? email;
 
-    if (!loginId || !password) {
+    // Strings only: an object here would reach Prisma as a filter like { contains: … }.
+    if (!loginId || !password || typeof loginId !== 'string' || typeof password !== 'string') {
       sendError(res, 'VALIDATION_ERROR', 'Email or username and password are required', 400);
+      return;
+    }
+
+    // Checked before the password, so a locked name can't be probed further.
+    const locked = loginLockMinutes(loginId);
+    if (locked) {
+      sendError(res, 'RATE_LIMITED', `Too many failed sign-in attempts. Try again in ${locked} minute${locked === 1 ? '' : 's'}.`, 429);
       return;
     }
 
@@ -208,7 +216,7 @@ export async function logout(req: Request, res: Response): Promise<void> {
 export async function forgotPassword(req: Request, res: Response): Promise<void> {
   try {
     const { email } = req.body;
-    if (!email) {
+    if (!email || typeof email !== 'string') {
       sendError(res, 'VALIDATION_ERROR', 'Email is required', 400);
       return;
     }
@@ -227,6 +235,10 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
 export async function resetPassword(req: Request, res: Response): Promise<void> {
   try {
     const { token, password } = req.body;
+    if (typeof token !== 'string' || typeof password !== 'string' || !token || !password) {
+      sendError(res, 'VALIDATION_ERROR', 'Token and password are required', 400);
+      return;
+    }
     await authService.resetPassword(token, password);
     sendSuccess(res, { message: 'Password updated. You can now log in.' });
   } catch (error) {
@@ -252,14 +264,21 @@ export async function mfaVerify(req: Request, res: Response): Promise<void> {
       sendError(res, 'UNAUTHORIZED', 'Invalid or expired MFA token', 401);
       return;
     }
+    const mfaLocked = mfaLockMinutes(payload.sub);
+    if (mfaLocked) {
+      sendError(res, 'RATE_LIMITED', `Too many wrong codes. Try again in ${mfaLocked} minute${mfaLocked === 1 ? '' : 's'}.`, 429);
+      return;
+    }
     const user = await import('../config/database').then((m) =>
       m.prisma.user.findUnique({ where: { id: payload.sub }, select: { mfaSecret: true, mfaEnabled: true } }),
     );
     // Only a confirmed (enabled) secret counts, and each code works once.
     if (!user?.mfaEnabled || !user.mfaSecret || !(await mfaService.verifyAndConsumeTotp(payload.sub, user.mfaSecret, String(code)))) {
+      recordFailedMfa(payload.sub);
       sendError(res, 'UNAUTHORIZED', 'Invalid authentication code', 401);
       return;
     }
+    clearFailedMfa(payload.sub);
     const result = await authService.completeMfaLogin(payload.sub);
     await recordSignIn(payload.sub, clientIp(req), req.get('user-agent'));
     sendSuccess(res, deliverSession(req, res, result));
@@ -284,11 +303,18 @@ export async function mfaVerifyBackup(req: Request, res: Response): Promise<void
       sendError(res, 'UNAUTHORIZED', 'Invalid or expired MFA token', 401);
       return;
     }
+    const mfaLocked = mfaLockMinutes(payload.sub);
+    if (mfaLocked) {
+      sendError(res, 'RATE_LIMITED', `Too many wrong codes. Try again in ${mfaLocked} minute${mfaLocked === 1 ? '' : 's'}.`, 429);
+      return;
+    }
     const ok = await mfaService.consumeBackupCode(payload.sub, backupCode);
     if (!ok) {
+      recordFailedMfa(payload.sub);
       sendError(res, 'UNAUTHORIZED', 'Invalid backup code', 401);
       return;
     }
+    clearFailedMfa(payload.sub);
     const result = await authService.completeMfaLogin(payload.sub);
     await recordSignIn(payload.sub, clientIp(req), req.get('user-agent'));
     sendSuccess(res, deliverSession(req, res, result));

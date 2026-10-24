@@ -39,6 +39,7 @@ import { usePostLock } from '../hooks/usePostLock';
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 import { PostLockDialog, LockVisitors } from '../components/PostLockDialog';
 import type { LockUser } from '../services/postLocks';
+import { sanitizeHtml } from '../utils/sanitize';
 import styles from './PostEditor.module.css';
 
 const turndown = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced', hr: '---', bulletListMarker: '-' });
@@ -47,7 +48,7 @@ turndown.keep(['figure']);
 
 function mdToHtml(src: string): string {
   const result = marked.parse(src);
-  return typeof result === 'string' ? result : String(result);
+  return sanitizeHtml(typeof result === 'string' ? result : String(result));
 }
 
 // Stable ref so QUILL_MODULES never changes identity (prevents Quill re-init on re-render)

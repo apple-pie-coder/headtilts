@@ -3,6 +3,9 @@ dist/
 build/
 .env
 .env.backup*
+# Per-environment files hold real secrets; only the templates are tracked.
+.env.*
+!.env.example
 .env.local
 .DS_Store
 *.log

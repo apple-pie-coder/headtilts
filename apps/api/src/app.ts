@@ -16,6 +16,7 @@ import apiRoutes from './routes';
 
 export function createApp(): Express {
   const app = express();
+  app.disable('x-powered-by');
 
   // Behind nginx in production — trust the first proxy so rate limiting
   // and logging see the real client IP from X-Forwarded-For.

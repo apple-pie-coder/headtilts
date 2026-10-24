@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
-import sharp from 'sharp';
+import sharp, { type FormatEnum, type Sharp } from 'sharp';
 import { prisma } from '../config/database';
 import { NotFoundError, ValidationError, ConflictError } from '../utils/errors';
 import { uploadDir } from '../middleware/upload';
@@ -161,8 +161,8 @@ async function processRaster(
   const outExt = FORMAT_EXT[settings.format] || path.extname(relSource).slice(1) || sourceFmt;
   const rel = (suffix: string) => (dir === '.' ? `${base}-${suffix}.${outExt}` : path.join(dir, `${base}-${suffix}.${outExt}`));
 
-  const encode = (pipeline: sharp.Sharp) =>
-    pipeline.toFormat(outFmt as keyof sharp.FormatEnum, { quality: settings.quality });
+  const encode = (pipeline: Sharp) =>
+    pipeline.toFormat(outFmt as keyof FormatEnum, { quality: settings.quality });
 
   // Display (capped to "large", converted/quality-encoded)
   const displayRel = rel('display');

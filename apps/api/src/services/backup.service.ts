@@ -23,9 +23,11 @@ function mysqlEnv(password: string): NodeJS.ProcessEnv {
   return { ...process.env, MYSQL_PWD: password };
 }
 
+// --sandbox makes the client refuse its own commands (`system`, `\\!`, `source`, …)
+// in the dump, so an uploaded archive can only run SQL, not shell commands.
 async function importSqlDump(db: ReturnType<typeof parseDatabaseUrl>, dumpPath: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    const child = spawn('mysql', ['-h', db.host, '-P', db.port, '-u', db.user, db.database], {
+    const child = spawn('mysql', ['--sandbox', '-h', db.host, '-P', db.port, '-u', db.user, db.database], {
       env: mysqlEnv(db.password),
       stdio: ['pipe', 'ignore', 'pipe'],
     });
