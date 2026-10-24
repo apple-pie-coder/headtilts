@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import styles from './ImageToolbar.module.css';
 
 type Align = 'inline' | 'left' | 'center' | 'right';
@@ -30,7 +31,9 @@ export function buildImageStyle(align: Align, size: SizeVal): string {
 interface ImageToolbarProps {
   anchorEl: HTMLImageElement;
   currentStyle: string;
+  caption: string;
   onStyleChange: (style: string) => void;
+  onCaptionChange: (caption: string) => void;
 }
 
 const SIZES: { val: SizeVal; label: string }[] = [
@@ -48,11 +51,18 @@ const ALIGNS: { val: Align; label: string }[] = [
   { val: 'right', label: 'Right' },
 ];
 
-export function ImageToolbar({ anchorEl, currentStyle, onStyleChange }: ImageToolbarProps) {
+export function ImageToolbar({ anchorEl, currentStyle, caption, onStyleChange, onCaptionChange }: ImageToolbarProps) {
   const { align, size } = parseImageStyle(currentStyle);
+  const [draft, setDraft] = useState(caption);
+  useEffect(() => setDraft(caption), [caption]);
+
+  function commitCaption() {
+    const next = draft.trim();
+    if (next !== caption) onCaptionChange(next);
+  }
 
   const rect = anchorEl.getBoundingClientRect();
-  const TOOLBAR_H = 42;
+  const TOOLBAR_H = 78;
   const GAP = 6;
   const top = rect.top > TOOLBAR_H + GAP ? rect.top - TOOLBAR_H - GAP : rect.bottom + GAP;
   const left = Math.max(8, Math.min(rect.left, window.innerWidth - 340));
@@ -64,31 +74,45 @@ export function ImageToolbar({ anchorEl, currentStyle, onStyleChange }: ImageToo
       style={{ top, left }}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <div className={styles.group}>
-        {ALIGNS.map(({ val, label }) => (
-          <button
-            key={val}
-            type="button"
-            className={align === val ? styles.active : ''}
-            onClick={() => onStyleChange(buildImageStyle(val, size))}
-          >
-            {label}
-          </button>
-        ))}
+      <div className={styles.row}>
+        <div className={styles.group}>
+          {ALIGNS.map(({ val, label }) => (
+            <button
+              key={val}
+              type="button"
+              className={align === val ? styles.active : ''}
+              onClick={() => onStyleChange(buildImageStyle(val, size))}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className={styles.divider} />
+        <div className={styles.group}>
+          {SIZES.map(({ val, label }) => (
+            <button
+              key={val}
+              type="button"
+              className={size === val ? styles.active : ''}
+              onClick={() => onStyleChange(buildImageStyle(align, val))}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className={styles.divider} />
-      <div className={styles.group}>
-        {SIZES.map(({ val, label }) => (
-          <button
-            key={val}
-            type="button"
-            className={size === val ? styles.active : ''}
-            onClick={() => onStyleChange(buildImageStyle(align, val))}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <input
+        className={styles.caption}
+        value={draft}
+        placeholder="Caption (optional)"
+        aria-label="Image caption"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commitCaption}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); commitCaption(); }
+          if (e.key === 'Escape') setDraft(caption);
+        }}
+      />
     </div>
   );
 }

@@ -308,6 +308,24 @@
   outline-offset: 2px;
 }
 
+.editorWrapper :global(.ql-editor figure) {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 1em;
+  cursor: pointer;
+}
+
+.editorWrapper :global(.ql-editor figure img) { display: block; max-width: 100%; }
+.editorWrapper :global(.ql-editor figure[style*='width'] img) { width: 100%; }
+
+.editorWrapper :global(.ql-editor figcaption) {
+  contain: inline-size;
+  margin-top: 0.4em;
+  font-size: 0.875em;
+  line-height: 1.4;
+  color: var(--t2);
+}
+
 /* ── Sidebar panel ── */
 
 .panel {

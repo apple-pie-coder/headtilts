@@ -2,8 +2,8 @@
   position: fixed;
   z-index: 200;
   display: flex;
-  align-items: center;
-  gap: 4px;
+  flex-direction: column;
+  gap: 5px;
   background: var(--surface-overlay);
   border: 1px solid var(--glass-border);
   border-radius: var(--r-sm);
@@ -43,3 +43,18 @@
   background: var(--accent) !important;
   color: #fff !important;
 }
+
+.row { display: flex; align-items: center; gap: 4px; }
+
+.caption {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--sep);
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  color: var(--t1);
+  font-size: 0.8125rem;
+  user-select: text;
+}
+
+.caption:focus { outline: none; border-color: var(--accent); }

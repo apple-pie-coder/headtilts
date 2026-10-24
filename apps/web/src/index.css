@@ -863,6 +863,24 @@ button { cursor: pointer; font-family: inherit; }
   height: auto;
 }
 
+/* Captioned images: the figure shrinks to the image and the caption wraps under it */
+.post-content figure {
+  width: fit-content;
+  max-width: 100%;
+  margin: 1rem 0;
+}
+
+.post-content figure img { display: block; margin: 0; }
+.post-content figure[style*='width'] img { width: 100%; }
+
+.post-content figcaption {
+  contain: inline-size;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: #6e6e73;
+}
+
 .post-content video,
 .post-content iframe,
 .post-content embed {
@@ -2667,6 +2685,7 @@ button { cursor: pointer; font-family: inherit; }
 [data-theme='dark'] .feed-card-cat { background: rgba(41, 151, 255, 0.2); color: #2997ff; }
 [data-theme='dark'] .feed-card-cat:hover { background: rgba(41, 151, 255, 0.3); }
 [data-theme='dark'] .feed-card-caption { color: #d1d1d6; }
+[data-theme='dark'] .post-content figcaption { color: #a1a1a6; }
 [data-theme='dark'] .feed-card-author { color: #a1a1a6; }
 [data-theme='dark'] .feed-card-sep { color: #5a5a5e; }
 [data-theme='dark'] .feed-card-date { color: #8e8e93; }

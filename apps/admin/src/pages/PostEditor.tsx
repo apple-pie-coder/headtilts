@@ -16,7 +16,7 @@ import { useToast } from '../components/ToastContext';
 import { ImageToolbar } from '../components/ImageToolbar';
 import { MediaLibraryModal } from '../components/MediaLibraryModal';
 import { useAuth } from '../hooks/useAuth';
-import { ArticleType, Category, LiveUpdate, Post, QnaSession, Review } from '../types';
+import { ArticleType, Category, LiveUpdate, Media, Post, QnaSession, Review } from '../types';
 import { PostTypeSwitch } from '../components/editor/PostTypeSwitch';
 import { EMPTY_REVIEW, ReviewPanel } from '../components/editor/ReviewPanel';
 import { EMPTY_QNA, QnaPanel } from '../components/editor/QnaPanel';
@@ -42,6 +42,8 @@ import type { LockUser } from '../services/postLocks';
 import styles from './PostEditor.module.css';
 
 const turndown = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced', hr: '---', bulletListMarker: '-' });
+// Markdown has no caption syntax, so captioned images stay as raw HTML.
+turndown.keep(['figure']);
 
 function mdToHtml(src: string): string {
   const result = marked.parse(src);
@@ -81,7 +83,7 @@ const QUILL_FORMATS = [
   'list', 'indent',
   'align',
   'blockquote', 'code-block',
-  'link', 'image', 'video',
+  'link', 'image', 'figure', 'video',
 ];
 
 // Extend the built-in image blot to preserve the `style` attribute through
@@ -112,6 +114,73 @@ class StyledImage extends QuillImageBase {
 StyledImage.blotName = 'image';
 StyledImage.tagName = 'IMG';
 Quill.register(StyledImage, true);
+
+interface CaptionedImageValue { src: string; alt?: string; caption: string }
+
+// An image with its caption shown underneath, saved as <figure><img><figcaption>.
+// The alignment/size style sits on the <figure> so the caption moves with the image.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const QuillBlockEmbed = Quill.import('blots/block/embed') as any;
+class CaptionedImage extends QuillBlockEmbed {
+  static create(value: CaptionedImageValue): HTMLElement {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const node = super.create() as HTMLElement;
+    node.setAttribute('contenteditable', 'false');
+    const img = document.createElement('img');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    img.setAttribute('src', QuillImageBase.sanitize(value.src) as string);
+    if (value.alt) img.setAttribute('alt', value.alt);
+    const caption = document.createElement('figcaption');
+    caption.textContent = value.caption;
+    node.append(img, caption);
+    return node;
+  }
+  static value(node: HTMLElement): CaptionedImageValue | null {
+    const img = node.querySelector('img');
+    const src = img?.getAttribute('src');
+    if (!img || !src) return null;
+    return { src, alt: img.getAttribute('alt') ?? undefined, caption: node.querySelector('figcaption')?.textContent?.trim() ?? '' };
+  }
+  static formats(node: HTMLElement): Record<string, string> {
+    const style = node.getAttribute('style');
+    return style ? { style } : {};
+  }
+  format(name: string, value: string | boolean) {
+    if (name === 'style') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const node = (this as any).domNode as HTMLElement;
+      if (value) node.setAttribute('style', value as string);
+      else node.removeAttribute('style');
+      return;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+    super.format(name, value);
+  }
+  // Saved HTML leaves out the editor-only contenteditable flag.
+  html(): string {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const clone = ((this as any).domNode as HTMLElement).cloneNode(true) as HTMLElement;
+    clone.removeAttribute('contenteditable');
+    return clone.outerHTML;
+  }
+}
+CaptionedImage.blotName = 'figure';
+CaptionedImage.tagName = 'FIGURE';
+Quill.register(CaptionedImage, true);
+
+// A captioned image's style and caption live on its <figure>; a plain image carries its own style.
+function imageHost(img: HTMLImageElement): HTMLElement {
+  return img.closest('figure') ?? img;
+}
+
+function readImage(imgEl: HTMLImageElement) {
+  const host = imageHost(imgEl);
+  return {
+    imgEl,
+    style: host.getAttribute('style') ?? '',
+    caption: host === imgEl ? '' : host.querySelector('figcaption')?.textContent ?? '',
+  };
+}
 
 interface ScEntry { tag: string; description: string; example: string }
 interface ScSection { category: string; shortcodes: ScEntry[] }
@@ -344,7 +413,7 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
   const [inlineMediaModalOpen, setInlineMediaModalOpen] = useState(false);
   const quillRef = useRef<ReactQuill>(null);
   const inlineInsertRange = useRef<{ index: number; length: number }>({ index: 0, length: 0 });
-  const [selectedImage, setSelectedImage] = useState<{ imgEl: HTMLImageElement; style: string } | null>(null);
+  const [selectedImage, setSelectedImage] = useState<{ imgEl: HTMLImageElement; style: string; caption: string } | null>(null);
   const [tagsInput, setTagsInput] = useState('');
   const [categoryIds, setCategoryIds] = useState<number[]>([]);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
@@ -464,11 +533,14 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
     setMediaModalOpen(false);
   }, []);
 
-  const handleInlineMediaSelect = useCallback((media: { url: string }) => {
+  const handleInlineMediaSelect = useCallback((media: Media) => {
     const quill = quillRef.current?.getEditor();
     if (quill) {
       const { index } = inlineInsertRange.current;
-      quill.insertEmbed(index, 'image', resolveMediaUrl(media.url), 'user');
+      const src = resolveMediaUrl(media.url);
+      const caption = media.caption?.trim();
+      if (caption) quill.insertEmbed(index, 'figure', { src, alt: media.altText ?? undefined, caption }, 'user');
+      else quill.insertEmbed(index, 'image', src, 'user');
       quill.setSelection(index + 1, 0, 'user');
     }
     setInlineMediaModalOpen(false);
@@ -496,9 +568,10 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
     const quill = quillRef.current?.getEditor();
     if (!quill) return;
     const handleClick = (e: MouseEvent) => {
-      if ((e.target as HTMLElement).tagName === 'IMG') {
-        const imgEl = e.target as HTMLImageElement;
-        setSelectedImage({ imgEl, style: imgEl.getAttribute('style') ?? '' });
+      const target = e.target as HTMLElement;
+      const imgEl = target.tagName === 'IMG' ? target as HTMLImageElement : target.closest('figure')?.querySelector('img');
+      if (imgEl) {
+        setSelectedImage(readImage(imgEl));
       } else {
         setSelectedImage(null);
       }
@@ -630,32 +703,52 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
     setFocusKeyword(loaded.seoMetadata?.focusKeyword ?? '');
   }
 
-  function applyImageStyle(style: string) {
+  // Re-insert the selected image with a new style/caption. A caption turns it into a
+  // captioned <figure>; clearing the caption turns it back into a plain image.
+  function updateImage(style: string, caption: string) {
     const quill = quillRef.current?.getEditor();
     if (!quill || !selectedImage) return;
+    const { imgEl } = selectedImage;
 
-    // Update style state immediately so the toolbar reflects the new state right away.
-    setSelectedImage((prev) => (prev ? { ...prev, style } : null));
+    // Update state immediately so the toolbar reflects the new state right away.
+    setSelectedImage((prev) => (prev ? { ...prev, style, caption } : null));
 
+    const host = imageHost(imgEl);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const blot = (quill.scroll as any).find(selectedImage.imgEl) as any;
+    const blot = (quill.scroll as any).find(host) as any;
     if (!blot) return;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const idx = quill.getIndex(blot);
-    const srcUrl = selectedImage.imgEl.getAttribute('src') ?? '';
+    const srcUrl = imgEl.getAttribute('src') ?? '';
+    const wasFigure = host !== imgEl;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const Delta = Quill.import('delta') as any;
     const attrs = style ? { style } : {};
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-    quill.updateContents(new Delta().retain(idx).delete(1).insert({ image: srcUrl }, attrs), 'user');
+    let delta = new Delta().retain(idx);
+    if (caption) {
+      // An image alone on its line becomes the figure outright rather than leaving an empty line behind.
+      const alone = !wasFigure && quill.getLine(idx)[0]?.length() === 2;
+      const alt = imgEl.getAttribute('alt') ?? undefined;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      delta = delta.delete(alone ? 2 : 1).insert({ figure: { src: srcUrl, alt, caption } }, attrs);
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      delta = delta.delete(1).insert({ image: srcUrl }, attrs);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      if (wasFigure) delta = delta.insert('\n');
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    quill.updateContents(delta, 'user');
 
-    // Re-find the new <img> DOM node after Quill recreates the blot.
+    // Re-find the new <img> DOM node after Quill recreates the blot, unless
+    // the user has since moved on to another image or deselected.
     requestAnimationFrame(() => {
       const newImg = Array.from(quill.root.querySelectorAll<HTMLImageElement>('img')).find(
         (img) => img.getAttribute('src') === srcUrl,
       );
-      setSelectedImage(newImg ? { imgEl: newImg, style } : null);
+      setSelectedImage((prev) => (prev?.imgEl === imgEl ? (newImg ? readImage(newImg) : null) : prev));
     });
   }
 
@@ -1828,7 +1921,9 @@ export default function PostEditorPage({ contentType = 'post' }: PostEditorPageP
         <ImageToolbar
           anchorEl={selectedImage.imgEl}
           currentStyle={selectedImage.style}
-          onStyleChange={applyImageStyle}
+          caption={selectedImage.caption}
+          onStyleChange={(style) => updateImage(style, selectedImage.caption)}
+          onCaptionChange={(caption) => updateImage(selectedImage.style, caption)}
         />
       )}
 
